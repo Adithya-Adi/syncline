@@ -48,3 +48,10 @@ Thumbs.db
 .nx/polygraph
 .nx/self-healing
 .nx/migrate-runs
+# env
+.env
+.env.*
+!.env.example
+
+# local blob storage
+.data

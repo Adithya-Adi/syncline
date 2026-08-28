@@ -1,12 +1,26 @@
 {
-  "name": "@org/source",
+  "name": "syncline",
   "version": "0.0.0",
-  "license": "MIT",
-  "scripts": {},
+  "description": "Every layer of your stack, folded onto one timeline.",
+  "license": "AGPL-3.0-only",
   "private": true,
-  "dependencies": {},
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "dev": "nx run-many -t dev serve --parallel=3",
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "typecheck": "nx run-many -t typecheck",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
   "devDependencies": {
+    "@nx/esbuild": "23.1.1",
+    "@nx/jest": "23.1.1",
     "@nx/js": "23.1.1",
+    "@nx/nest": "23.1.1",
+    "@nx/next": "23.1.1",
+    "@nx/node": "23.1.1",
+    "@nx/webpack": "23.1.1",
     "@swc-node/register": "1.11.1",
     "@swc/core": "1.15.8",
     "@swc/helpers": "0.5.18",
@@ -15,8 +29,5 @@
     "prettier": "^3.8.1",
     "tslib": "^2.3.0",
     "typescript": "~6.0.3"
-  },
-  "workspaces": [
-    "packages/*"
-  ]
+  }
 }
