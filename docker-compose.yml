@@ -1,0 +1,73 @@
+# Local development infrastructure. Not a production topology — no persistence guarantees, no
+# auth hardening, credentials in plaintext on purpose so `pnpm infra:up` needs no setup.
+#
+# Production runs managed Postgres, managed Redis, and real S3-compatible storage.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: syncline-postgres
+    environment:
+      POSTGRES_USER: syncline
+      POSTGRES_PASSWORD: syncline
+      POSTGRES_DB: syncline
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Without -d it checks the `syncline` *database named after the user*, which is not the one
+      # we create, and reports healthy before the real database exists.
+      test: ['CMD-SHELL', 'pg_isready -U syncline -d syncline']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    container_name: syncline-redis
+    ports:
+      - '6379:6379'
+    # BullMQ requires this: it uses blocking reads and must never have keys evicted underneath it.
+    command: redis-server --maxmemory-policy noeviction --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: syncline-minio
+    environment:
+      MINIO_ROOT_USER: syncline
+      MINIO_ROOT_PASSWORD: syncline-dev-secret
+    ports:
+      - '9000:9000' # S3 API
+      - '9001:9001' # console at http://localhost:9001
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+  # Creates the bucket once and exits. `pnpm infra:up` is then enough to have working storage.
+  minio-init:
+    image: minio/mc:latest
+    container_name: syncline-minio-init
+    depends_on:
+      - minio
+    # Retries rather than waiting on a healthcheck: the minio image's tooling varies between
+    # releases, and a healthcheck that never passes would wedge this container silently.
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 syncline syncline-dev-secret 2>/dev/null;
+      do echo 'waiting for minio'; sleep 1; done &&
+      mc mb --ignore-existing local/syncline &&
+      echo 'bucket ready'
+      "
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:

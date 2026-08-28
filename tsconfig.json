@@ -5,6 +5,9 @@
   "references": [
     {
       "path": "./packages/protocol"
+    },
+    {
+      "path": "./packages/models"
     }
   ],
   "compilerOptions": {}

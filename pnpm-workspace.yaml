@@ -6,7 +6,12 @@ packages:
 # (prisma, esbuild) — `pnpm approve-builds` writes them for you.
 allowBuilds:
   '@parcel/watcher': true
+  '@prisma/engines': true
   '@swc/core': true
+  esbuild: true
   less: true
+  msgpackr-extract: set this to true or false
   nx: true
+  prisma: true
   unrs-resolver: true
+  workerd: set this to true or false

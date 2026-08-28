@@ -11,7 +11,14 @@
     "test": "nx run-many -t test",
     "typecheck": "nx run-many -t typecheck",
     "infra:up": "docker compose up -d",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "infra:logs": "docker compose logs -f"
   },
   "devDependencies": {
     "@nx/esbuild": "23.1.1",
@@ -28,8 +35,10 @@
     "@swc/helpers": "0.5.18",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "~4.1.0",
+    "dotenv": "^17.4.2",
     "nx": "23.1.1",
     "prettier": "^3.8.1",
+    "prisma": "7.10.0",
     "tslib": "^2.3.0",
     "typescript": "~6.0.3",
     "vite": "^8.0.0",

@@ -1,0 +1,120 @@
+// Syncline data model. See docs/ARCHITECTURE.md §6 for the reasoning behind the shape.
+//
+// Two rules this schema exists to enforce:
+//   1. rrweb blobs never land in Postgres. A five-minute session is tens of megabytes of DOM
+//      mutations. Postgres holds the index; object storage holds the film.
+//   2. Spans are reached through the SpanStore port, never through this client directly. They are
+//      the one table with unbounded write volume and the one destined for ClickHouse.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  /// pk_* — ships in browser bundles. Public by construction: write-only and origin-gated.
+  publicKey String   @unique
+  /// sk_* — server-side only.
+  secretKey String   @unique
+  /// Origins allowed to send chunks, and the only ones the SDK injects traceparent into.
+  origins   String[]
+  createdAt DateTime @default(now())
+
+  sessions Session[]
+}
+
+model Session {
+  id        String  @id
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId    String?
+  release   String?
+  userAgent String?
+  url       String?
+  viewport  Json?
+
+  /// serverMs - clientMs, from the NTP-style handshake in §3.5. Drawing only, never attribution.
+  clockOffsetMs Int @default(0)
+  rttMs         Int @default(0)
+
+  startedAt  DateTime
+  endedAt    DateTime?
+  durationMs Int?
+  meta       Json?
+
+  chunks SessionChunk[]
+  links  RequestLink[]
+
+  /// The session list: newest first, per project.
+  @@index([projectId, startedAt(sort: Desc)])
+}
+
+model SessionChunk {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  seq        Int
+  startedAt  DateTime
+  endedAt    DateTime
+  eventCount Int
+  sizeBytes  Int
+  /// sessions/{projectId}/{sessionId}/{seq}.json.gz
+  storageKey String
+
+  /// Makes a redelivered job an upsert instead of a duplicate.
+  @@unique([sessionId, seq])
+}
+
+model RequestLink {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  traceId String
+  spanId  String
+  method  String
+  url     String
+  status  Int?
+
+  clientStartMs BigInt
+  clientEndMs   BigInt
+
+  /// Draw the network lane in order.
+  @@index([sessionId, clientStartMs])
+  /// The reverse lookup: given a trace id from an alert, which replay shows it?
+  @@index([traceId])
+}
+
+model Span {
+  traceId      String
+  spanId       String
+  parentSpanId String?
+
+  name        String
+  kind        String
+  serviceName String
+
+  /// OpenTelemetry is nanoseconds since epoch, which overflows Int.
+  startNs    BigInt
+  endNs      BigInt
+  durationNs BigInt
+
+  statusCode String?
+  statusMsg  String?
+  /// db.system, db.statement, http.*, and whatever else the customer's instrumentation emits.
+  attributes Json
+
+  @@id([traceId, spanId])
+  /// Fetch a whole trace, already ordered.
+  @@index([traceId, startNs])
+  @@index([serviceName, startNs])
+}
