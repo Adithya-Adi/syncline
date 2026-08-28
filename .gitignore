@@ -55,3 +55,5 @@ Thumbs.db
 
 # local blob storage
 .data
+
+vitest.config.*.timestamp*

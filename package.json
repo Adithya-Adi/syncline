@@ -20,14 +20,19 @@
     "@nx/nest": "23.1.1",
     "@nx/next": "23.1.1",
     "@nx/node": "23.1.1",
+    "@nx/vite": "23.1.1",
+    "@nx/vitest": "23.1.1",
     "@nx/webpack": "23.1.1",
     "@swc-node/register": "1.11.1",
     "@swc/core": "1.15.8",
     "@swc/helpers": "0.5.18",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "~4.1.0",
     "nx": "23.1.1",
     "prettier": "^3.8.1",
     "tslib": "^2.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vite": "^8.0.0",
+    "vitest": "~4.1.0"
   }
 }
