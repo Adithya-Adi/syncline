@@ -8,6 +8,9 @@
     },
     {
       "path": "./packages/models"
+    },
+    {
+      "path": "./apps/api"
     }
   ],
   "compilerOptions": {}

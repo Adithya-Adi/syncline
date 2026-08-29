@@ -6,7 +6,7 @@ CREATE TABLE "Project" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "publicKey" TEXT NOT NULL,
-    "secretKey" TEXT NOT NULL,
+    "secretKeyHash" TEXT NOT NULL,
     "origins" TEXT[],
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -83,7 +83,7 @@ CREATE TABLE "Span" (
 CREATE UNIQUE INDEX "Project_publicKey_key" ON "Project"("publicKey");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Project_secretKey_key" ON "Project"("secretKey");
+CREATE UNIQUE INDEX "Project_secretKeyHash_key" ON "Project"("secretKeyHash");
 
 -- CreateIndex
 CREATE INDEX "Session_projectId_startedAt_idx" ON "Session"("projectId", "startedAt" DESC);

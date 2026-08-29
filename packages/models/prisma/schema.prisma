@@ -19,10 +19,12 @@ datasource db {
 model Project {
   id        String   @id @default(cuid())
   name      String
-  /// pk_* — ships in browser bundles. Public by construction: write-only and origin-gated.
-  publicKey String   @unique
-  /// sk_* — server-side only.
-  secretKey String   @unique
+  /// pk_* — ships in browser bundles. Public by construction: write-only and origin-gated,
+  /// so it is stored as-is: there is nothing to protect.
+  publicKey     String   @unique
+  /// sha256 of the sk_* key, never the key itself. Lookup is by hash, which doubles as the
+  /// comparison — a database dump does not hand over working credentials.
+  secretKeyHash String   @unique
   /// Origins allowed to send chunks, and the only ones the SDK injects traceparent into.
   origins   String[]
   createdAt DateTime @default(now())

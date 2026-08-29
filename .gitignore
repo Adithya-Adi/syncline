@@ -60,3 +60,5 @@ vitest.config.*.timestamp*
 
 # prisma generates ~10k lines of TypeScript; `pnpm db:generate` recreates it
 packages/models/src/generated/
+
+test-output
