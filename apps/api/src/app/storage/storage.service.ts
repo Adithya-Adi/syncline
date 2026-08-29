@@ -1,35 +1,28 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import {
-  CreateBucketCommand,
-  HeadBucketCommand,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { ObjectStore, type PutOptions } from '@syncline/storage';
 import { CONFIG, type AppConfig } from '../config/config.js';
 
 /**
- * Object storage for raw ingest bodies.
+ * Object storage for raw ingest bodies, as a Nest provider.
  *
- * Postgres stores the index; this stores the film. A five-minute session is tens of megabytes of
- * DOM mutations, which has no business in a relational database.
+ * The client itself lives in @syncline/storage because apps/worker reads back exactly what this
+ * writes. Sharing one implementation is what keeps the two from drifting on bucket, credentials
+ * or addressing style — a mismatch there shows up as "the object is not there" at the far end of a
+ * queue, which is a miserable thing to trace back.
  */
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private readonly client: S3Client;
-  private readonly bucket: string;
+  private readonly store: ObjectStore;
 
   constructor(@Inject(CONFIG) config: AppConfig) {
-    this.bucket = config.S3_BUCKET;
-    this.client = new S3Client({
+    this.store = new ObjectStore({
       endpoint: config.S3_ENDPOINT,
       region: config.S3_REGION,
-      // MinIO addresses buckets by path; most cloud providers use virtual-host style.
+      bucket: config.S3_BUCKET,
+      accessKeyId: config.S3_ACCESS_KEY_ID,
+      secretAccessKey: config.S3_SECRET_ACCESS_KEY,
       forcePathStyle: config.S3_FORCE_PATH_STYLE,
-      credentials: {
-        accessKeyId: config.S3_ACCESS_KEY_ID,
-        secretAccessKey: config.S3_SECRET_ACCESS_KEY,
-      },
     });
   }
 
@@ -40,33 +33,11 @@ export class StorageService implements OnModuleInit {
    * cost of finding out here is one round trip at startup.
    */
   async onModuleInit(): Promise<void> {
-    try {
-      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
-      this.logger.log(`bucket "${this.bucket}" ready`);
-    } catch (error) {
-      const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
-        ?.httpStatusCode;
-      if (status !== 404) throw error;
-
-      await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
-      this.logger.log(`bucket "${this.bucket}" created`);
-    }
+    const state = await this.store.ensureBucket();
+    this.logger.log(`bucket "${this.store.bucket}" ${state}`);
   }
 
-  async put(
-    key: string,
-    body: Buffer,
-    options: { contentType?: string; contentEncoding?: string } = {}
-  ): Promise<void> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: body,
-        ContentLength: body.byteLength,
-        ...(options.contentType ? { ContentType: options.contentType } : {}),
-        ...(options.contentEncoding ? { ContentEncoding: options.contentEncoding } : {}),
-      })
-    );
+  async put(key: string, body: Buffer, options: PutOptions = {}): Promise<void> {
+    await this.store.put(key, body, options);
   }
 }
