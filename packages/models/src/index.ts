@@ -1,5 +1,6 @@
 export * from './lib/client.js';
 export * from './lib/span-store.js';
+export * from './lib/keys.js';
 
 // Prisma's generated row types, re-exported under plain names so nothing else in the workspace
 // reaches into src/generated. Prisma 7 suffixes these with `Model`.

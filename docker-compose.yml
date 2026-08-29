@@ -12,7 +12,9 @@ services:
       POSTGRES_PASSWORD: syncline
       POSTGRES_DB: syncline
     ports:
-      - '5432:5432'
+      # 5442, not 5432: a machine with a native Postgres already owns the standard port, and on
+      # Windows both can bind it — host connections then silently reach the wrong server.
+      - '5442:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +29,8 @@ services:
     image: redis:8-alpine
     container_name: syncline-redis
     ports:
-      - '6379:6379'
+      # Likewise for a native Redis.
+      - '6399:6379'
     # BullMQ requires this: it uses blocking reads and must never have keys evicted underneath it.
     command: redis-server --maxmemory-policy noeviction --appendonly yes
     volumes:
