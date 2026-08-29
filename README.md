@@ -1,4 +1,6 @@
-<h1 align="center">Syncline</h1>
+
+
+The landing page is at , and a recording at .<h1 align="center">Syncline</h1>
 
 <p align="center"><strong>Every layer of your stack, folded onto one timeline.</strong></p>
 
@@ -48,9 +50,9 @@ Two design notes worth calling out:
 Pre-alpha. Nothing is installable yet. Building in the open, milestone by milestone:
 
 - [x] **M0** — repo, architecture, scaffold
-- [ ] **M1** — browser SDK captures, viewer replays
-- [ ] **M2** — OTLP ingest, trace stitching, synced backend lane
-- [ ] **M3** — database lane, clock-skew correction, demo app
+- [x] **M1** — browser SDK captures, chunks land in Postgres
+- [x] **M2** — OTLP ingest, trace stitching, the read API, the viewer
+- [ ] **M3** — demo recording, clock-skew band against real latency, README gif
 
 ## Architecture
 

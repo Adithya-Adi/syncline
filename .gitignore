@@ -62,3 +62,7 @@ vitest.config.*.timestamp*
 packages/models/src/generated/
 
 test-output
+
+# Next.js
+.next
+out
