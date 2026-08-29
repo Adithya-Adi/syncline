@@ -11,6 +11,15 @@
     },
     {
       "path": "./apps/api"
+    },
+    {
+      "path": "./packages/otlp"
+    },
+    {
+      "path": "./packages/storage"
+    },
+    {
+      "path": "./apps/worker"
     }
   ],
   "compilerOptions": {}

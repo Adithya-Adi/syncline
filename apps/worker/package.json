@@ -1,5 +1,5 @@
 {
-  "name": "api",
+  "name": "worker",
   "version": "0.0.1",
   "private": true,
   "nx": {
@@ -11,7 +11,7 @@
           "env": {
             "NODE_ENV": "production"
           },
-          "cwd": "apps/api"
+          "cwd": "apps/worker"
         },
         "configurations": {
           "development": {
@@ -28,8 +28,8 @@
         "cache": true,
         "executor": "@nx/js:prune-lockfile",
         "outputs": [
-          "{workspaceRoot}/apps/api/dist/package.json",
-          "{workspaceRoot}/apps/api/dist/pnpm-lock.yaml"
+          "{workspaceRoot}/apps/worker/dist/package.json",
+          "{workspaceRoot}/apps/worker/dist/pnpm-lock.yaml"
         ],
         "options": {
           "buildTarget": "build"
@@ -41,7 +41,7 @@
         ],
         "cache": true,
         "outputs": [
-          "{workspaceRoot}/apps/api/dist/workspace_modules"
+          "{workspaceRoot}/apps/worker/dist/workspace_modules"
         ],
         "executor": "@nx/js:copy-workspace-modules",
         "options": {
@@ -63,15 +63,15 @@
           "build"
         ],
         "options": {
-          "buildTarget": "api:build",
+          "buildTarget": "worker:build",
           "runBuildTargetDependencies": false
         },
         "configurations": {
           "development": {
-            "buildTarget": "api:build:development"
+            "buildTarget": "worker:build:development"
           },
           "production": {
-            "buildTarget": "api:build:production"
+            "buildTarget": "worker:build:production"
           }
         }
       },
@@ -83,11 +83,11 @@
     }
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1120.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@syncline/models": "workspace:*",
+    "@syncline/otlp": "workspace:*",
     "@syncline/protocol": "workspace:*",
     "@syncline/storage": "workspace:*",
     "bullmq": "^6.3.1",
@@ -96,7 +96,6 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
     "tslib": "^2.3.0",
-    "ulid": "^3.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

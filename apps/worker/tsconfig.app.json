@@ -31,6 +31,9 @@
       "path": "../../packages/protocol/tsconfig.lib.json"
     },
     {
+      "path": "../../packages/otlp/tsconfig.lib.json"
+    },
+    {
       "path": "../../packages/models/tsconfig.lib.json"
     }
   ]
