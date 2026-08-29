@@ -102,8 +102,23 @@ Nx monorepo, pnpm, TypeScript.
 ```sh
 pnpm install
 pnpm infra:up      # postgres, redis, minio
-pnpm dev
+pnpm db:migrate
+pnpm db:seed       # prints the project's pk_ / sk_ keys
 ```
+
+Then run the three processes:
+
+```sh
+node apps/api/dist/main.js       # :4000
+node apps/worker/dist/main.js
+pnpm nx dev web                  # :3000
+```
+
+The landing page is at `/`; a recording is at `/s/<sessionId>`.
+
+Ports 5442 and 6399 are deliberate — if you already run Postgres or Redis
+natively, the standard ports are taken, and a host connection can reach your own
+server instead of the container with nothing to tell you so.
 
 ## License
 
