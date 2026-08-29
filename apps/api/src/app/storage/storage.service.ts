@@ -40,4 +40,9 @@ export class StorageService implements OnModuleInit {
   async put(key: string, body: Buffer, options: PutOptions = {}): Promise<void> {
     await this.store.put(key, body, options);
   }
+
+  /** Returns the stored bytes untouched, still compressed if that is how they arrived. */
+  async get(key: string): Promise<Buffer> {
+    return this.store.get(key);
+  }
 }
