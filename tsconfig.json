@@ -23,6 +23,9 @@
     },
     {
       "path": "./packages/browser-sdk"
+    },
+    {
+      "path": "./apps/web"
     }
   ],
   "compilerOptions": {}

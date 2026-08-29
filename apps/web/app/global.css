@@ -1,0 +1,549 @@
+/*
+ * Syncline visual language.
+ *
+ * A syncline is a geological fold — rock strata dipping toward one shared axis. The viewer takes
+ * that literally: the lanes are strata, and the playhead is a core sample cut down through them,
+ * showing what is true at one instant in every layer at once.
+ *
+ * Stratum colors come from the ICS geologic time scale rather than a generic dark-theme ramp, and
+ * they read as depth: surface water, mid rock, deep rock. Permian red is reserved for exactly one
+ * meaning — an error — and appears nowhere else.
+ */
+
+:root {
+  --rock-900: #0b1017;
+  --rock-850: #0f1620;
+  --rock-800: #141c27;
+  --rock-700: #1c2634;
+  --rock-600: #273343;
+  --rock-500: #3a4859;
+
+  --bone-100: #e8ecf1;
+  --bone-300: #9fadbe;
+  --bone-500: #6b7a8d;
+
+  /* Strata, shallow to deep. */
+  --stratum-network: #4ec3d9;
+  --stratum-backend: #e8a33d;
+  --stratum-database: #a16ae8;
+
+  /* Permian red. Errors only. */
+  --fault: #f04028;
+
+  --display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --rule: 1px solid var(--rock-700);
+  --radius: 3px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--rock-900);
+  color: var(--bone-100);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--stratum-network);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------- shared */
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+.rule {
+  border: 0;
+  border-top: var(--rule);
+  margin: 0;
+}
+
+/* ------------------------------------------------------------- marketing */
+
+.landing {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 96px 32px 128px;
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.landing__lede {
+  font-family: var(--display);
+  font-size: clamp(30px, 5.5vw, 52px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin: 56px 0 0;
+  max-width: 15ch;
+}
+
+.landing__lede em {
+  font-style: normal;
+  color: var(--stratum-backend);
+}
+
+.landing__sub {
+  color: var(--bone-300);
+  max-width: 62ch;
+  margin: 24px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/*
+ * The hero is the product's own idea at small scale: three strata, one axis through them. Static
+ * and honest — an animation here would be decoration, and the diagram is the argument.
+ */
+.fold {
+  margin: 56px 0 0;
+  border: var(--rule);
+  border-radius: var(--radius);
+  background: var(--rock-850);
+  padding: 22px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.fold__row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  align-items: center;
+  gap: 16px;
+  height: 30px;
+}
+
+.fold__label {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+.fold__track {
+  position: relative;
+  height: 100%;
+}
+
+.fold__bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 9px;
+  border-radius: 1px;
+  opacity: 0.85;
+}
+
+.fold__axis {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: calc(88px + 16px + 38%);
+  width: 9px;
+  margin-left: -4px;
+  background: linear-gradient(
+    180deg,
+    rgba(232, 236, 241, 0.02),
+    rgba(232, 236, 241, 0.1) 12%,
+    rgba(232, 236, 241, 0.1) 88%,
+    rgba(232, 236, 241, 0.02)
+  );
+  border-left: 1px solid rgba(232, 236, 241, 0.45);
+  border-right: 1px solid rgba(232, 236, 241, 0.12);
+  pointer-events: none;
+}
+
+.landing__meta {
+  margin: 56px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  color: var(--bone-500);
+  font-size: 12px;
+}
+
+.landing__meta strong {
+  color: var(--bone-300);
+  font-weight: 400;
+}
+
+.landing__section {
+  margin: 64px 0 0;
+}
+
+.landing__h2 {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+}
+
+.landing__body {
+  color: var(--bone-300);
+  line-height: 1.7;
+  font-size: 13px;
+  max-width: 70ch;
+  margin: 0 0 12px;
+}
+
+.snippet {
+  border: var(--rule);
+  border-radius: var(--radius);
+  background: var(--rock-850);
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--bone-300);
+  margin: 0;
+}
+
+.snippet .k {
+  color: var(--stratum-network);
+}
+
+.snippet .s {
+  color: var(--stratum-backend);
+}
+
+.snippet .c {
+  color: var(--bone-500);
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--bone-300);
+}
+
+.status__row {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.5);
+}
+
+.status__mark {
+  color: var(--bone-500);
+}
+
+.status__mark--done {
+  color: var(--stratum-network);
+}
+
+.landing__foot {
+  margin: 72px 0 0;
+  padding-top: 20px;
+  border-top: var(--rule);
+  color: var(--bone-500);
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- viewer */
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.railbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 16px;
+  height: 44px;
+  border-bottom: var(--rule);
+  background: var(--rock-850);
+  flex-wrap: wrap;
+}
+
+.railbar__field {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.railbar__key {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+.railbar__value {
+  color: var(--bone-100);
+}
+
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--rock-900);
+  min-height: 320px;
+  overflow: auto;
+}
+
+.stage__frame {
+  border: var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fff;
+}
+
+.strata {
+  border-top: var(--rule);
+  background: var(--rock-850);
+  user-select: none;
+}
+
+.strata__ruler {
+  height: 22px;
+  position: relative;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.6);
+}
+
+.strata__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--rock-600);
+  padding-left: 5px;
+  font-size: 9.5px;
+  line-height: 22px;
+  color: var(--bone-500);
+  white-space: nowrap;
+}
+
+.strata__lanes {
+  position: relative;
+  cursor: crosshair;
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.45);
+  height: 34px;
+}
+
+.lane__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  font-family: var(--display);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+  border-right: var(--rule);
+}
+
+.lane__swatch {
+  width: 3px;
+  height: 13px;
+  border-radius: 1px;
+}
+
+/* Stratification: hairlines that read as bedding planes and help place a bar vertically. */
+.lane__track {
+  position: relative;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(232, 236, 241, 0.028) 0px,
+    rgba(232, 236, 241, 0.028) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+}
+
+.bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 13px;
+  min-width: 2px;
+  border-radius: 1px;
+  opacity: 0.62;
+  transition: opacity 120ms ease;
+}
+
+.bar--live {
+  opacity: 1;
+}
+
+.bar--error {
+  background: var(--fault) !important;
+}
+
+.bar:hover {
+  opacity: 1;
+}
+
+.bar__caption {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--rock-900);
+  white-space: nowrap;
+  pointer-events: none;
+  overflow: hidden;
+  max-width: calc(100% - 10px);
+}
+
+/*
+ * The core sample. Not a hairline — a narrow column cut through every stratum, which is what makes
+ * "all layers at this instant" a thing you can see rather than infer.
+ */
+.core {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  margin-left: -4px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(232, 236, 241, 0.03),
+    rgba(232, 236, 241, 0.11) 10%,
+    rgba(232, 236, 241, 0.11) 90%,
+    rgba(232, 236, 241, 0.03)
+  );
+  border-left: 1px solid rgba(232, 236, 241, 0.6);
+  border-right: 1px solid rgba(232, 236, 241, 0.14);
+  z-index: 3;
+}
+
+.core__readout {
+  position: absolute;
+  top: -19px;
+  left: -1px;
+  background: var(--bone-100);
+  color: var(--rock-900);
+  font-size: 9.5px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 1px;
+  white-space: nowrap;
+}
+
+.uncertainty {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(232, 236, 241, 0.05);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.detail {
+  border-top: var(--rule);
+  background: var(--rock-800);
+  padding: 12px 16px;
+  min-height: 92px;
+  font-size: 12px;
+}
+
+.detail__head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.detail__name {
+  color: var(--bone-100);
+  font-size: 13px;
+}
+
+.detail__attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2px 24px;
+  color: var(--bone-300);
+}
+
+.detail__attr {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.detail__attr dt {
+  color: var(--bone-500);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.detail__attr dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--bone-500);
+}
+
+.notice code {
+  color: var(--bone-300);
+}
