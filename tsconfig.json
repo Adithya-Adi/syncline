@@ -20,6 +20,9 @@
     },
     {
       "path": "./apps/worker"
+    },
+    {
+      "path": "./packages/browser-sdk"
     }
   ],
   "compilerOptions": {}
