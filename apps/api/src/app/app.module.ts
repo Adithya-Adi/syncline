@@ -10,9 +10,16 @@ import { IngestController } from './ingest/ingest.controller.js';
 import { StorageService } from './storage/storage.service.js';
 import { QueueService } from './queue/queue.service.js';
 import { HealthController } from './health/health.controller.js';
+import { ReadController } from './read/read.controller.js';
 
 @Module({
-  controllers: [ClockController, HealthController, ProjectController, IngestController],
+  controllers: [
+    ClockController,
+    HealthController,
+    ProjectController,
+    IngestController,
+    ReadController,
+  ],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig() },
     PrismaService,
