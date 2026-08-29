@@ -179,7 +179,7 @@ sequenceDiagram
 Two keys per project. `pk_*` is public, ships in browser bundles, is write-only and origin-locked.
 `sk_*` is secret and server-side. Neither can read.
 
-### `POST /v1/ingest/session`
+### `POST /v1/ingest/session/:sessionId/:seq`
 
 ```
 Content-Type:     application/json
@@ -187,6 +187,11 @@ Content-Encoding: gzip
 x-syncline-key:   pk_live_...
 Origin:           https://app.acme.com     (must match project allowlist)
 ```
+
+**Why the id and sequence are in the URL.** The storage key is built from them, and reading them
+out of the body would mean parsing the payload this endpoint exists not to parse. In the path they
+also make object keys meaningful, give the queue a natural job id for deduplication, and appear in
+access logs. The body carries them too; the worker checks that the two agree.
 
 ```jsonc
 {
@@ -226,6 +231,11 @@ Transport: flush every 5 s or 64 KB, whichever comes first; `navigator.sendBeaco
 
 Standard OTLP/HTTP with a JSON payload — `ResourceSpans` as emitted by any OTel SDK or collector.
 Auth via `x-syncline-key: sk_*`. Protobuf encoding is a later addition; JSON keeps M2 small.
+
+The route is also served at `/v1/ingest/v1/traces`. An OTel exporter appends `/v1/traces` to
+`OTEL_EXPORTER_OTLP_ENDPOINT` but uses `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` verbatim, so accepting
+both means either variable works. The failure it prevents is a 404 swallowed inside a batch
+exporter, which surfaces as "no traces" with nothing in the logs.
 
 ### `GET /v1/clock`
 
