@@ -41,3 +41,8 @@ jobs:
       # target no project defines makes the failure look like a broken pipeline rather than an
       # absent one.
       - run: pnpm exec nx run-many -t typecheck build test
+        env:
+          # Build-time only, and deliberately not a real secret. Better Auth logs a warning when
+          # the secret is unset, which is noise in a job that never signs anyone in; the running
+          # app reads the real value from its own environment.
+          BETTER_AUTH_SECRET: ci-build-only-not-a-real-secret
