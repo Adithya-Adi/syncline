@@ -131,20 +131,34 @@ export function SetupProgress({
       </CardHeader>
 
       <CardContent>
-        <ol className="space-y-4">
+        <ol className="relative space-y-4">
+          {/*
+           * A rail behind the marks, so three rungs read as one ladder rather than three unrelated
+           * checks. It stops short at both ends to avoid poking out past the first and last mark.
+           */}
+          <span
+            aria-hidden="true"
+            className="absolute top-4 bottom-4 left-[7px] w-px bg-border"
+          />
           {rungs(status).map((rung) => (
-            <li key={rung.label} className="flex gap-3">
+            <li key={rung.label} className="relative flex gap-3">
               {rung.done ? (
-                <CircleCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+                <CircleCheck className="mt-0.5 size-4 shrink-0 bg-card text-primary" />
               ) : (
-                <Circle
-                  className={cn(
-                    'mt-0.5 size-4 shrink-0',
-                    rung.blocked
-                      ? 'text-muted-foreground/40'
-                      : 'text-muted-foreground',
+                <span className="relative mt-0.5 size-4 shrink-0 bg-card">
+                  <Circle
+                    className={cn(
+                      'size-4',
+                      rung.blocked
+                        ? 'text-muted-foreground/40'
+                        : 'text-muted-foreground',
+                    )}
+                  />
+                  {/* The one rung actually being waited on says so without another spinner. */}
+                  {!rung.blocked && (
+                    <span className="bg-network absolute inset-1 animate-ping rounded-full opacity-60" />
                   )}
-                />
+                </span>
               )}
               <div className="space-y-1">
                 <p

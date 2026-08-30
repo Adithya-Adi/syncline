@@ -1,11 +1,13 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /*
- * shadcn/ui theme — new-york, zinc base, dark by default.
+ * The token layer. Everything visual in the app resolves here — including global.css, which now
+ * declares no color of its own and only aliases these.
  *
- * The app is a debugging tool people keep open for long stretches, so dark is the default rather
- * than a toggle. Light values are kept anyway: they cost nothing and make the toggle a one-line
- * change if it is ever wanted.
+ * The app is a debugging tool people keep open for long stretches, so dark is the default. Light
+ * is a real theme rather than a courtesy: the strata keep their hue across both, because those
+ * three colors are how you read depth in the viewer and a theme change must not restate them.
  */
 
 @custom-variant dark (&:is(.dark *));
@@ -13,79 +15,106 @@
 :root {
   --radius: 0.5rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  /* One easing curve for the whole product. */
+  --ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+
+  color-scheme: light;
+
+  --background: oklch(0.995 0.001 286);
+  --foreground: oklch(0.161 0.008 264);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.161 0.008 264);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
+  --popover-foreground: oklch(0.161 0.008 264);
   --primary: oklch(0.21 0.006 285.885);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  --muted: oklch(0.972 0.002 286);
+  --muted-foreground: oklch(0.502 0.014 274);
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
+  --destructive: oklch(0.545 0.213 27.2);
+  --border: oklch(0.905 0.005 275);
+  --input: oklch(0.905 0.005 275);
+  --ring: oklch(0.66 0.098 217);
 
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /*
+   * Strata, shallow to deep — surface water, mid rock, deep rock. Same three hues in both themes;
+   * only the lightness moves, so a bar that is "the database one" stays recognisably so.
+   */
+  --stratum-network: oklch(0.62 0.107 218);
+  --stratum-backend: oklch(0.63 0.132 68);
+  --stratum-database: oklch(0.53 0.203 300);
+
+  /* Permian red. Errors only. */
+  --fault: oklch(0.545 0.213 27.2);
+
+  /* Landing decoration. Used in the hero and the auth brand panel, nowhere else. */
+  --grid-line: oklch(0.161 0.008 264 / 6%);
+  --glow: oklch(0.62 0.107 218 / 12%);
+
+  --chart-1: var(--stratum-network);
+  --chart-2: var(--stratum-backend);
+  --chart-3: var(--stratum-database);
+  --chart-4: var(--fault);
+  --chart-5: oklch(0.488 0.243 264.376);
 
   --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
+  --sidebar-foreground: oklch(0.161 0.008 264);
   --sidebar-primary: oklch(0.21 0.006 285.885);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --sidebar-border: oklch(0.905 0.005 275);
+  --sidebar-ring: oklch(0.66 0.098 217);
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
+  color-scheme: dark;
 
-  /*
-   * The timeline lanes read as depth: surface, middle, deep. They are chart tokens rather than
-   * bespoke values so the palette stays one system, and so a theme change moves them too.
-   */
-  --chart-1: oklch(0.696 0.17 162.48);
-  --chart-2: oklch(0.769 0.188 70.08);
-  --chart-3: oklch(0.627 0.265 303.9);
-  --chart-4: oklch(0.645 0.246 16.439);
+  --background: oklch(0.164 0.014 258);
+  --foreground: oklch(0.936 0.007 254);
+  --card: oklch(0.196 0.016 258);
+  --card-foreground: oklch(0.936 0.007 254);
+  --popover: oklch(0.196 0.016 258);
+  --popover-foreground: oklch(0.936 0.007 254);
+  --primary: oklch(0.936 0.007 254);
+  --primary-foreground: oklch(0.196 0.016 258);
+  --secondary: oklch(0.246 0.018 257);
+  --secondary-foreground: oklch(0.936 0.007 254);
+  --muted: oklch(0.222 0.017 258);
+  --muted-foreground: oklch(0.678 0.021 257);
+  --accent: oklch(0.246 0.018 257);
+  --accent-foreground: oklch(0.936 0.007 254);
+  --destructive: oklch(0.637 0.219 29.5);
+  --border: oklch(0.936 0.007 254 / 12%);
+  --input: oklch(0.936 0.007 254 / 16%);
+  --ring: oklch(0.762 0.093 214);
+
+  --stratum-network: oklch(0.762 0.093 214);
+  --stratum-backend: oklch(0.775 0.133 71);
+  --stratum-database: oklch(0.66 0.176 297);
+
+  --fault: oklch(0.637 0.219 29.5);
+
+  --grid-line: oklch(0.936 0.007 254 / 6%);
+  --glow: oklch(0.762 0.093 214 / 14%);
+
+  --chart-1: var(--stratum-network);
+  --chart-2: var(--stratum-backend);
+  --chart-3: var(--stratum-database);
+  --chart-4: var(--fault);
   --chart-5: oklch(0.488 0.243 264.376);
 
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --sidebar: oklch(0.196 0.016 258);
+  --sidebar-foreground: oklch(0.936 0.007 254);
+  --sidebar-primary: oklch(0.762 0.093 214);
+  --sidebar-primary-foreground: oklch(0.164 0.014 258);
+  --sidebar-accent: oklch(0.246 0.018 257);
+  --sidebar-accent-foreground: oklch(0.936 0.007 254);
+  --sidebar-border: oklch(0.936 0.007 254 / 12%);
+  --sidebar-ring: oklch(0.762 0.093 214);
 }
 
 @theme inline {
@@ -108,6 +137,11 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --color-network: var(--stratum-network);
+  --color-backend: var(--stratum-backend);
+  --color-database: var(--stratum-database);
+  --color-fault: var(--fault);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -124,7 +158,10 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-space-grotesk);
+  --font-mono: var(--font-plex-mono);
+
+  --ease-brand: var(--ease);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -140,4 +177,21 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /*
+   * Display type is set tight and small on purpose. The diagram carries the page; a heading that
+   * competes with it just makes both quieter.
+   */
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.035em;
+    line-height: 1.06;
+  }
+}
+
+@utility grid-backdrop {
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
 }

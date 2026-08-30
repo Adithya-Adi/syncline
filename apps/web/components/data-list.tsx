@@ -40,7 +40,7 @@ export function DataListHeader({
 }) {
   return (
     <div
-      className="grid items-center gap-4 border-b bg-muted/30 px-4 py-2.5 text-xs font-medium text-muted-foreground"
+      className="sticky top-14 z-10 grid items-center gap-4 border-b bg-muted/40 px-4 py-2.5 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase backdrop-blur"
       style={{ gridTemplateColumns: columns }}
     >
       {children}
@@ -63,6 +63,7 @@ export function DataListRow({
       className={cn(
         'grid items-center gap-4 px-4 py-3 text-sm transition-colors',
         'border-b last:border-b-0 hover:bg-muted/40',
+        'ease-brand duration-200',
         'focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
       )}
       style={{ gridTemplateColumns: columns }}

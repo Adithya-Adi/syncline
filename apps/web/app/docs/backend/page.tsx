@@ -1,4 +1,4 @@
-export const metadata = { title: 'Backend tracing · Syncline' };
+export const metadata = { title: 'Backend tracing' };
 
 export default function Backend() {
   return (

@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
+import { EmptyState, PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
+import { Clapperboard } from 'lucide-react';
 import { db } from '@/lib/db';
 import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Recordings · Syncline' };
+export const metadata = { title: 'Recordings' };
 
 /** Header and rows share this, so a column cannot drift from its heading. */
 const COLUMNS = '180px minmax(0,1fr) 150px 110px 90px 90px 70px';
@@ -52,24 +55,24 @@ export default async function SessionsPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
-      <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-xl font-semibold tracking-tight">Recordings</h1>
-        <p className="text-sm text-muted-foreground">
-          {sessions.length} in {viewer.organizationName}
-        </p>
-      </div>
+      <PageHeader
+        title="Recordings"
+        description={`${sessions.length} in ${viewer.organizationName}`}
+      />
 
       {sessions.length === 0 ? (
-        <p className="mt-10 max-w-prose text-sm leading-relaxed text-muted-foreground">
-          No recordings yet. Add the browser SDK to a page using one of your{' '}
-          <Link
-            href="/projects"
-            className="text-foreground underline underline-offset-4"
-          >
-            project keys
-          </Link>{' '}
-          — the first chunk arrives within a few seconds of the page loading.
-        </p>
+        <EmptyState
+          icon={<Clapperboard className="size-4" />}
+          title="No recordings yet"
+          action={
+            <Button asChild size="sm">
+              <Link href="/projects">Get a project key</Link>
+            </Button>
+          }
+        >
+          Add the browser SDK to a page using one of your project keys — the
+          first chunk arrives within a few seconds of the page loading.
+        </EmptyState>
       ) : (
         <DataList columns={COLUMNS}>
           <DataListHeader columns={COLUMNS}>
