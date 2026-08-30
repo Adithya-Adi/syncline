@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import {
+  ArrowUpRight,
   BookOpen,
   FolderKanban,
   LayoutDashboard,
@@ -32,12 +33,6 @@ const PRIMARY_LINKS = [
     label: 'Projects',
     icon: FolderKanban,
     isActive: (pathname: string) => pathname.startsWith('/projects'),
-  },
-  {
-    href: '/docs',
-    label: 'Docs',
-    icon: BookOpen,
-    isActive: (pathname: string) => pathname.startsWith('/docs'),
   },
 ];
 
@@ -184,6 +179,23 @@ function SidebarContent({
       </div>
 
       <div className="border-t border-border/80 p-3">
+        <Link
+          href="/docs"
+          target="_blank"
+          rel="noreferrer"
+          aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
+          onClick={onNavigate}
+          className={cn(
+            'mb-2 flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors duration-200',
+            pathname.startsWith('/docs')
+              ? 'bg-accent text-foreground'
+              : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+          )}
+        >
+          <BookOpen className="size-4 shrink-0" />
+          <span className="truncate">Docs</span>
+          <ArrowUpRight className="ml-auto size-3.5 opacity-60" />
+        </Link>
         <AccountMenu
           organizationName={organizationName}
           email={email}
