@@ -1,14 +1,17 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Separator } from '@/components/ui/separator';
+
+import { LogoMark } from '@/components/logo';
 import { requireViewer } from '@/lib/session';
-import { SignOutButton } from './sign-out';
+import { AccountMenu } from './account-menu';
+import { NavLinks } from './nav-links';
 
 /**
  * Everything under here requires a session and an organization.
  *
  * The gate is in the layout rather than in each page, so a new page is protected by existing rather
- * than by remembering to add a check.
+ * than by remembering to add a check. It stays a server component for that reason — the two pieces
+ * that need the browser (the active-link indicator and the account menu) are leaves.
  */
 export default async function DashboardLayout({
   children,
@@ -19,45 +22,25 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-svh">
-      <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
           <Link
             href="/sessions"
-            className="font-mono text-sm font-medium tracking-tight"
+            className="flex items-center gap-2 transition-opacity duration-200 hover:opacity-80"
           >
-            syncline
+            <LogoMark className="size-[18px]" />
+            <span className="font-display text-[15px] font-semibold tracking-[-0.01em]">
+              syncline
+            </span>
           </Link>
 
-          <nav className="flex items-center gap-5 text-sm text-muted-foreground">
-            <Link
-              href="/sessions"
-              className="transition-colors hover:text-foreground"
-            >
-              Recordings
-            </Link>
-            <Link
-              href="/projects"
-              className="transition-colors hover:text-foreground"
-            >
-              Projects
-            </Link>
-            <Link
-              href="/docs"
-              className="transition-colors hover:text-foreground"
-            >
-              Docs
-            </Link>
-          </nav>
+          <NavLinks />
 
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            <span
-              className="text-muted-foreground"
-              title={`Signed in as ${viewer.email}`}
-            >
-              {viewer.organizationName}
-            </span>
-            <Separator orientation="vertical" className="h-4" />
-            <SignOutButton />
+          <div className="ml-auto">
+            <AccountMenu
+              organizationName={viewer.organizationName}
+              email={viewer.email}
+            />
           </div>
         </div>
       </header>

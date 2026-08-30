@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Wordmark } from '@/components/logo';
 import { isInstanceUnclaimed } from '@/lib/auth';
 import { SignInForm } from './form';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Sign in · Syncline' };
+export const metadata = { title: 'Sign in' };
 
 export default async function SignInPage({
   searchParams,
@@ -16,11 +17,15 @@ export default async function SignInPage({
 
   return (
     <>
-      <Link href="/" className="font-mono text-sm font-medium tracking-tight">
-        syncline
+      <Link href="/" className="lg:hidden">
+        <Wordmark />
       </Link>
 
-      <h1 className="mt-8 text-2xl font-semibold tracking-tight">Sign in</h1>
+      <h1 className="mt-8 text-2xl font-semibold lg:mt-0">Sign in</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Recordings are readable only by members of the organization that owns
+        them.
+      </p>
 
       {closed && (
         <Alert className="mt-4">

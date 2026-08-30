@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export const metadata = { title: 'Browser SDK · Syncline' };
+export const metadata = { title: 'Browser SDK' };
 
 export default function BrowserSdk() {
   return (

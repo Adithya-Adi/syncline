@@ -1,5 +1,5 @@
 /*
- * Syncline visual language.
+ * Syncline visual language — the pages still on hand-written CSS.
  *
  * A syncline is a geological fold — rock strata dipping toward one shared axis. The viewer takes
  * that literally: the lanes are strata, and the playhead is a core sample cut down through them,
@@ -8,35 +8,29 @@
  * Stratum colors come from the ICS geologic time scale rather than a generic dark-theme ramp, and
  * they read as depth: surface water, mid rock, deep rock. Permian red is reserved for exactly one
  * meaning — an error — and appears nowhere else.
+ *
+ * Scope: the docs pages and the replay viewer. The landing page, auth and the dashboard are
+ * Tailwind now, and their rules have been deleted rather than left to rot.
+ *
+ * Every value below is an alias of a token in theme.css. Nothing here declares a color of its own,
+ * which is what lets these pages follow the light/dark toggle without being rewritten.
  */
 
 :root {
-  --rock-900: #0b1017;
-  --rock-850: #0f1620;
-  --rock-800: #141c27;
-  --rock-700: #1c2634;
-  --rock-600: #273343;
-  --rock-500: #3a4859;
+  --rock-900: var(--background);
+  --rock-850: var(--muted);
+  --rock-800: var(--card);
+  --rock-700: var(--border);
+  --rock-600: var(--border);
+  --rock-500: var(--ring);
 
-  --bone-100: #e8ecf1;
-  --bone-300: #9fadbe;
-  --bone-500: #6b7a8d;
+  --bone-100: var(--foreground);
+  --bone-300: color-mix(in oklch, var(--foreground) 72%, var(--background));
+  --bone-500: var(--muted-foreground);
 
-  /* Strata, shallow to deep. */
-  --stratum-network: #4ec3d9;
-  --stratum-backend: #e8a33d;
-  --stratum-database: #a16ae8;
+  --fault: var(--destructive);
 
-  /* Permian red. Errors only. */
-  --fault: #f04028;
-
-  --display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-  --rule: 1px solid var(--rock-700);
-  --radius: 3px;
-
-  color-scheme: dark;
+  --rule: 1px solid var(--border);
 }
 
 *,
@@ -52,26 +46,35 @@
  * font and background while appearing correct in the source. This file loads after theme.css, so
  * anything it puts on a global selector silently wins.
  */
-.landing,
 .docs,
 .viewer,
-.notice,
-.nav,
-.foot {
+.notice {
   background: var(--rock-900);
   color: var(--bone-100);
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-a {
+/*
+ * Scoped, and it matters more than it looks.
+ *
+ * This file is unlayered, and unlayered rules beat anything in a cascade layer regardless of
+ * specificity — so a bare `a { color: inherit }` here silently outranks Tailwind's
+ * `text-primary-foreground` utility on every button rendered as a link, painting the label the
+ * same color as the button. Same trap as the body rule above, one selector further along.
+ */
+.docs a,
+.viewer a,
+.notice a {
   color: inherit;
   text-decoration: none;
 }
 
-:focus-visible {
+.docs :focus-visible,
+.viewer :focus-visible,
+.notice :focus-visible {
   outline: 2px solid var(--stratum-network);
   outline-offset: 2px;
 }
@@ -88,97 +91,11 @@ a {
 /* ---------------------------------------------------------------- shared */
 
 .eyebrow {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--bone-500);
-}
-
-.rule {
-  border: 0;
-  border-top: var(--rule);
-  margin: 0;
-}
-
-/* ------------------------------------------------------------- marketing */
-
-/* A plain wrapper. Each section below sets its own width and padding, so a max-width here would
-   silently cap every one of them. */
-.landing {
-  display: block;
-}
-
-.wordmark {
-  font-family: var(--display);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
-
-/*
- * The hero is the product's own idea at small scale: three strata, one axis through them. Static
- * and honest — an animation here would be decoration, and the diagram is the argument.
- */
-.fold {
-  margin: 56px 0 0;
-  border: var(--rule);
-  border-radius: var(--radius);
-  background: var(--rock-850);
-  padding: 22px 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.fold__row {
-  display: grid;
-  grid-template-columns: 88px 1fr;
-  align-items: center;
-  gap: 16px;
-  height: 30px;
-}
-
-.fold__label {
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--bone-500);
-}
-
-.fold__track {
-  position: relative;
-  height: 100%;
-}
-
-.fold__bar {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 9px;
-  border-radius: 1px;
-  opacity: 0.85;
-}
-
-.fold__axis {
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  /* Aligned to the track, not to the whole card. Mixing a percentage of the card with a fixed
-     label width puts the axis wherever the viewport happens to make it land — here it missed the
-     database bar entirely. */
-  left: calc(104px + (100% - 104px) * 0.5);
-  width: 9px;
-  margin-left: -4px;
-  background: linear-gradient(
-    180deg,
-    rgba(232, 236, 241, 0.02),
-    rgba(232, 236, 241, 0.1) 12%,
-    rgba(232, 236, 241, 0.1) 88%,
-    rgba(232, 236, 241, 0.02)
-  );
-  border-left: 1px solid rgba(232, 236, 241, 0.45);
-  border-right: 1px solid rgba(232, 236, 241, 0.12);
-  pointer-events: none;
 }
 
 .snippet {
@@ -205,36 +122,9 @@ a {
   color: var(--bone-500);
 }
 
-.status {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12.5px;
-  color: var(--bone-300);
-}
-
-.status__row {
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 12px;
-  padding: 5px 0;
-  border-bottom: 1px solid rgba(39, 51, 67, 0.5);
-}
-
-.status__mark {
-  color: var(--bone-500);
-}
-
-.status__mark--done {
-  color: var(--stratum-network);
-}
 
 /* ---------------------------------------------------------------- viewer */
 
-/*
- * A bounded height, not a minimum. The strata are the reason this page exists, so the player gets
- * whatever vertical space is left over — never the other way round.
- */
 .viewer {
   display: flex;
   flex-direction: column;
@@ -347,7 +237,7 @@ a {
   align-items: center;
   gap: 8px;
   padding-left: 14px;
-  font-family: var(--display);
+  font-family: var(--font-display);
   font-size: 9.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -516,98 +406,6 @@ a {
 
 /* ------------------------------------------------------------------ list */
 
-.list {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 40px 24px 96px;
-}
-
-.list__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 14px;
-  border-bottom: var(--rule);
-}
-
-.list__empty {
-  color: var(--bone-500);
-  margin: 32px 0 0;
-  max-width: 62ch;
-  line-height: 1.7;
-}
-
-.list__rows {
-  margin-top: 4px;
-}
-
-.list__head,
-.list__row {
-  display: grid;
-  grid-template-columns: 160px 1fr 110px 88px 84px 72px;
-  gap: 16px;
-  align-items: center;
-  padding: 9px 8px;
-}
-
-.list__head {
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--bone-500);
-  border-bottom: 1px solid rgba(39, 51, 67, 0.6);
-}
-
-.list__row {
-  border-bottom: 1px solid rgba(39, 51, 67, 0.4);
-  color: var(--bone-300);
-  font-size: 12.5px;
-  transition: background 100ms ease;
-}
-
-.list__row:hover {
-  background: var(--rock-850);
-  color: var(--bone-100);
-}
-
-.list__when {
-  color: var(--bone-500);
-}
-
-.list__page,
-.list__user {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.list__page {
-  color: var(--bone-100);
-}
-
-.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-/* The only red on the page, so a broken recording is the thing your eye lands on. */
-.list__errors {
-  color: var(--fault);
-}
-
-@media (max-width: 760px) {
-  .list__head {
-    display: none;
-  }
-
-  .list__row {
-    grid-template-columns: 1fr auto;
-    grid-auto-rows: min-content;
-    row-gap: 4px;
-  }
-}
-
 .strata__focus {
   display: flex;
   align-items: center;
@@ -622,7 +420,7 @@ a {
   border: var(--rule);
   border-radius: var(--radius);
   color: var(--bone-300);
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 9px;
   cursor: pointer;
@@ -635,246 +433,6 @@ a {
 
 /* --------------------------------------------------------- site chrome */
 
-.nav {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 28px;
-  height: 52px;
-  border-bottom: var(--rule);
-  background: rgba(11, 16, 23, 0.86);
-  backdrop-filter: blur(8px);
-}
-
-.nav__links {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  font-size: 12.5px;
-  color: var(--bone-300);
-}
-
-.nav__links a:hover {
-  color: var(--bone-100);
-}
-
-.nav__github {
-  border: var(--rule);
-  border-radius: var(--radius);
-  padding: 3px 10px;
-}
-
-.foot {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 32px;
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 48px 28px 72px;
-  border-top: var(--rule);
-  font-size: 12.5px;
-}
-
-.foot__col {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  color: var(--bone-500);
-}
-
-.foot__col a:hover {
-  color: var(--bone-100);
-}
-
-.foot__note {
-  margin: 4px 0 0;
-  max-width: 34ch;
-  line-height: 1.6;
-}
-
-@media (max-width: 720px) {
-  .foot {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* ------------------------------------------------------------- landing */
-
-.hero {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 60px 28px 8px;
-}
-
-.hero__lede {
-  font-family: var(--display);
-  font-size: clamp(34px, 6vw, 62px);
-  font-weight: 500;
-  line-height: 1.04;
-  letter-spacing: -0.035em;
-  margin: 18px 0 0;
-  max-width: 17ch;
-}
-
-.hero__lede em {
-  font-style: normal;
-  color: var(--stratum-backend);
-}
-
-.hero__sub {
-  color: var(--bone-300);
-  max-width: 64ch;
-  margin: 22px 0 0;
-  font-size: 14.5px;
-  line-height: 1.7;
-}
-
-.hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 28px 0 0;
-}
-
-.button {
-  display: inline-block;
-  border: var(--rule);
-  border-radius: var(--radius);
-  padding: 8px 16px;
-  font-size: 12.5px;
-  color: var(--bone-300);
-  background: transparent;
-  cursor: pointer;
-}
-
-.button:hover {
-  color: var(--bone-100);
-  border-color: var(--rock-500);
-}
-
-.button--primary {
-  background: var(--bone-100);
-  border-color: var(--bone-100);
-  color: var(--rock-900);
-}
-
-.button--primary:hover {
-  background: #fff;
-  color: var(--rock-900);
-}
-
-.fold__caption {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.fold__legend {
-  color: var(--bone-500);
-  font-size: 11.5px;
-  margin: 10px 0 0;
-}
-
-/* --------------------------------------------------------- page blocks */
-
-.band {
-  border-top: var(--rule);
-  border-bottom: var(--rule);
-  background: var(--rock-850);
-  margin: 72px 0 0;
-}
-
-.band__inner,
-.section,
-.cta {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 56px 28px;
-}
-
-.h2 {
-  font-family: var(--display);
-  font-size: 21px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  margin: 0 0 18px;
-}
-
-.lede {
-  color: var(--bone-300);
-  max-width: 68ch;
-  line-height: 1.7;
-  margin: 0 0 18px;
-}
-
-.steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 18px;
-  max-width: 76ch;
-}
-
-.steps li {
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 14px;
-  color: var(--bone-300);
-  line-height: 1.65;
-}
-
-/* Numbered because these are genuinely sequential — each step depends on the one before it. */
-.steps__n {
-  font-family: var(--display);
-  color: var(--rock-500);
-  font-size: 13px;
-}
-
-.steps strong {
-  color: var(--bone-100);
-  font-weight: 400;
-}
-
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1px;
-  background: var(--rock-700);
-  border: var(--rule);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.card {
-  background: var(--rock-900);
-  padding: 20px 22px;
-}
-
-.card__title {
-  font-family: var(--display);
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0 0 8px;
-  color: var(--bone-100);
-}
-
-.card__body {
-  color: var(--bone-300);
-  font-size: 12.5px;
-  line-height: 1.65;
-  margin: 0;
-}
-
-.cta {
-  border-top: var(--rule);
-  text-align: left;
-}
 
 /* ---------------------------------------------------------------- docs */
 
@@ -924,7 +482,7 @@ a {
 }
 
 .docs__h1 {
-  font-family: var(--display);
+  font-family: var(--font-display);
   font-size: 30px;
   font-weight: 500;
   letter-spacing: -0.025em;
@@ -933,7 +491,7 @@ a {
 }
 
 .docs__h2 {
-  font-family: var(--display);
+  font-family: var(--font-display);
   font-size: 17px;
   font-weight: 500;
   color: var(--bone-100);
@@ -943,7 +501,7 @@ a {
 }
 
 .docs__h3 {
-  font-family: var(--display);
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 500;
   color: var(--bone-100);
@@ -1046,404 +604,4 @@ a {
     flex-wrap: wrap;
     gap: 18px 28px;
   }
-}
-
-@media (max-width: 620px) {
-  /* The nav is the only thing that refuses to fit: let it wrap rather than pushing the document
-     wider than the viewport, which is what produced horizontal scroll on the whole page. */
-  .nav {
-    height: auto;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    padding: 10px 18px;
-  }
-
-  .nav__links {
-    gap: 14px;
-    font-size: 12px;
-  }
-
-  .hero,
-  .band__inner,
-  .section,
-  .cta,
-  .docs {
-    padding-left: 18px;
-    padding-right: 18px;
-  }
-
-  .hero {
-    padding-top: 48px;
-  }
-
-  .steps li {
-    grid-template-columns: 28px 1fr;
-    gap: 10px;
-  }
-}
-
-/* ---------------------------------------------------------------- auth */
-
-.auth {
-  max-width: 380px;
-  margin: 0 auto;
-  padding: 88px 24px 96px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.auth__title {
-  font-family: var(--display);
-  font-size: 24px;
-  font-weight: 500;
-  letter-spacing: -0.025em;
-  margin: 28px 0 0;
-}
-
-.auth__sub {
-  color: var(--bone-300);
-  font-size: 12.5px;
-  line-height: 1.65;
-  margin: 10px 0 0;
-}
-
-.auth__notice {
-  border: var(--rule);
-  border-left: 2px solid var(--stratum-backend);
-  border-radius: var(--radius);
-  background: var(--rock-850);
-  padding: 10px 12px;
-  font-size: 12px;
-  color: var(--bone-300);
-  margin: 16px 0 0;
-}
-
-.auth__form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin: 26px 0 0;
-}
-
-.auth__foot {
-  color: var(--bone-500);
-  font-size: 12px;
-  margin: 22px 0 0;
-}
-
-.auth__foot a {
-  color: var(--stratum-network);
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.field__label {
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--bone-500);
-}
-
-.field__input {
-  background: var(--rock-850);
-  border: var(--rule);
-  border-radius: var(--radius);
-  color: var(--bone-100);
-  font-family: var(--mono);
-  font-size: 13px;
-  padding: 9px 11px;
-  width: 100%;
-}
-
-.field__input:focus {
-  border-color: var(--rock-500);
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(78, 195, 217, 0.18);
-}
-
-.field__hint {
-  font-size: 11px;
-  color: var(--bone-500);
-}
-
-.field__error {
-  color: var(--fault);
-  font-size: 12px;
-  margin: 0;
-}
-
-.auth .button {
-  text-align: center;
-  padding: 9px 16px;
-}
-
-.auth .button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-/* ------------------------------------------------------- dashboard extras */
-
-.nav__org {
-  color: var(--bone-500);
-  border-left: var(--rule);
-  padding-left: 22px;
-}
-
-.nav__signout {
-  background: transparent;
-  border: 0;
-  color: var(--bone-500);
-  font-family: var(--mono);
-  font-size: 12.5px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.nav__signout:hover {
-  color: var(--bone-100);
-}
-
-.list__h1 {
-  font-family: var(--display);
-  font-size: 20px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
-
-.list__head--projects,
-.list__row--projects {
-  grid-template-columns: 1fr 220px 1fr 100px;
-}
-
-.form-page {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 40px 24px 96px;
-}
-
-.form-page__back {
-  color: var(--bone-500);
-  font-size: 12px;
-}
-
-.form-page__back:hover {
-  color: var(--bone-100);
-}
-
-.form-page__title {
-  font-family: var(--display);
-  font-size: 26px;
-  font-weight: 500;
-  letter-spacing: -0.025em;
-  margin: 16px 0 0;
-}
-
-.form-page__sub {
-  color: var(--bone-300);
-  font-size: 12.5px;
-  line-height: 1.7;
-  margin: 10px 0 0;
-  max-width: 66ch;
-}
-
-.field__input--area {
-  resize: vertical;
-  line-height: 1.6;
-}
-
-.panel {
-  border: var(--rule);
-  border-radius: var(--radius);
-  background: var(--rock-850);
-  padding: 20px 22px;
-  margin: 26px 0 0;
-}
-
-.panel__title {
-  font-family: var(--display);
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0 0 16px;
-}
-
-.panel__note {
-  color: var(--bone-500);
-  font-size: 11.5px;
-  line-height: 1.6;
-  margin: 10px 0 0;
-  max-width: 70ch;
-}
-
-.panel__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.keyfield {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-bottom: 18px;
-}
-
-.keyfield__row {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.keyfield__value {
-  flex: 1;
-  min-width: 0;
-  background: var(--rock-900);
-  border: var(--rule);
-  border-radius: var(--radius);
-  padding: 8px 11px;
-  font-size: 12px;
-  color: var(--bone-100);
-  overflow-x: auto;
-  white-space: nowrap;
-  user-select: all;
-}
-
-/* A value that will never be shown again earns the one accent on the page. */
-.keyfield--reveal .keyfield__value {
-  border-color: var(--stratum-backend);
-  color: var(--stratum-backend);
-}
-
-.keyfield__copy {
-  flex: 0 0 auto;
-}
-
-/* ----------------------------------------------------------------- setup */
-
-.form-page--wide {
-  max-width: 860px;
-}
-
-.panel--warn {
-  border-left: 2px solid var(--fault);
-}
-
-.panel__note--lead {
-  color: var(--bone-300);
-  font-size: 12.5px;
-  margin-top: 0;
-}
-
-.progress__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.progress__head .panel__title {
-  margin: 0;
-}
-
-.progress__pulse {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--bone-500);
-}
-
-.progress--complete {
-  border-left: 2px solid var(--stratum-network);
-}
-
-.progress__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 14px;
-}
-
-.progress__item {
-  display: grid;
-  grid-template-columns: 20px 1fr;
-  gap: 10px;
-  color: var(--bone-500);
-}
-
-.progress__item strong {
-  color: var(--bone-300);
-  font-weight: 400;
-  font-size: 12.5px;
-}
-
-.progress__item--done strong {
-  color: var(--bone-100);
-}
-
-.progress__mark {
-  color: var(--rock-500);
-  line-height: 1.5;
-}
-
-.progress__item--done .progress__mark {
-  color: var(--stratum-network);
-}
-
-.progress__detail {
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  line-height: 1.6;
-  max-width: 74ch;
-}
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.tabs__tab {
-  background: transparent;
-  border: var(--rule);
-  border-radius: var(--radius);
-  color: var(--bone-500);
-  font-family: var(--mono);
-  font-size: 11.5px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-
-.tabs__tab:hover {
-  color: var(--bone-100);
-}
-
-.tabs__tab--active {
-  color: var(--rock-900);
-  background: var(--bone-100);
-  border-color: var(--bone-100);
-}
-
-.snippet code {
-  white-space: pre;
-}
-
-/* A project that has never received anything needs a next action, not a zero. */
-.list__setup {
-  color: var(--stratum-network);
-  font-size: 11px;
-}
-
-/* A rung waiting on an earlier step is not a failure, and should not read like one. */
-.progress__item--blocked .progress__detail {
-  color: var(--rock-500);
 }

@@ -1,4 +1,4 @@
-export const metadata = { title: 'Privacy and masking · Syncline' };
+export const metadata = { title: 'Privacy and masking' };
 
 export default function Privacy() {
   return (

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export const metadata = { title: 'Quickstart · Syncline' };
+export const metadata = { title: 'Quickstart' };
 
 export default function Quickstart() {
   return (

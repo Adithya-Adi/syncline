@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Wordmark } from '@/components/logo';
 import { isInstanceUnclaimed } from '@/lib/auth';
 import { SignUpForm } from './form';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Create your account · Syncline' };
+export const metadata = { title: 'Create your account' };
 
 /**
  * First-run only.
@@ -20,11 +21,11 @@ export default async function SignUpPage() {
 
   return (
     <>
-      <Link href="/" className="font-mono text-sm font-medium tracking-tight">
-        syncline
+      <Link href="/" className="lg:hidden">
+        <Wordmark />
       </Link>
 
-      <h1 className="mt-8 text-2xl font-semibold tracking-tight">
+      <h1 className="mt-8 text-2xl font-semibold lg:mt-0">
         Claim this instance
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">

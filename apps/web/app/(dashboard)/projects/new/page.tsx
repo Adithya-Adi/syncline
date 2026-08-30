@@ -4,11 +4,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/page-header';
 import { createProject } from '@/lib/projects';
 import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'New project · Syncline' };
+export const metadata = { title: 'New project' };
 
 export default async function NewProjectPage() {
   const viewer = await requireViewer();
@@ -22,14 +23,11 @@ export default async function NewProjectPage() {
         ← Projects
       </Link>
 
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight">
-        New project
-      </h1>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
-        A project owns a pair of API keys and the list of origins allowed to
-        send recordings to it. Most teams want one per application rather than
-        one per environment — a recording already carries its release.
-      </p>
+      <PageHeader
+        className="mt-4"
+        title="New project"
+        description="A project owns a pair of API keys and the list of origins allowed to send recordings to it. Most teams want one per application rather than one per environment — a recording already carries its release."
+      />
 
       <Card className="mt-6">
         <CardContent>

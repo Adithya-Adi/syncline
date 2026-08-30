@@ -2,11 +2,13 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
+import { EmptyState, PageHeader } from '@/components/page-header';
+import { FolderPlus } from 'lucide-react';
 import { db } from '@/lib/db';
 import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Projects · Syncline' };
+export const metadata = { title: 'Projects' };
 
 const COLUMNS = 'minmax(0,1fr) 230px minmax(0,1fr) 110px';
 
@@ -21,18 +23,29 @@ export default async function ProjectsPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
-        <Button asChild size="sm">
-          <Link href="/projects/new">New project</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Projects"
+        description="A project is what an API key pair belongs to, and the boundary an allowed origin is checked against."
+        actions={
+          <Button asChild size="sm">
+            <Link href="/projects/new">New project</Link>
+          </Button>
+        }
+      />
 
       {projects.length === 0 ? (
-        <p className="mt-10 max-w-prose text-sm leading-relaxed text-muted-foreground">
-          No projects yet. A project is what an API key belongs to — create one
-          to get a key and start recording.
-        </p>
+        <EmptyState
+          icon={<FolderPlus className="size-4" />}
+          title="No projects yet"
+          action={
+            <Button asChild size="sm">
+              <Link href="/projects/new">Create a project</Link>
+            </Button>
+          }
+        >
+          A project is what an API key belongs to — create one to get a key and
+          start recording.
+        </EmptyState>
       ) : (
         <DataList columns={COLUMNS}>
           <DataListHeader columns={COLUMNS}>

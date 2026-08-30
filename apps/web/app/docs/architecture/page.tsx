@@ -1,4 +1,4 @@
-export const metadata = { title: 'Architecture · Syncline' };
+export const metadata = { title: 'Architecture' };
 
 export default function Architecture() {
   return (

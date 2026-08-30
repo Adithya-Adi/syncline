@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export const metadata = { title: 'Docs · Syncline' };
+export const metadata = { title: 'Docs' };
 
 export default function DocsOverview() {
   return (

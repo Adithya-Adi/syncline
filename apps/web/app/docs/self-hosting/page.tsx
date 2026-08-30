@@ -1,4 +1,4 @@
-export const metadata = { title: 'Self-hosting · Syncline' };
+export const metadata = { title: 'Self-hosting' };
 
 export default function SelfHosting() {
   return (
