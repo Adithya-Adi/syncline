@@ -1,18 +1,14 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
 import { db } from '@/lib/db';
 import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Recordings · Syncline' };
+
+/** Header and rows share this, so a column cannot drift from its heading. */
+const COLUMNS = '180px minmax(0,1fr) 150px 110px 90px 90px 70px';
 
 /**
  * Recordings for the viewer's organization.
@@ -75,73 +71,58 @@ export default async function SessionsPage() {
           — the first chunk arrives within a few seconds of the page loading.
         </p>
       ) : (
-        <div className="mt-6 rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[190px]">Recorded</TableHead>
-                <TableHead>Page</TableHead>
-                <TableHead className="w-[150px]">Project</TableHead>
-                <TableHead className="w-[110px]">User</TableHead>
-                <TableHead className="w-[100px] text-right">Duration</TableHead>
-                <TableHead className="w-[90px] text-right">Requests</TableHead>
-                <TableHead className="w-[90px] text-right">Errors</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sessions.map((session) => {
-                const errorCount = errorBySession.get(session.id) ?? 0;
-                return (
-                  <TableRow key={session.id} className="cursor-pointer">
-                    <TableCell className="p-0" colSpan={7}>
-                      {/*
-                        The link wraps the whole row so the entire strip is clickable, and keyboard
-                        focus lands on one target per recording rather than seven.
-                      */}
-                      <Link
-                        href={`/s/${session.id}`}
-                        className="grid grid-cols-[190px_1fr_150px_110px_100px_90px_90px] items-center px-4 py-2.5 text-sm"
-                      >
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {formatWhen(session.startedAt)}
-                        </span>
-                        <span className="truncate pr-4 font-mono text-xs">
-                          {shortPath(session.url ?? undefined)}
-                        </span>
-                        <span className="truncate pr-4 text-muted-foreground">
-                          {session.project.name}
-                        </span>
-                        <span className="truncate pr-4 text-muted-foreground">
-                          {session.userId ?? '—'}
-                        </span>
-                        <span className="text-right font-mono text-xs tabular-nums">
-                          {formatDuration(session.durationMs ?? 0)}
-                        </span>
-                        <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
-                          {session._count.links}
-                        </span>
-                        <span className="text-right">
-                          {errorCount > 0 ? (
-                            <Badge
-                              variant="destructive"
-                              className="font-mono tabular-nums"
-                            >
-                              {errorCount}
-                            </Badge>
-                          ) : (
-                            <span className="font-mono text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </span>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <DataList columns={COLUMNS}>
+          <DataListHeader columns={COLUMNS}>
+            <span>Recorded</span>
+            <span>Page</span>
+            <span>Project</span>
+            <span>User</span>
+            <span className="text-right">Duration</span>
+            <span className="text-right">Requests</span>
+            <span className="text-right">Errors</span>
+          </DataListHeader>
+
+          {sessions.map((session) => {
+            const errorCount = errorBySession.get(session.id) ?? 0;
+            return (
+              <DataListRow
+                key={session.id}
+                href={`/s/${session.id}`}
+                columns={COLUMNS}
+              >
+                <span className="font-mono text-xs text-muted-foreground">
+                  {formatWhen(session.startedAt)}
+                </span>
+                <span className="truncate font-mono text-xs">
+                  {shortPath(session.url ?? undefined)}
+                </span>
+                <span className="truncate text-muted-foreground">
+                  {session.project.name}
+                </span>
+                <span className="truncate text-muted-foreground">
+                  {session.userId ?? '—'}
+                </span>
+                <span className="text-right font-mono text-xs tabular-nums">
+                  {formatDuration(session.durationMs ?? 0)}
+                </span>
+                <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                  {session._count.links}
+                </span>
+                <span className="text-right">
+                  {errorCount > 0 ? (
+                    <Badge variant="destructive" className="tabular-nums">
+                      {errorCount}
+                    </Badge>
+                  ) : (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      —
+                    </span>
+                  )}
+                </span>
+              </DataListRow>
+            );
+          })}
+        </DataList>
       )}
     </main>
   );

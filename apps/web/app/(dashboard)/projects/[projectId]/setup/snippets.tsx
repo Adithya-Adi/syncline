@@ -3,7 +3,13 @@
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
@@ -119,16 +125,18 @@ export function SetupSnippets({
 
   return (
     <Card className="mt-6">
-      <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+      <CardHeader>
         <CardTitle>First: record the browser</CardTitle>
-        <Button type="button" variant="outline" size="sm" onClick={copy}>
-          {copied ? (
-            <Check className="size-3.5" />
-          ) : (
-            <Copy className="size-3.5" />
-          )}
-          {copied ? 'Copied' : 'Copy'}
-        </Button>
+        <CardAction>
+          <Button type="button" variant="outline" size="sm" onClick={copy}>
+            {copied ? (
+              <Check className="size-3.5" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        </CardAction>
       </CardHeader>
 
       <CardContent>

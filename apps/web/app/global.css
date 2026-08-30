@@ -45,10 +45,19 @@
   box-sizing: border-box;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
+/*
+ * Scoped to the pages that still use this stylesheet, rather than applied to body.
+ *
+ * Styling body here overrode the shadcn theme on every converted page — they rendered in the old
+ * font and background while appearing correct in the source. This file loads after theme.css, so
+ * anything it puts on a global selector silently wins.
+ */
+.landing,
+.docs,
+.viewer,
+.notice,
+.nav,
+.foot {
   background: var(--rock-900);
   color: var(--bone-100);
   font-family: var(--mono);
@@ -832,7 +841,7 @@ a {
   font-weight: 400;
 }
 
-.grid {
+.feature-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1px;
