@@ -135,37 +135,19 @@ export default async function ProjectPage({
 
       <section className="panel">
         <h2 className="panel__title">Install</h2>
-        <pre className="snippet">
-          <code>
-            <span className="k">import</span> {'{ startRecording }'}{' '}
-            <span className="k">from</span>{' '}
-            <span className="s">&apos;@syncline/browser&apos;</span>;{'\n\n'}
-            startRecording({'{'}
-            {'\n  '}key:{' '}
-            <span className="s">&apos;{project.publicKey}&apos;</span>,{'\n  '}
-            endpoint:{' '}
-            <span className="s">
-              &apos;
-              {process.env.NEXT_PUBLIC_SYNCLINE_API ?? 'http://localhost:4000'}
-              &apos;
-            </span>
-            ,{'\n  '}traceOrigins: [
-            {project.origins.map((origin, i) => (
-              <span key={origin}>
-                <span className="s">&apos;{origin}&apos;</span>
-                {i < project.origins.length - 1 ? ', ' : ''}
-              </span>
-            ))}
-            ],{'\n'}
-            {'}'});
-          </code>
-        </pre>
-        <p className="panel__note">
-          Your API must return{' '}
-          <code>Access-Control-Allow-Headers: traceparent</code>, or every
-          traced request fails preflight. See{' '}
-          <Link href="/docs/browser-sdk">the SDK docs</Link>.
+        <p className="panel__note panel__note--lead">
+          Snippets with this key already in them, plus a live check that names
+          the step that has not happened yet rather than leaving you staring at
+          an empty list.
         </p>
+        <div className="panel__actions">
+          <Link
+            href={`/projects/${project.id}/setup`}
+            className="button button--primary"
+          >
+            Set up the SDK
+          </Link>
+        </div>
       </section>
     </main>
   );

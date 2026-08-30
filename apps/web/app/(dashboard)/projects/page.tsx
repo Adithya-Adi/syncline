@@ -50,7 +50,13 @@ export default async function ProjectsPage() {
               <span className="list__user">
                 {project.origins.length > 0 ? project.origins.join(', ') : '—'}
               </span>
-              <span className="num">{project._count.sessions}</span>
+              <span className="num">
+                {project._count.sessions > 0 ? (
+                  project._count.sessions
+                ) : (
+                  <span className="list__setup">set up</span>
+                )}
+              </span>
             </Link>
           ))}
         </div>
