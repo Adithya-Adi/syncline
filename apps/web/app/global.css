@@ -94,10 +94,10 @@ a {
 
 /* ------------------------------------------------------------- marketing */
 
+/* A plain wrapper. Each section below sets its own width and padding, so a max-width here would
+   silently cap every one of them. */
 .landing {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 96px 32px 128px;
+  display: block;
 }
 
 .wordmark {
@@ -105,29 +105,6 @@ a {
   font-size: 15px;
   font-weight: 500;
   letter-spacing: -0.01em;
-}
-
-.landing__lede {
-  font-family: var(--display);
-  font-size: clamp(30px, 5.5vw, 52px);
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.03em;
-  margin: 56px 0 0;
-  max-width: 15ch;
-}
-
-.landing__lede em {
-  font-style: normal;
-  color: var(--stratum-backend);
-}
-
-.landing__sub {
-  color: var(--bone-300);
-  max-width: 62ch;
-  margin: 24px 0 0;
-  font-size: 14px;
-  line-height: 1.65;
 }
 
 /*
@@ -177,7 +154,10 @@ a {
   position: absolute;
   top: 12px;
   bottom: 12px;
-  left: calc(88px + 16px + 38%);
+  /* Aligned to the track, not to the whole card. Mixing a percentage of the card with a fixed
+     label width puts the axis wherever the viewport happens to make it land — here it missed the
+     database bar entirely. */
+  left: calc(104px + (100% - 104px) * 0.5);
   width: 9px;
   margin-left: -4px;
   background: linear-gradient(
@@ -190,40 +170,6 @@ a {
   border-left: 1px solid rgba(232, 236, 241, 0.45);
   border-right: 1px solid rgba(232, 236, 241, 0.12);
   pointer-events: none;
-}
-
-.landing__meta {
-  margin: 56px 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 28px;
-  color: var(--bone-500);
-  font-size: 12px;
-}
-
-.landing__meta strong {
-  color: var(--bone-300);
-  font-weight: 400;
-}
-
-.landing__section {
-  margin: 64px 0 0;
-}
-
-.landing__h2 {
-  font-family: var(--display);
-  font-size: 17px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  margin: 0 0 16px;
-}
-
-.landing__body {
-  color: var(--bone-300);
-  line-height: 1.7;
-  font-size: 13px;
-  max-width: 70ch;
-  margin: 0 0 12px;
 }
 
 .snippet {
@@ -272,18 +218,6 @@ a {
 
 .status__mark--done {
   color: var(--stratum-network);
-}
-
-.landing__foot {
-  margin: 72px 0 0;
-  padding-top: 20px;
-  border-top: var(--rule);
-  color: var(--bone-500);
-  font-size: 12px;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
 }
 
 /* ---------------------------------------------------------------- viewer */
@@ -688,4 +622,453 @@ a {
 .strata__fit:hover {
   color: var(--bone-100);
   border-color: var(--rock-500);
+}
+
+/* --------------------------------------------------------- site chrome */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 28px;
+  height: 52px;
+  border-bottom: var(--rule);
+  background: rgba(11, 16, 23, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+.nav__links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 12.5px;
+  color: var(--bone-300);
+}
+
+.nav__links a:hover {
+  color: var(--bone-100);
+}
+
+.nav__github {
+  border: var(--rule);
+  border-radius: var(--radius);
+  padding: 3px 10px;
+}
+
+.foot {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 32px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 48px 28px 72px;
+  border-top: var(--rule);
+  font-size: 12.5px;
+}
+
+.foot__col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--bone-500);
+}
+
+.foot__col a:hover {
+  color: var(--bone-100);
+}
+
+.foot__note {
+  margin: 4px 0 0;
+  max-width: 34ch;
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .foot {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ------------------------------------------------------------- landing */
+
+.hero {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 60px 28px 8px;
+}
+
+.hero__lede {
+  font-family: var(--display);
+  font-size: clamp(34px, 6vw, 62px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  margin: 18px 0 0;
+  max-width: 17ch;
+}
+
+.hero__lede em {
+  font-style: normal;
+  color: var(--stratum-backend);
+}
+
+.hero__sub {
+  color: var(--bone-300);
+  max-width: 64ch;
+  margin: 22px 0 0;
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 28px 0 0;
+}
+
+.button {
+  display: inline-block;
+  border: var(--rule);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-size: 12.5px;
+  color: var(--bone-300);
+  background: transparent;
+  cursor: pointer;
+}
+
+.button:hover {
+  color: var(--bone-100);
+  border-color: var(--rock-500);
+}
+
+.button--primary {
+  background: var(--bone-100);
+  border-color: var(--bone-100);
+  color: var(--rock-900);
+}
+
+.button--primary:hover {
+  background: #fff;
+  color: var(--rock-900);
+}
+
+.fold__caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.fold__legend {
+  color: var(--bone-500);
+  font-size: 11.5px;
+  margin: 10px 0 0;
+}
+
+/* --------------------------------------------------------- page blocks */
+
+.band {
+  border-top: var(--rule);
+  border-bottom: var(--rule);
+  background: var(--rock-850);
+  margin: 72px 0 0;
+}
+
+.band__inner,
+.section,
+.cta {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 56px 28px;
+}
+
+.h2 {
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+}
+
+.lede {
+  color: var(--bone-300);
+  max-width: 68ch;
+  line-height: 1.7;
+  margin: 0 0 18px;
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 18px;
+  max-width: 76ch;
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 14px;
+  color: var(--bone-300);
+  line-height: 1.65;
+}
+
+/* Numbered because these are genuinely sequential — each step depends on the one before it. */
+.steps__n {
+  font-family: var(--display);
+  color: var(--rock-500);
+  font-size: 13px;
+}
+
+.steps strong {
+  color: var(--bone-100);
+  font-weight: 400;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1px;
+  background: var(--rock-700);
+  border: var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card {
+  background: var(--rock-900);
+  padding: 20px 22px;
+}
+
+.card__title {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 8px;
+  color: var(--bone-100);
+}
+
+.card__body {
+  color: var(--bone-300);
+  font-size: 12.5px;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.cta {
+  border-top: var(--rule);
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- docs */
+
+.docs {
+  display: grid;
+  grid-template-columns: 218px minmax(0, 1fr);
+  gap: 48px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 44px 28px 88px;
+}
+
+.docs__side {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  position: sticky;
+  top: 76px;
+  align-self: start;
+}
+
+.docs__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.docs__link {
+  font-size: 12.5px;
+  color: var(--bone-300);
+  padding: 2px 0;
+}
+
+.docs__link:hover {
+  color: var(--bone-100);
+}
+
+.docs__body {
+  min-width: 0;
+  color: var(--bone-300);
+  line-height: 1.75;
+  font-size: 13.5px;
+}
+
+.docs__body p {
+  max-width: 72ch;
+}
+
+.docs__h1 {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--bone-100);
+  margin: 0 0 14px;
+}
+
+.docs__h2 {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--bone-100);
+  margin: 40px 0 12px;
+  padding-top: 14px;
+  border-top: var(--rule);
+}
+
+.docs__h3 {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bone-100);
+  margin: 24px 0 8px;
+}
+
+.docs__lede {
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 68ch;
+}
+
+.docs__list {
+  padding-left: 18px;
+  max-width: 72ch;
+}
+
+.docs__list li {
+  margin-bottom: 10px;
+}
+
+.docs__body code {
+  background: var(--rock-800);
+  border: 1px solid var(--rock-700);
+  border-radius: 2px;
+  padding: 1px 5px;
+  font-size: 12px;
+  color: var(--bone-100);
+}
+
+.docs__body a {
+  color: var(--stratum-network);
+}
+
+.docs__body a:hover {
+  text-decoration: underline;
+}
+
+.docs__body .snippet code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+
+.docs__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 8px;
+  font-size: 12.5px;
+}
+
+.docs__table th {
+  text-align: left;
+  font-weight: 400;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+  padding: 6px 12px 6px 0;
+  border-bottom: var(--rule);
+}
+
+.docs__table td {
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.45);
+  vertical-align: top;
+}
+
+.callout {
+  border: var(--rule);
+  border-left: 2px solid var(--stratum-network);
+  border-radius: var(--radius);
+  background: var(--rock-850);
+  padding: 14px 16px;
+  margin: 20px 0;
+  font-size: 12.5px;
+  max-width: 72ch;
+}
+
+/* Reserved for things that will actually hurt someone if ignored. */
+.callout--warn {
+  border-left-color: var(--fault);
+}
+
+.snippet--diagram {
+  line-height: 1.35;
+  font-size: 11.5px;
+}
+
+@media (max-width: 860px) {
+  .docs {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .docs__side {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 18px 28px;
+  }
+}
+
+@media (max-width: 620px) {
+  /* The nav is the only thing that refuses to fit: let it wrap rather than pushing the document
+     wider than the viewport, which is what produced horizontal scroll on the whole page. */
+  .nav {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 10px 18px;
+  }
+
+  .nav__links {
+    gap: 14px;
+    font-size: 12px;
+  }
+
+  .hero,
+  .band__inner,
+  .section,
+  .cta,
+  .docs {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .hero {
+    padding-top: 48px;
+  }
+
+  .steps li {
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+  }
 }
