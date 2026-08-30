@@ -66,3 +66,6 @@ test-output
 # Next.js
 .next
 out
+
+# local verification artifacts
+viewer.png
