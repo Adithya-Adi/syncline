@@ -10,7 +10,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'rrweb-player/dist/style.css';
-import type { SessionResponse, TraceResponse, ViewerSpan } from '@syncline/protocol';
+import type {
+  SessionResponse,
+  TraceResponse,
+  ViewerSpan,
+} from '@syncline/protocol';
 
 const API = process.env.NEXT_PUBLIC_SYNCLINE_API ?? 'http://localhost:4000';
 
@@ -36,7 +40,10 @@ const LANES: { key: LaneKey; label: string; color: string }[] = [
 
 export function Viewer({ sessionId }: { sessionId: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<{ getReplayer: () => { getCurrentTime: () => number } } | null>(null);
+  const playerRef = useRef<{
+    getReplayer: () => { getCurrentTime: () => number };
+  } | null>(null);
+  const buildingRef = useRef(false);
 
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [traces, setTraces] = useState<Record<string, TraceResponse>>({});
@@ -56,7 +63,8 @@ export function Viewer({ sessionId }: { sessionId: string }) {
         const data = (await res.json()) as SessionResponse;
         if (!cancelled) setSession(data);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'could not load session');
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : 'could not load session');
       }
     })();
 
@@ -95,8 +103,15 @@ export function Viewer({ sessionId }: { sessionId: string }) {
   // ---------------------------------------------------------------- player
 
   useEffect(() => {
-    if (!session || !stageRef.current || playerRef.current) return;
+    if (!session || !stageRef.current) return;
+
+    // Claimed synchronously. `playerRef` is only assigned after two awaits, so checking it alone
+    // lets StrictMode's double-invoke — or any fast remount — build two players into one element.
+    if (buildingRef.current) return;
+    buildingRef.current = true;
+
     let cancelled = false;
+    let built: { $destroy?: () => void } | null = null;
 
     (async () => {
       const events: unknown[] = [];
@@ -107,34 +122,69 @@ export function Viewer({ sessionId }: { sessionId: string }) {
         events.push(...body.events);
       }
 
-      if (cancelled || !stageRef.current || events.length < 2) {
-        if (!cancelled && events.length < 2) setError('recording has too few events to replay');
+      if (cancelled || !stageRef.current) return;
+
+      // rrweb needs a full snapshot plus something after it before there is anything to play.
+      if (events.length < 2) {
+        setError('recording has too few events to replay');
         return;
       }
 
       // rrweb-player is a Svelte component and reaches for `document` at import time, so it is
       // loaded here rather than at module scope.
       const { default: RrwebPlayer } = await import('rrweb-player');
+      if (cancelled || !stageRef.current) return;
 
-      const width = Math.min(stageRef.current.clientWidth - 4, session.meta.viewport?.w ?? 1024);
-      const height = Math.round(width * ((session.meta.viewport?.h ?? 768) / (session.meta.viewport?.w ?? 1024)));
+      const recorded = session.meta.viewport ?? { w: 1024, h: 768 };
 
-      playerRef.current = new RrwebPlayer({
+      // Scale the recording into the space that is actually left, rather than letting its original
+      // viewport dictate the layout. Sizing from `recorded` alone pushes the strata off the bottom
+      // of the screen on any recording taller than the gap — which is the common case, and it
+      // hides the one thing this page exists to show.
+      //
+      // The controller is rrweb's own transport bar, drawn below the canvas and not counted in the
+      // height prop, so it has to come out of the budget explicitly.
+      const CONTROLLER_HEIGHT = 90;
+      const budgetWidth = Math.max(320, stageRef.current.clientWidth - 8);
+      const budgetHeight = Math.max(
+        200,
+        stageRef.current.clientHeight - 8 - CONTROLLER_HEIGHT,
+      );
+
+      const scale = Math.min(
+        budgetWidth / recorded.w,
+        budgetHeight / recorded.h,
+        1,
+      );
+      const width = Math.floor(recorded.w * scale);
+      const height = Math.floor(recorded.h * scale);
+
+      built = new RrwebPlayer({
         target: stageRef.current,
         props: {
           events: events as never,
           width,
           height,
           autoPlay: false,
-          // Syncline draws its own timeline; a second scrubber would be two clocks in one screen.
+          // rrweb's controller stays: it is the transport, and the strata below are a read-only
+          // view of the same clock. Building a second set of play controls would be the thing
+          // that introduces two clocks, not this.
           showController: true,
           mouseTail: false,
         },
       }) as never;
+
+      playerRef.current = built as never;
     })();
 
     return () => {
       cancelled = true;
+      // Svelte components are not garbage collected just because the element goes away — they
+      // keep timers and listeners running. Without this, navigating between recordings leaves a
+      // player playing into a detached DOM.
+      built?.$destroy?.();
+      playerRef.current = null;
+      buildingRef.current = false;
     };
   }, [session]);
 
@@ -143,7 +193,10 @@ export function Viewer({ sessionId }: { sessionId: string }) {
     let raf = 0;
     const tick = () => {
       const replayer = playerRef.current?.getReplayer?.();
-      if (replayer) setCurrentMs(replayer.getCurrentTime());
+      // Before playback starts, rrweb reports baselineTime minus the first event's timestamp,
+      // which is a large negative number rather than zero. Taken at face value it puts the core
+      // sample tens of thousands of pixels off the left edge.
+      if (replayer) setCurrentMs(Math.max(0, replayer.getCurrentTime()));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -176,7 +229,10 @@ export function Viewer({ sessionId }: { sessionId: string }) {
       for (const span of trace.spans) {
         out.push({
           key: `span:${span.spanId}`,
-          lane: typeof span.attributes['db.system'] === 'string' ? 'database' : 'backend',
+          lane:
+            typeof span.attributes['db.system'] === 'string'
+              ? 'database'
+              : 'backend',
           startMs: span.startClientMs,
           endMs: span.endClientMs,
           label: span.name,
@@ -196,11 +252,25 @@ export function Viewer({ sessionId }: { sessionId: string }) {
 
   const pct = useCallback(
     (ms: number) => ((ms - startMs) / durationMs) * 100,
-    [startMs, durationMs]
+    [startMs, durationMs],
+  );
+
+  // The player keeps counting past the last recorded event, so the playhead can exceed the
+  // timeline it is drawn on. Bars are real measurements and stay where they fall; the core sample
+  // is a cursor, and a cursor outside the chart is just gone.
+  const clampedPct = useCallback(
+    (ms: number) => Math.min(100, Math.max(0, pct(ms))),
+    [pct],
   );
 
   const playheadMs = session ? session.startedMs + currentMs : startMs;
-  const uncertaintyMs = Object.values(traces)[0]?.uncertaintyMs ?? 0;
+  // From this session's own calibration rather than whichever trace happened to arrive first:
+  // the band describes how well this recording's clock is known, and every trace it references
+  // inherits that same uncertainty.
+  const uncertaintyMs =
+    session && session.clock.rttMs >= 100
+      ? Math.round(session.clock.rttMs / 2)
+      : 0;
 
   // ----------------------------------------------------------------- render
 
@@ -221,11 +291,20 @@ export function Viewer({ sessionId }: { sessionId: string }) {
       <div className="railbar">
         <span className="wordmark">syncline</span>
         <Field label="session" value={session.id} />
-        {session.meta.url && <Field label="page" value={shortPath(session.meta.url)} />}
-        {session.meta.release && <Field label="release" value={session.meta.release} />}
-        {session.meta.user && <Field label="user" value={session.meta.user.id} />}
+        {session.meta.url && (
+          <Field label="page" value={shortPath(session.meta.url)} />
+        )}
+        {session.meta.release && (
+          <Field label="release" value={session.meta.release} />
+        )}
+        {session.meta.user && (
+          <Field label="user" value={session.meta.user.id} />
+        )}
         <Field label="duration" value={`${session.durationMs ?? 0}ms`} />
-        <Field label="skew" value={`${session.clock.offsetMs}ms ±${Math.round(session.clock.rttMs / 2)}`} />
+        <Field
+          label="skew"
+          value={`${session.clock.offsetMs}ms ±${Math.round(session.clock.rttMs / 2)}`}
+        />
       </div>
 
       <div className="stage" ref={stageRef} />
@@ -237,7 +316,10 @@ export function Viewer({ sessionId }: { sessionId: string }) {
           {LANES.map((lane) => (
             <div className="lane" key={lane.key}>
               <div className="lane__label">
-                <span className="lane__swatch" style={{ background: lane.color }} />
+                <span
+                  className="lane__swatch"
+                  style={{ background: lane.color }}
+                />
                 {lane.label}
               </div>
               <div className="lane__track">
@@ -246,7 +328,8 @@ export function Viewer({ sessionId }: { sessionId: string }) {
                   .map((bar) => {
                     const left = pct(bar.startMs);
                     const width = Math.max(0.25, pct(bar.endMs) - left);
-                    const live = playheadMs >= bar.startMs && playheadMs <= bar.endMs;
+                    const live =
+                      playheadMs >= bar.startMs && playheadMs <= bar.endMs;
                     return (
                       <button
                         key={bar.key}
@@ -263,7 +346,9 @@ export function Viewer({ sessionId }: { sessionId: string }) {
                         }}
                         title={`${bar.label} · ${Math.round(bar.endMs - bar.startMs)}ms`}
                       >
-                        {width > 12 && <span className="bar__caption">{bar.label}</span>}
+                        {width > 12 && (
+                          <span className="bar__caption">{bar.label}</span>
+                        )}
                       </button>
                     );
                   })}
@@ -279,13 +364,18 @@ export function Viewer({ sessionId }: { sessionId: string }) {
             <div
               className="uncertainty"
               style={{
-                left: `calc(108px + (100% - 108px) * ${pct(playheadMs - uncertaintyMs) / 100})`,
+                left: `calc(108px + (100% - 108px) * ${clampedPct(playheadMs - uncertaintyMs) / 100})`,
                 width: `calc((100% - 108px) * ${(uncertaintyMs * 2) / durationMs})`,
               }}
             />
           )}
 
-          <div className="core" style={{ left: `calc(108px + (100% - 108px) * ${pct(playheadMs) / 100})` }}>
+          <div
+            className="core"
+            style={{
+              left: `calc(108px + (100% - 108px) * ${clampedPct(playheadMs) / 100})`,
+            }}
+          >
             <span className="core__readout">{Math.round(currentMs)}ms</span>
           </div>
         </div>
@@ -314,7 +404,7 @@ function Ruler({ durationMs }: { durationMs: number }) {
         return (
           <span
             key={i}
-            className="strata__tick"
+            className={`strata__tick${i === steps ? ' strata__tick--last' : ''}`}
             style={{ left: `calc(108px + (100% - 108px) * ${at / 100})` }}
           >
             {Math.round((durationMs * i) / steps)}ms
@@ -346,7 +436,9 @@ function Detail({ bar }: { bar: Bar | null }) {
         <span className="eyebrow">{Math.round(bar.endMs - bar.startMs)}ms</span>
         {bar.span && <span className="eyebrow">{bar.span.serviceName}</span>}
         {bar.span && <span className="eyebrow">{bar.span.kind}</span>}
-        {bar.status !== undefined && <span className="eyebrow">HTTP {bar.status}</span>}
+        {bar.status !== undefined && (
+          <span className="eyebrow">HTTP {bar.status}</span>
+        )}
         {bar.error && <span style={{ color: 'var(--fault)' }}>error</span>}
       </div>
 

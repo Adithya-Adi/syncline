@@ -288,10 +288,14 @@ a {
 
 /* ---------------------------------------------------------------- viewer */
 
+/*
+ * A bounded height, not a minimum. The strata are the reason this page exists, so the player gets
+ * whatever vertical space is left over — never the other way round.
+ */
 .viewer {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .railbar {
@@ -325,14 +329,21 @@ a {
 }
 
 .stage {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
   background: var(--rock-900);
-  min-height: 320px;
-  overflow: auto;
+  /* Without min-height:0 a flex child refuses to shrink below its content, and an oversized
+     player would push the strata off the bottom of the screen. */
+  min-height: 0;
+  overflow: hidden;
+}
+
+.strata,
+.detail {
+  flex: 0 0 auto;
 }
 
 .stage__frame {
@@ -364,6 +375,15 @@ a {
   line-height: 22px;
   color: var(--bone-500);
   white-space: nowrap;
+}
+
+/* The final tick sits exactly on the right edge, so its label has to hang inwards or it is cut off. */
+.strata__tick--last {
+  border-left: 0;
+  border-right: 1px solid var(--rock-600);
+  padding-left: 0;
+  padding-right: 5px;
+  transform: translateX(-100%);
 }
 
 .strata__lanes {
@@ -455,7 +475,10 @@ a {
   top: 0;
   bottom: 0;
   width: 9px;
+  /* Kept inside the track at both extremes: centred normally, but a core half off the edge at
+     0% or 100% reads as a rendering fault rather than as the playhead reaching the end. */
   margin-left: -4px;
+  max-width: 9px;
   pointer-events: none;
   background: linear-gradient(
     180deg,
