@@ -3,7 +3,13 @@
 import { CircleCheck, Circle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { SetupStatus } from '@/lib/setup-status';
 
@@ -110,15 +116,17 @@ export function SetupProgress({
 
   return (
     <Card className={cn('mt-6', complete && 'border-primary/40')}>
-      <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+      <CardHeader>
         <CardTitle>
           {complete ? 'Everything is working' : 'Waiting for data'}
         </CardTitle>
         {!complete && (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            checking every 3s
-          </span>
+          <CardAction>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              checking every 3s
+            </span>
+          </CardAction>
         )}
       </CardHeader>
 

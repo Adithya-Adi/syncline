@@ -1,19 +1,14 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
 import { db } from '@/lib/db';
 import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Projects · Syncline' };
+
+const COLUMNS = 'minmax(0,1fr) 230px minmax(0,1fr) 110px';
 
 export default async function ProjectsPage() {
   const viewer = await requireViewer();
@@ -39,55 +34,41 @@ export default async function ProjectsPage() {
           to get a key and start recording.
         </p>
       ) : (
-        <div className="mt-6 rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead className="w-[230px]">Public key</TableHead>
-                <TableHead>Allowed origins</TableHead>
-                <TableHead className="w-[130px] text-right">
-                  Recordings
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell className="p-0" colSpan={4}>
-                    <Link
-                      href={`/projects/${project.id}`}
-                      className="grid grid-cols-[1fr_230px_1fr_130px] items-center px-4 py-2.5 text-sm"
-                    >
-                      <span className="truncate pr-4 font-medium">
-                        {project.name}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {truncateKey(project.publicKey)}
-                      </span>
-                      <span className="truncate pr-4 font-mono text-xs text-muted-foreground">
-                        {project.origins.length > 0
-                          ? project.origins.join(', ')
-                          : '—'}
-                      </span>
-                      <span className="text-right">
-                        {project._count.sessions > 0 ? (
-                          <span className="font-mono text-xs tabular-nums">
-                            {project._count.sessions}
-                          </span>
-                        ) : (
-                          // A project that has never received anything needs a next action, not a
-                          // zero it cannot act on.
-                          <Badge variant="secondary">Set up</Badge>
-                        )}
-                      </span>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataList columns={COLUMNS}>
+          <DataListHeader columns={COLUMNS}>
+            <span>Name</span>
+            <span>Public key</span>
+            <span>Allowed origins</span>
+            <span className="text-right">Recordings</span>
+          </DataListHeader>
+
+          {projects.map((project) => (
+            <DataListRow
+              key={project.id}
+              href={`/projects/${project.id}`}
+              columns={COLUMNS}
+            >
+              <span className="truncate font-medium">{project.name}</span>
+              <span className="font-mono text-xs text-muted-foreground">
+                {truncateKey(project.publicKey)}
+              </span>
+              <span className="truncate font-mono text-xs text-muted-foreground">
+                {project.origins.length > 0 ? project.origins.join(', ') : '—'}
+              </span>
+              <span className="text-right">
+                {project._count.sessions > 0 ? (
+                  <span className="font-mono text-xs tabular-nums">
+                    {project._count.sessions}
+                  </span>
+                ) : (
+                  // A project that has never received anything needs a next action, not a zero it
+                  // cannot act on.
+                  <Badge variant="secondary">Set up</Badge>
+                )}
+              </span>
+            </DataListRow>
+          ))}
+        </DataList>
       )}
     </main>
   );

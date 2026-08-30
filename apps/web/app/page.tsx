@@ -210,7 +210,7 @@ export default function Landing() {
 
         <section className="section">
           <h2 className="h2">What makes it different</h2>
-          <div className="grid">
+          <div className="feature-grid">
             {PROPERTIES.map((p) => (
               <div className="card" key={p.title}>
                 <h3 className="card__title">{p.title}</h3>
