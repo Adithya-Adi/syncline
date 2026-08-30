@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Wordmark } from '@/components/logo';
 import { isInstanceUnclaimed } from '@/lib/auth';
 import { SignUpForm } from './form';
 
@@ -21,10 +20,6 @@ export default async function SignUpPage() {
 
   return (
     <>
-      <Link href="/" className="lg:hidden">
-        <Wordmark />
-      </Link>
-
       <h1 className="mt-8 text-2xl font-semibold lg:mt-0">
         Claim this instance
       </h1>

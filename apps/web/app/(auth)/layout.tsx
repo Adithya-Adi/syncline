@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 import { Fold } from '@/app/(marketing)/fold';
 import { LogoMark } from '@/components/logo';
@@ -17,6 +18,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="relative flex items-center justify-center px-6 py-16">
+        <Link
+          href="/"
+          className="absolute top-5 left-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" />
+          Home
+        </Link>
         <ThemeToggle className="absolute top-5 right-5" />
         <div className="w-full max-w-sm">{children}</div>
       </div>
