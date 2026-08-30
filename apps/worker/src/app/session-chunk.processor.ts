@@ -23,7 +23,7 @@ export class SessionChunkProcessor {
 
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly storage: ObjectStore
+    private readonly storage: ObjectStore,
   ) {}
 
   async process(job: Job<SessionChunkJob>): Promise<void> {
@@ -37,7 +37,7 @@ export class SessionChunkProcessor {
     // let a chunk be filed under someone else's session.
     if (parsed.sessionId !== sessionId || parsed.seq !== seq) {
       throw new UnrecoverableChunkError(
-        `chunk body (${parsed.sessionId}/${parsed.seq}) disagrees with its path (${sessionId}/${seq})`
+        `chunk body (${parsed.sessionId}/${parsed.seq}) disagrees with its path (${sessionId}/${seq})`,
       );
     }
 
@@ -60,7 +60,9 @@ export class SessionChunkProcessor {
           clockOffsetMs: parsed.clock.offsetMs,
           rttMs: parsed.clock.rttMs,
           ...(parsed.meta?.url ? { url: parsed.meta.url } : {}),
-          ...(parsed.meta?.userAgent ? { userAgent: parsed.meta.userAgent } : {}),
+          ...(parsed.meta?.userAgent
+            ? { userAgent: parsed.meta.userAgent }
+            : {}),
           ...(parsed.meta?.release ? { release: parsed.meta.release } : {}),
           ...(parsed.meta?.user?.id ? { userId: parsed.meta.user.id } : {}),
           ...(parsed.meta?.viewport ? { viewport: parsed.meta.viewport } : {}),
@@ -89,7 +91,12 @@ export class SessionChunkProcessor {
       });
 
       if (parsed.links.length > 0) {
-        await tx.requestLink.deleteMany({ where: { sessionId, spanId: { in: parsed.links.map((l) => l.spanId) } } });
+        await tx.requestLink.deleteMany({
+          where: {
+            sessionId,
+            spanId: { in: parsed.links.map((l) => l.spanId) },
+          },
+        });
         await tx.requestLink.createMany({
           data: parsed.links.map((link) => ({
             sessionId,
@@ -118,14 +125,15 @@ export class SessionChunkProcessor {
           data: {
             startedAt: bounds._min.startedAt,
             endedAt: bounds._max.endedAt,
-            durationMs: bounds._max.endedAt.getTime() - bounds._min.startedAt.getTime(),
+            durationMs:
+              bounds._max.endedAt.getTime() - bounds._min.startedAt.getTime(),
           },
         });
       }
     });
 
     this.logger.log(
-      `session ${sessionId} seq ${seq}: ${parsed.events.length} events, ${parsed.links.length} links`
+      `session ${sessionId} seq ${seq}: ${parsed.events.length} events, ${parsed.links.length} links`,
     );
   }
 
@@ -134,7 +142,9 @@ export class SessionChunkProcessor {
     try {
       json = JSON.parse(raw.toString('utf8'));
     } catch (error) {
-      throw new UnrecoverableChunkError(`${storageKey} is not valid JSON: ${(error as Error).message}`);
+      throw new UnrecoverableChunkError(
+        `${storageKey} is not valid JSON: ${(error as Error).message}`,
+      );
     }
 
     const result = sessionChunkSchema.safeParse(json);
@@ -145,7 +155,7 @@ export class SessionChunkProcessor {
         `${storageKey} failed validation: ${result.error.issues
           .slice(0, 3)
           .map((i) => `${i.path.join('.')} ${i.message}`)
-          .join('; ')}`
+          .join('; ')}`,
       );
     }
 
@@ -165,7 +175,10 @@ export class UnrecoverableChunkError extends UnrecoverableError {}
  * rrweb stamps every event with a client timestamp. Syncline's own custom events are excluded:
  * they mark request boundaries and can sit outside the window of recorded DOM activity.
  */
-export function eventTimestamps(events: unknown[]): { first?: number; last?: number } {
+export function eventTimestamps(events: unknown[]): {
+  first?: number;
+  last?: number;
+} {
   let first: number | undefined;
   let last: number | undefined;
 
@@ -177,5 +190,8 @@ export function eventTimestamps(events: unknown[]): { first?: number; last?: num
     if (last === undefined || ts > last) last = ts;
   }
 
-  return { ...(first !== undefined ? { first } : {}), ...(last !== undefined ? { last } : {}) };
+  return {
+    ...(first !== undefined ? { first } : {}),
+    ...(last !== undefined ? { last } : {}),
+  };
 }

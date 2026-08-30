@@ -32,7 +32,7 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export function resolveSession(
   storage: StorageLike | undefined,
   now = Date.now(),
-  idleTimeoutMs = IDLE_TIMEOUT_MS
+  idleTimeoutMs = IDLE_TIMEOUT_MS,
 ): SessionState {
   if (!storage) return { id: ulid(now), isNew: true };
 
@@ -59,10 +59,17 @@ export function resolveSession(
   return { id, isNew: true };
 }
 
-export function touch(storage: StorageLike | undefined, id: string, now = Date.now()): void {
+export function touch(
+  storage: StorageLike | undefined,
+  id: string,
+  now = Date.now(),
+): void {
   if (!storage) return;
   try {
-    storage.setItem(STORAGE_KEY, JSON.stringify({ id, lastSeenMs: now } satisfies StoredSession));
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ id, lastSeenMs: now } satisfies StoredSession),
+    );
   } catch {
     // Quota or a blocked storage API. Not worth interrupting the page for.
   }

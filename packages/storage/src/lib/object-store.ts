@@ -61,15 +61,19 @@ export class ObjectStore {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return 'existing';
     } catch (error) {
-      const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
-        ?.httpStatusCode;
+      const status = (error as { $metadata?: { httpStatusCode?: number } })
+        .$metadata?.httpStatusCode;
       if (status !== 404) throw error;
       await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
       return 'created';
     }
   }
 
-  async put(key: string, body: Buffer, options: PutOptions = {}): Promise<void> {
+  async put(
+    key: string,
+    body: Buffer,
+    options: PutOptions = {},
+  ): Promise<void> {
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -77,14 +81,16 @@ export class ObjectStore {
         Body: body,
         ContentLength: body.byteLength,
         ...(options.contentType ? { ContentType: options.contentType } : {}),
-        ...(options.contentEncoding ? { ContentEncoding: options.contentEncoding } : {}),
-      })
+        ...(options.contentEncoding
+          ? { ContentEncoding: options.contentEncoding }
+          : {}),
+      }),
     );
   }
 
   async get(key: string): Promise<Buffer> {
     const result = await this.client.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: key })
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
     );
     if (!result.Body) throw new Error(`object ${key} has no body`);
     return Buffer.from(await result.Body.transformToByteArray());
@@ -101,7 +107,9 @@ export class ObjectStore {
   async getMaybeGzipped(key: string): Promise<Buffer> {
     const bytes = await this.get(key);
     const gzipped =
-      bytes.length >= 2 && bytes[0] === GZIP_MAGIC[0] && bytes[1] === GZIP_MAGIC[1];
+      bytes.length >= 2 &&
+      bytes[0] === GZIP_MAGIC[0] &&
+      bytes[1] === GZIP_MAGIC[1];
     return gzipped ? gunzipSync(bytes) : bytes;
   }
 }

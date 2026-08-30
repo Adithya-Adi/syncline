@@ -19,7 +19,11 @@ export interface TransportOptions {
   fetchImpl: typeof fetch;
 }
 
-export function chunkUrl(endpoint: string, sessionId: string, seq: number): string {
+export function chunkUrl(
+  endpoint: string,
+  sessionId: string,
+  seq: number,
+): string {
   return `${endpoint}/v1/ingest/session/${sessionId}/${seq}`;
 }
 
@@ -32,7 +36,7 @@ export function chunkUrl(endpoint: string, sessionId: string, seq: number): stri
  */
 export async function encodeBody(
   payload: SessionChunk,
-  compress = true
+  compress = true,
 ): Promise<{ body: BodyInit; gzipped: boolean }> {
   const json = JSON.stringify(payload);
 
@@ -41,7 +45,9 @@ export async function encodeBody(
   }
 
   try {
-    const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+    const stream = new Blob([json])
+      .stream()
+      .pipeThrough(new CompressionStream('gzip'));
     return { body: await new Response(stream).blob(), gzipped: true };
   } catch {
     return { body: json, gzipped: false };
@@ -58,25 +64,28 @@ export async function sendChunk(
   sessionId: string,
   seq: number,
   payload: SessionChunk,
-  sendOptions: SendOptions = {}
+  sendOptions: SendOptions = {},
 ): Promise<boolean> {
   const keepalive = sendOptions.keepalive ?? false;
   const { body, gzipped } = await encodeBody(payload, !keepalive);
 
   try {
-    const response = await options.fetchImpl(chunkUrl(options.endpoint, sessionId, seq), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(gzipped ? { 'content-encoding': 'gzip' } : {}),
-        [INGEST_KEY_HEADER]: options.key,
+    const response = await options.fetchImpl(
+      chunkUrl(options.endpoint, sessionId, seq),
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(gzipped ? { 'content-encoding': 'gzip' } : {}),
+          [INGEST_KEY_HEADER]: options.key,
+        },
+        body,
+        // Recording is never worth sending someone's cookies. The key identifies the project; there
+        // is nothing here to authenticate as.
+        credentials: 'omit',
+        keepalive,
       },
-      body,
-      // Recording is never worth sending someone's cookies. The key identifies the project; there
-      // is nothing here to authenticate as.
-      credentials: 'omit',
-      keepalive,
-    });
+    );
 
     return response.ok;
   } catch {

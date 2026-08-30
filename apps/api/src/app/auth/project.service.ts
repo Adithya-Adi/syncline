@@ -28,7 +28,7 @@ export class ProjectService {
       this.prisma.client.project.findUnique({
         where: { publicKey },
         select: { id: true, name: true, origins: true },
-      })
+      }),
     );
   }
 
@@ -42,14 +42,14 @@ export class ProjectService {
       this.prisma.client.project.findUnique({
         where: { secretKeyHash: hash },
         select: { id: true, name: true, origins: true },
-      })
+      }),
     );
   }
 
   /** Negative results are cached too, so a key sprayed at the endpoint costs one query, not many. */
   private async resolve(
     cacheKey: string,
-    query: () => Promise<ResolvedProject | null>
+    query: () => Promise<ResolvedProject | null>,
   ): Promise<ResolvedProject | null> {
     const now = Date.now();
     const cached = this.cache.get(cacheKey);

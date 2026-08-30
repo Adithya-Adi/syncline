@@ -6,18 +6,10 @@
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
     "emitDeclarationOnly": false,
     "forceConsistentCasingInFileNames": true,
-    "types": [
-      "node"
-    ],
-    "lib": [
-      "es2022",
-      "dom",
-      "dom.iterable"
-    ]
+    "types": ["node"],
+    "lib": ["es2022", "dom", "dom.iterable"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "references": [
     {
       "path": "../protocol/tsconfig.lib.json"

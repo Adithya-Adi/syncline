@@ -19,12 +19,18 @@ describe('readBody', () => {
   });
 
   it('reassembles a body split across chunks', async () => {
-    const body = await readBody(request([Buffer.from('{"a":'), Buffer.from('1}')]), 1024);
+    const body = await readBody(
+      request([Buffer.from('{"a":'), Buffer.from('1}')]),
+      1024,
+    );
     expect(body.bytes.toString()).toBe('{"a":1}');
   });
 
   it('detects gzip from the payload, not from a header we were told about', async () => {
-    const body = await readBody(request([gzipSync(Buffer.from('{"a":1}'))]), 1024);
+    const body = await readBody(
+      request([gzipSync(Buffer.from('{"a":1}'))]),
+      1024,
+    );
     expect(body.gzipped).toBe(true);
   });
 
@@ -42,7 +48,9 @@ describe('readBody', () => {
 
   it('rejects a body over the limit', async () => {
     const big = Buffer.alloc(200, 0x61);
-    await expect(readBody(request([big]), 100)).rejects.toBeInstanceOf(PayloadTooLargeException);
+    await expect(readBody(request([big]), 100)).rejects.toBeInstanceOf(
+      PayloadTooLargeException,
+    );
   });
 
   it('stops reading without destroying the socket, so the 413 can be written', async () => {
@@ -51,7 +59,9 @@ describe('readBody', () => {
     const destroy = jest.fn();
     stream.destroy = destroy as unknown as IncomingMessage['destroy'];
 
-    await expect(readBody(stream, 100)).rejects.toBeInstanceOf(PayloadTooLargeException);
+    await expect(readBody(stream, 100)).rejects.toBeInstanceOf(
+      PayloadTooLargeException,
+    );
     expect(destroy).not.toHaveBeenCalled();
   });
 

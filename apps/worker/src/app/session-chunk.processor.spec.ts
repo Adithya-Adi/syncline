@@ -33,7 +33,9 @@ function job(over: Partial<SessionChunkJob> = {}): Job<SessionChunkJob> {
 }
 
 function storageReturning(body: Buffer): ObjectStore {
-  return { getMaybeGzipped: jest.fn().mockResolvedValue(body) } as unknown as ObjectStore;
+  return {
+    getMaybeGzipped: jest.fn().mockResolvedValue(body),
+  } as unknown as ObjectStore;
 }
 
 /** Enough of Prisma to see what the processor tried to write. */
@@ -47,7 +49,9 @@ function fakePrisma() {
     requestLink: { deleteMany: jest.fn(), createMany: jest.fn() },
   };
   const prisma = {
-    $transaction: jest.fn(async (fn: (t: typeof tx) => Promise<void>) => fn(tx)),
+    $transaction: jest.fn(async (fn: (t: typeof tx) => Promise<void>) =>
+      fn(tx),
+    ),
   } as unknown as PrismaClient;
   return { prisma, tx };
 }
@@ -55,17 +59,26 @@ function fakePrisma() {
 describe('validation', () => {
   it('rejects a body that is not JSON, without retrying', async () => {
     const { prisma } = fakePrisma();
-    const processor = new SessionChunkProcessor(prisma, storageReturning(Buffer.from('not json')));
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from('not json')),
+    );
 
-    await expect(processor.process(job())).rejects.toBeInstanceOf(UnrecoverableChunkError);
+    await expect(processor.process(job())).rejects.toBeInstanceOf(
+      UnrecoverableChunkError,
+    );
   });
 
   it('rejects a body that fails the schema, without retrying', async () => {
     const { prisma } = fakePrisma();
-    const bad = Buffer.from(JSON.stringify({ ...CHUNK, sessionId: 'not-a-ulid' }));
+    const bad = Buffer.from(
+      JSON.stringify({ ...CHUNK, sessionId: 'not-a-ulid' }),
+    );
     const processor = new SessionChunkProcessor(prisma, storageReturning(bad));
 
-    await expect(processor.process(job())).rejects.toBeInstanceOf(UnrecoverableChunkError);
+    await expect(processor.process(job())).rejects.toBeInstanceOf(
+      UnrecoverableChunkError,
+    );
   });
 
   it('refuses a chunk whose body disagrees with the path it was stored under', async () => {
@@ -73,7 +86,9 @@ describe('validation', () => {
     const body = Buffer.from(JSON.stringify({ ...CHUNK, seq: 5 }));
     const processor = new SessionChunkProcessor(prisma, storageReturning(body));
 
-    await expect(processor.process(job({ seq: 0 }))).rejects.toThrow(/disagrees with its path/);
+    await expect(processor.process(job({ seq: 0 }))).rejects.toThrow(
+      /disagrees with its path/,
+    );
     expect(tx.session.upsert).not.toHaveBeenCalled();
   });
 
@@ -84,7 +99,9 @@ describe('validation', () => {
 
     await processor.process(job());
 
-    expect(storage.getMaybeGzipped).toHaveBeenCalledWith(`sessions/proj_1/${SESSION_ID}/0.json.gz`);
+    expect(storage.getMaybeGzipped).toHaveBeenCalledWith(
+      `sessions/proj_1/${SESSION_ID}/0.json.gz`,
+    );
     expect(tx.sessionChunk.upsert).toHaveBeenCalled();
   });
 });
@@ -94,7 +111,7 @@ describe('writes', () => {
     const { prisma, tx } = fakePrisma();
     const processor = new SessionChunkProcessor(
       prisma,
-      storageReturning(Buffer.from(JSON.stringify(CHUNK)))
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
     );
 
     await processor.process(job());
@@ -110,7 +127,7 @@ describe('writes', () => {
     const { prisma, tx } = fakePrisma();
     const processor = new SessionChunkProcessor(
       prisma,
-      storageReturning(Buffer.from(JSON.stringify(CHUNK)))
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
     );
 
     await processor.process(job());
@@ -139,7 +156,7 @@ describe('writes', () => {
     };
     const processor = new SessionChunkProcessor(
       prisma,
-      storageReturning(Buffer.from(JSON.stringify(withLinks)))
+      storageReturning(Buffer.from(JSON.stringify(withLinks))),
     );
 
     await processor.process(job());
@@ -157,7 +174,7 @@ describe('writes', () => {
     const { prisma } = fakePrisma();
     const processor = new SessionChunkProcessor(
       prisma,
-      storageReturning(Buffer.from(JSON.stringify(CHUNK)))
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
     );
 
     await processor.process(job());
@@ -172,7 +189,7 @@ describe('eventTimestamps', () => {
         { type: 3, timestamp: 300 },
         { type: 3, timestamp: 100 },
         { type: 3, timestamp: 200 },
-      ])
+      ]),
     ).toEqual({ first: 100, last: 300 });
   });
 
@@ -180,8 +197,12 @@ describe('eventTimestamps', () => {
     expect(
       eventTimestamps([
         { type: 3, timestamp: 200 },
-        { type: 5, timestamp: 1, data: { tag: 'syncline.request', payload: {} } },
-      ])
+        {
+          type: 5,
+          timestamp: 1,
+          data: { tag: 'syncline.request', payload: {} },
+        },
+      ]),
     ).toEqual({ first: 200, last: 200 });
   });
 

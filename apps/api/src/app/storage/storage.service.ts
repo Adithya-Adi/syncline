@@ -37,7 +37,11 @@ export class StorageService implements OnModuleInit {
     this.logger.log(`bucket "${this.store.bucket}" ${state}`);
   }
 
-  async put(key: string, body: Buffer, options: PutOptions = {}): Promise<void> {
+  async put(
+    key: string,
+    body: Buffer,
+    options: PutOptions = {},
+  ): Promise<void> {
     await this.store.put(key, body, options);
   }
 

@@ -34,7 +34,7 @@ export interface TraceContextOptions {
 function contextFor(
   url: string,
   method: string,
-  options: TraceContextOptions
+  options: TraceContextOptions,
 ): RequestStartPayload | null {
   if (!shouldTrace(url, options.traceOrigins, options.pageOrigin)) return null;
 
@@ -59,18 +59,19 @@ type FetchTarget = { fetch: typeof fetch };
 export function installFetchPatch(
   target: FetchTarget,
   options: TraceContextOptions,
-  hooks: TraceHooks
+  hooks: TraceHooks,
 ): () => void {
   const original = target.fetch;
 
   target.fetch = async function patchedFetch(
     input: RequestInfo | URL,
-    init?: RequestInit
+    init?: RequestInit,
   ): Promise<Response> {
     let started: RequestStartPayload | null = null;
 
     try {
-      const isRequest = typeof Request !== 'undefined' && input instanceof Request;
+      const isRequest =
+        typeof Request !== 'undefined' && input instanceof Request;
       const url = isRequest ? input.url : String(input);
       const method = init?.method ?? (isRequest ? input.method : 'GET');
 
@@ -88,7 +89,9 @@ export function installFetchPatch(
         if (isRequest && !init?.headers) {
           input.headers.set(TRACEPARENT_HEADER, header);
         } else {
-          const headers = new Headers(init?.headers ?? (isRequest ? input.headers : undefined));
+          const headers = new Headers(
+            init?.headers ?? (isRequest ? input.headers : undefined),
+          );
           headers.set(TRACEPARENT_HEADER, header);
           init = { ...init, headers };
         }
@@ -103,7 +106,13 @@ export function installFetchPatch(
     try {
       const response = await original.call(target, input as RequestInfo, init);
       if (started) {
-        safely(() => hooks.onEnd({ spanId: started.spanId, endMs: Date.now(), status: response.status }));
+        safely(() =>
+          hooks.onEnd({
+            spanId: started.spanId,
+            endMs: Date.now(),
+            status: response.status,
+          }),
+        );
       }
       return response;
     } catch (error) {
@@ -112,8 +121,11 @@ export function installFetchPatch(
           hooks.onEnd({
             spanId: started.spanId,
             endMs: Date.now(),
-            error: error instanceof Error ? error.message.slice(0, 256) : 'network error',
-          })
+            error:
+              error instanceof Error
+                ? error.message.slice(0, 256)
+                : 'network error',
+          }),
         );
       }
       throw error;
@@ -132,7 +144,7 @@ interface PatchedXhr extends XMLHttpRequest {
 export function installXhrPatch(
   ctor: typeof XMLHttpRequest,
   options: TraceContextOptions,
-  hooks: TraceHooks
+  hooks: TraceHooks,
 ): () => void {
   const originalOpen = ctor.prototype.open;
   const originalSend = ctor.prototype.send;
@@ -152,14 +164,21 @@ export function installXhrPatch(
     return originalOpen.apply(this, [method, url, ...rest] as never);
   } as typeof ctor.prototype.open;
 
-  ctor.prototype.send = function send(this: PatchedXhr, body?: Document | XMLHttpRequestBodyInit | null) {
+  ctor.prototype.send = function send(
+    this: PatchedXhr,
+    body?: Document | XMLHttpRequestBodyInit | null,
+  ) {
     const started = this.__syncline;
 
     if (started) {
       safely(() => {
         this.setRequestHeader(
           TRACEPARENT_HEADER,
-          formatTraceparent({ traceId: started.traceId, spanId: started.spanId, sampled: true })
+          formatTraceparent({
+            traceId: started.traceId,
+            spanId: started.spanId,
+            sampled: true,
+          }),
         );
         hooks.onStart(started);
 
@@ -172,8 +191,10 @@ export function installXhrPatch(
               endMs: Date.now(),
               // status is 0 for network errors and aborts; reporting that as a status code would
               // be a lie, so it becomes an error instead.
-              ...(this.status > 0 ? { status: this.status } : { error: 'request failed' }),
-            })
+              ...(this.status > 0
+                ? { status: this.status }
+                : { error: 'request failed' }),
+            }),
           );
         });
       });

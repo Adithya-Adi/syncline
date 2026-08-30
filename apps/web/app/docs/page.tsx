@@ -98,10 +98,10 @@ export default function DocsOverview() {
       </ul>
 
       <div className="callout callout--warn">
-        <strong>Pre-alpha.</strong> Read access is currently gated only by
-        recordings having unguessable identifiers. Accounts, organizations and
-        per-project access control are being built now. Until then, run Syncline
-        on a trusted network.
+        <strong>Pre-alpha.</strong> Recordings are scoped to the organization
+        that owns them and the dashboard requires an account, but there are
+        still no invitations, no roles beyond owner and member, and no retention
+        or deletion. Do not point this at production traffic yet.
       </div>
     </>
   );

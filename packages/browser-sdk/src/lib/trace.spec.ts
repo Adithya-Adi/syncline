@@ -12,9 +12,13 @@ function harness(fetchImpl?: typeof fetch) {
     fetch: (fetchImpl ??
       (async (input: RequestInfo | URL, init?: RequestInit) => {
         const headers = new Headers(
-          init?.headers ?? (input instanceof Request ? input.headers : undefined)
+          init?.headers ??
+            (input instanceof Request ? input.headers : undefined),
         );
-        calls.push({ url: input instanceof Request ? input.url : String(input), headers });
+        calls.push({
+          url: input instanceof Request ? input.url : String(input),
+          headers,
+        });
         return new Response('{}', { status: 200 });
       })) as typeof fetch,
   };
@@ -41,7 +45,10 @@ describe('header injection', () => {
 
     await target.fetch(`${PAGE_ORIGIN}/api/checkout`);
 
-    expect(parseTraceparent(calls[0].headers.get(TRACEPARENT_HEADER) as string)?.sampled).toBe(true);
+    expect(
+      parseTraceparent(calls[0].headers.get(TRACEPARENT_HEADER) as string)
+        ?.sampled,
+    ).toBe(true);
   });
 
   it('never injects cross-origin, which would leak ids and break their preflight', async () => {
@@ -70,8 +77,12 @@ describe('header injection', () => {
     await target.fetch('/a');
     await target.fetch('/b');
 
-    const first = parseTraceparent(calls[0].headers.get(TRACEPARENT_HEADER) as string);
-    const second = parseTraceparent(calls[1].headers.get(TRACEPARENT_HEADER) as string);
+    const first = parseTraceparent(
+      calls[0].headers.get(TRACEPARENT_HEADER) as string,
+    );
+    const second = parseTraceparent(
+      calls[1].headers.get(TRACEPARENT_HEADER) as string,
+    );
     expect(first?.traceId).not.toBe(second?.traceId);
   });
 
@@ -94,25 +105,28 @@ describe('header injection', () => {
 describe('hooks', () => {
   it('reports the status the client actually saw', async () => {
     const { target, hooks } = harness(
-      (async () => new Response('', { status: 500 })) as unknown as typeof fetch
+      (async () =>
+        new Response('', { status: 500 })) as unknown as typeof fetch,
     );
     installFetchPatch(target, OPTIONS, hooks);
 
     await target.fetch('/api/checkout');
 
-    expect(hooks.onEnd).toHaveBeenCalledWith(expect.objectContaining({ status: 500 }));
+    expect(hooks.onEnd).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 500 }),
+    );
   });
 
   it('closes the span with an error when the request throws, and rethrows', async () => {
-    const { target, hooks } = harness(
-      (async () => {
-        throw new Error('offline');
-      }) as unknown as typeof fetch
-    );
+    const { target, hooks } = harness((async () => {
+      throw new Error('offline');
+    }) as unknown as typeof fetch);
     installFetchPatch(target, OPTIONS, hooks);
 
     await expect(target.fetch('/api/checkout')).rejects.toThrow('offline');
-    expect(hooks.onEnd).toHaveBeenCalledWith(expect.objectContaining({ error: 'offline' }));
+    expect(hooks.onEnd).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'offline' }),
+    );
   });
 
   it('pairs start and end by span id', async () => {
@@ -121,7 +135,8 @@ describe('hooks', () => {
 
     await target.fetch('/api/checkout');
 
-    const started = (hooks.onStart as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const started = (hooks.onStart as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
     const ended = (hooks.onEnd as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(ended.spanId).toBe(started.spanId);
   });
@@ -132,7 +147,8 @@ describe('hooks', () => {
 
     await target.fetch('/search?token=secret123&page=2');
 
-    const started = (hooks.onStart as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const started = (hooks.onStart as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
     expect(started.url).toBe(`${PAGE_ORIGIN}/search?token&page`);
     expect(started.url).not.toContain('secret123');
   });

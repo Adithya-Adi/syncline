@@ -6,7 +6,9 @@ import { z } from 'zod';
  * would quietly require the worker to hold configuration it never reads.
  */
 const schema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  NODE_ENV: z
+    .enum(['development', 'test', 'production'])
+    .default('development'),
 
   DATABASE_URL: z.string().min(1),
   DATABASE_MAX_CONNECTIONS: z.coerce.number().int().positive().optional(),
@@ -36,7 +38,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
       .join('\n');
     throw new Error(
       `Invalid environment configuration:\n${problems}\n\n` +
-        'Copy .env.example to .env for local development.'
+        'Copy .env.example to .env for local development.',
     );
   }
 

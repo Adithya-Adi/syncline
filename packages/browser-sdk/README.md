@@ -31,7 +31,7 @@ Subdomains do not match, because a third-party widget can be parked on one.
 **Never trace itself.** `window.fetch` is captured before the patch is installed, so the SDK's own
 uploads and clock probes carry no header and never appear in their own recording.
 
-**Mask by default.** `maskAllInputs` is on unless you turn it off. Query *values* are stripped from
+**Mask by default.** `maskAllInputs` is on unless you turn it off. Query _values_ are stripped from
 recorded URLs and only keys kept — `?token=abc&page=2` becomes `?token&page`. Fragments are dropped
 entirely, since implicit-flow tokens live there.
 
@@ -59,15 +59,15 @@ across all in-flight requests, which is where the flush threshold comes from.
 
 ## Options
 
-| Option | Default | |
-| --- | --- | --- |
-| `key` | — | Public project key, `pk_*` |
-| `endpoint` | — | Syncline API base URL |
-| `traceOrigins` | page origin | Origins that receive a `traceparent` |
-| `release` | — | Ties a replay to a deploy |
-| `user` | — | `{ id }` |
-| `maskAllInputs` | `true` | Masks every input, textarea and select |
-| `debug` | `false` | SDK diagnostics to the console |
+| Option          | Default     |                                        |
+| --------------- | ----------- | -------------------------------------- |
+| `key`           | —           | Public project key, `pk_*`             |
+| `endpoint`      | —           | Syncline API base URL                  |
+| `traceOrigins`  | page origin | Origins that receive a `traceparent`   |
+| `release`       | —           | Ties a replay to a deploy              |
+| `user`          | —           | `{ id }`                               |
+| `maskAllInputs` | `true`      | Masks every input, textarea and select |
+| `debug`         | `false`     | SDK diagnostics to the console         |
 
 ## The one thing an integrator has to do
 

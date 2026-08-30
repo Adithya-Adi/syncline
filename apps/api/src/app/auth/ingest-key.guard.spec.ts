@@ -1,4 +1,8 @@
-import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { INGEST_KEY_HEADER, type KeyKind } from '@syncline/protocol';
 import { IngestKeyGuard } from './ingest-key.guard.js';
@@ -24,7 +28,10 @@ function contextFor(headers: Record<string, unknown>) {
   };
 }
 
-function guardWith(required: KeyKind | undefined, project: ResolvedProject | null = PROJECT) {
+function guardWith(
+  required: KeyKind | undefined,
+  project: ResolvedProject | null = PROJECT,
+) {
   const reflector = { get: () => required } as unknown as Reflector;
   const projects = {
     byPublicKey: jest.fn().mockResolvedValue(project),
@@ -45,13 +52,17 @@ describe('key validation', () => {
   it('rejects a missing key', async () => {
     const { guard } = guardWith('public');
     const { ctx } = contextFor({});
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('rejects a malformed key before touching the database', async () => {
     const { guard, projects } = guardWith('public');
     const { ctx } = contextFor({ [INGEST_KEY_HEADER]: 'pk_short' });
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
     expect(projects.byPublicKey).not.toHaveBeenCalled();
   });
 
@@ -61,13 +72,17 @@ describe('key validation', () => {
       [INGEST_KEY_HEADER]: SECRET_KEY,
       origin: 'https://app.acme.com',
     });
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('refuses a public key on a server route', async () => {
     const { guard } = guardWith('secret');
     const { ctx } = contextFor({ [INGEST_KEY_HEADER]: PUBLIC_KEY });
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('rejects a well-formed key that matches no project', async () => {
@@ -76,7 +91,9 @@ describe('key validation', () => {
       [INGEST_KEY_HEADER]: PUBLIC_KEY,
       origin: 'https://app.acme.com',
     });
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 });
 
@@ -87,13 +104,17 @@ describe('origin allowlist', () => {
       [INGEST_KEY_HEADER]: PUBLIC_KEY,
       origin: 'https://evil.example',
     });
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('requires an Origin header at all for browser ingest', async () => {
     const { guard } = guardWith('public');
     const { ctx } = contextFor({ [INGEST_KEY_HEADER]: PUBLIC_KEY });
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('does not apply to secret keys, which are not sent by browsers', async () => {

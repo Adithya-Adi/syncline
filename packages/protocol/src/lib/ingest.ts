@@ -7,7 +7,11 @@
  */
 
 import { z } from 'zod';
-import { MAX_EVENTS_PER_CHUNK, MAX_LINKS_PER_CHUNK, MAX_CHUNKS_PER_SESSION } from './limits.js';
+import {
+  MAX_EVENTS_PER_CHUNK,
+  MAX_LINKS_PER_CHUNK,
+  MAX_CHUNKS_PER_SESSION,
+} from './limits.js';
 
 const traceId = z.string().regex(/^[0-9a-f]{32}$/);
 const spanId = z.string().regex(/^[0-9a-f]{16}$/);

@@ -44,7 +44,7 @@ describe('insert', () => {
   it('chunks large batches to stay under the parameter limit', async () => {
     const { client, createMany } = fakePrisma();
     const spans = Array.from({ length: 2_500 }, (_, i) =>
-      span({ spanId: i.toString(16).padStart(16, '0') })
+      span({ spanId: i.toString(16).padStart(16, '0') }),
     );
 
     await new PostgresSpanStore(client).insert(spans);
@@ -68,7 +68,10 @@ describe('insert', () => {
 describe('byTraces', () => {
   it('is a single query, not one per trace', async () => {
     const { client, findMany } = fakePrisma();
-    await new PostgresSpanStore(client).byTraces(['a'.repeat(32), 'b'.repeat(32)]);
+    await new PostgresSpanStore(client).byTraces([
+      'a'.repeat(32),
+      'b'.repeat(32),
+    ]);
     expect(findMany).toHaveBeenCalledTimes(1);
   });
 
@@ -76,14 +79,24 @@ describe('byTraces', () => {
     const a = 'a'.repeat(32);
     const b = 'b'.repeat(32);
     const { client } = fakePrisma([
-      { ...span({ traceId: a }), parentSpanId: null, statusCode: null, statusMsg: null },
+      {
+        ...span({ traceId: a }),
+        parentSpanId: null,
+        statusCode: null,
+        statusMsg: null,
+      },
       {
         ...span({ traceId: a, spanId: '11f067aa0ba902b7' }),
         parentSpanId: '00f067aa0ba902b7',
         statusCode: null,
         statusMsg: null,
       },
-      { ...span({ traceId: b }), parentSpanId: null, statusCode: null, statusMsg: null },
+      {
+        ...span({ traceId: b }),
+        parentSpanId: null,
+        statusCode: null,
+        statusMsg: null,
+      },
     ]);
 
     const grouped = await new PostgresSpanStore(client).byTraces([a, b]);
@@ -95,7 +108,9 @@ describe('byTraces', () => {
 
   it('omits traces that have no spans yet, which is a normal state', async () => {
     const { client } = fakePrisma([]);
-    const grouped = await new PostgresSpanStore(client).byTraces(['c'.repeat(32)]);
+    const grouped = await new PostgresSpanStore(client).byTraces([
+      'c'.repeat(32),
+    ]);
     expect(grouped.size).toBe(0);
   });
 
@@ -107,10 +122,18 @@ describe('byTraces', () => {
 
   it('drops nulls instead of carrying them into the record', async () => {
     const { client } = fakePrisma([
-      { ...span(), parentSpanId: null, statusCode: null, statusMsg: null, attributes: null },
+      {
+        ...span(),
+        parentSpanId: null,
+        statusCode: null,
+        statusMsg: null,
+        attributes: null,
+      },
     ]);
 
-    const [record] = await new PostgresSpanStore(client).byTrace('a'.repeat(32));
+    const [record] = await new PostgresSpanStore(client).byTrace(
+      'a'.repeat(32),
+    );
 
     expect(record).not.toHaveProperty('parentSpanId');
     expect(record).not.toHaveProperty('statusCode');

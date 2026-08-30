@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { decodeAnyValue, decodeAttributes, decodeId, normalizeOtlp } from './normalize.js';
+import {
+  decodeAnyValue,
+  decodeAttributes,
+  decodeId,
+  normalizeOtlp,
+} from './normalize.js';
 
 const TRACE_HEX = '4bf92f3577b34da6a3ce929d0e0e4736';
 const SPAN_HEX = '00f067aa0ba902b7';
@@ -9,7 +14,9 @@ function payload(span: Record<string, unknown>, serviceName = 'api') {
     resourceSpans: [
       {
         resource: {
-          attributes: [{ key: 'service.name', value: { stringValue: serviceName } }],
+          attributes: [
+            { key: 'service.name', value: { stringValue: serviceName } },
+          ],
         },
         scopeSpans: [{ spans: [span] }],
       },
@@ -70,12 +77,15 @@ describe('decodeAnyValue', () => {
   });
 
   it('handles nested arrays and key-value lists', () => {
-    expect(decodeAnyValue({ arrayValue: { values: [{ stringValue: 'a' }, { intValue: '2' }] } })).toEqual([
-      'a',
-      2,
-    ]);
     expect(
-      decodeAnyValue({ kvlistValue: { values: [{ key: 'k', value: { stringValue: 'v' } }] } })
+      decodeAnyValue({
+        arrayValue: { values: [{ stringValue: 'a' }, { intValue: '2' }] },
+      }),
+    ).toEqual(['a', 2]);
+    expect(
+      decodeAnyValue({
+        kvlistValue: { values: [{ key: 'k', value: { stringValue: 'v' } }] },
+      }),
     ).toEqual({ k: 'v' });
   });
 
@@ -91,12 +101,14 @@ describe('decodeAttributes', () => {
       decodeAttributes([
         { key: 'db.system', value: { stringValue: 'postgresql' } },
         { key: 'db.rows', value: { intValue: '12' } },
-      ])
+      ]),
     ).toEqual({ 'db.system': 'postgresql', 'db.rows': 12 });
   });
 
   it('skips malformed entries rather than failing the span', () => {
-    expect(decodeAttributes([{ value: { stringValue: 'no key' } }, 'junk', null])).toEqual({});
+    expect(
+      decodeAttributes([{ value: { stringValue: 'no key' } }, 'junk', null]),
+    ).toEqual({});
   });
 });
 
@@ -135,7 +147,12 @@ describe('normalizeOtlp', () => {
 
   it('reads the pre-1.0 instrumentationLibrarySpans key that old collectors still emit', () => {
     const { spans } = normalizeOtlp({
-      resourceSpans: [{ resource: {}, instrumentationLibrarySpans: [{ spans: [VALID_SPAN] }] }],
+      resourceSpans: [
+        {
+          resource: {},
+          instrumentationLibrarySpans: [{ spans: [VALID_SPAN] }],
+        },
+      ],
     });
     expect(spans).toHaveLength(1);
   });
@@ -149,9 +166,12 @@ describe('normalizeOtlp', () => {
         name: 'query',
         start_time_unix_nano: '1000',
         end_time_unix_nano: '2000',
-      })
+      }),
     );
-    expect(spans[0]).toMatchObject({ parentSpanId: '11f067aa0ba902b7', durationNs: 1000n });
+    expect(spans[0]).toMatchObject({
+      parentSpanId: '11f067aa0ba902b7',
+      durationNs: 1000n,
+    });
   });
 
   it('drops one malformed span without losing the rest of the batch', () => {
@@ -161,7 +181,11 @@ describe('normalizeOtlp', () => {
           resource: {},
           scopeSpans: [
             {
-              spans: [VALID_SPAN, { name: 'no ids at all' }, { ...VALID_SPAN, spanId: 'nope' }],
+              spans: [
+                VALID_SPAN,
+                { name: 'no ids at all' },
+                { ...VALID_SPAN, spanId: 'nope' },
+              ],
             },
           ],
         },
@@ -174,28 +198,45 @@ describe('normalizeOtlp', () => {
 
   it('clamps a negative duration, which is a clock artifact rather than real', () => {
     const { spans } = normalizeOtlp(
-      payload({ ...VALID_SPAN, startTimeUnixNano: '2000', endTimeUnixNano: '1000' })
+      payload({
+        ...VALID_SPAN,
+        startTimeUnixNano: '2000',
+        endTimeUnixNano: '1000',
+      }),
     );
     expect(spans[0].durationNs).toBe(0n);
   });
 
   it('maps span kinds from both the enum value and the proto name', () => {
-    expect(normalizeOtlp(payload({ ...VALID_SPAN, kind: 3 })).spans[0].kind).toBe('CLIENT');
-    expect(normalizeOtlp(payload({ ...VALID_SPAN, kind: 'SPAN_KIND_CONSUMER' })).spans[0].kind).toBe(
-      'CONSUMER'
-    );
-    expect(normalizeOtlp(payload({ ...VALID_SPAN, kind: 99 })).spans[0].kind).toBe('INTERNAL');
+    expect(
+      normalizeOtlp(payload({ ...VALID_SPAN, kind: 3 })).spans[0].kind,
+    ).toBe('CLIENT');
+    expect(
+      normalizeOtlp(payload({ ...VALID_SPAN, kind: 'SPAN_KIND_CONSUMER' }))
+        .spans[0].kind,
+    ).toBe('CONSUMER');
+    expect(
+      normalizeOtlp(payload({ ...VALID_SPAN, kind: 99 })).spans[0].kind,
+    ).toBe('INTERNAL');
   });
 
   it('omits parentSpanId for a root span rather than carrying an empty string', () => {
-    const { spans } = normalizeOtlp(payload({ ...VALID_SPAN, parentSpanId: '' }));
+    const { spans } = normalizeOtlp(
+      payload({ ...VALID_SPAN, parentSpanId: '' }),
+    );
     expect(spans[0]).not.toHaveProperty('parentSpanId');
   });
 
   it('survives structurally wrong input', () => {
     expect(normalizeOtlp(null)).toEqual({ spans: [], dropped: 0 });
     expect(normalizeOtlp({})).toEqual({ spans: [], dropped: 0 });
-    expect(normalizeOtlp({ resourceSpans: 'nope' })).toEqual({ spans: [], dropped: 0 });
-    expect(normalizeOtlp({ resourceSpans: [null] })).toEqual({ spans: [], dropped: 0 });
+    expect(normalizeOtlp({ resourceSpans: 'nope' })).toEqual({
+      spans: [],
+      dropped: 0,
+    });
+    expect(normalizeOtlp({ resourceSpans: [null] })).toEqual({
+      spans: [],
+      dropped: 0,
+    });
   });
 });

@@ -10,28 +10,39 @@ const ORIGIN = 'https://app.acme.com';
 
 describe('options', () => {
   it('defaults the trace allowlist to the page origin', () => {
-    expect(resolveOptions({ key: 'pk_x', endpoint: 'https://s.io' }, ORIGIN).traceOrigins).toEqual([
-      ORIGIN,
-    ]);
+    expect(
+      resolveOptions({ key: 'pk_x', endpoint: 'https://s.io' }, ORIGIN)
+        .traceOrigins,
+    ).toEqual([ORIGIN]);
   });
 
   it('masks inputs unless you opt out', () => {
-    expect(resolveOptions({ key: 'pk_x', endpoint: 'https://s.io' }, ORIGIN).maskAllInputs).toBe(true);
     expect(
-      resolveOptions({ key: 'pk_x', endpoint: 'https://s.io', maskAllInputs: false }, ORIGIN)
-        .maskAllInputs
+      resolveOptions({ key: 'pk_x', endpoint: 'https://s.io' }, ORIGIN)
+        .maskAllInputs,
+    ).toBe(true);
+    expect(
+      resolveOptions(
+        { key: 'pk_x', endpoint: 'https://s.io', maskAllInputs: false },
+        ORIGIN,
+      ).maskAllInputs,
     ).toBe(false);
   });
 
   it('strips a trailing slash so URLs do not end up doubled', () => {
-    expect(resolveOptions({ key: 'pk_x', endpoint: 'https://s.io/' }, ORIGIN).endpoint).toBe(
-      'https://s.io'
-    );
+    expect(
+      resolveOptions({ key: 'pk_x', endpoint: 'https://s.io/' }, ORIGIN)
+        .endpoint,
+    ).toBe('https://s.io');
   });
 
   it('fails loudly on missing configuration rather than recording nowhere', () => {
-    expect(() => resolveOptions({ key: '', endpoint: 'https://s.io' }, ORIGIN)).toThrow(/key/);
-    expect(() => resolveOptions({ key: 'pk_x', endpoint: '' }, ORIGIN)).toThrow(/endpoint/);
+    expect(() =>
+      resolveOptions({ key: '', endpoint: 'https://s.io' }, ORIGIN),
+    ).toThrow(/key/);
+    expect(() => resolveOptions({ key: 'pk_x', endpoint: '' }, ORIGIN)).toThrow(
+      /endpoint/,
+    );
   });
 });
 
@@ -44,27 +55,37 @@ describe('shouldTrace', () => {
   });
 
   it('refuses third parties', () => {
-    expect(shouldTrace('https://analytics.example/collect', allow, ORIGIN)).toBe(false);
+    expect(
+      shouldTrace('https://analytics.example/collect', allow, ORIGIN),
+    ).toBe(false);
   });
 
   it('refuses subdomains, since a widget can be parked on one', () => {
     expect(shouldTrace('https://cdn.acme.com/x', allow, ORIGIN)).toBe(false);
-    expect(shouldTrace('https://evil-app.acme.com.attacker.net/x', allow, ORIGIN)).toBe(false);
+    expect(
+      shouldTrace('https://evil-app.acme.com.attacker.net/x', allow, ORIGIN),
+    ).toBe(false);
   });
 
   it('refuses non-http schemes', () => {
     expect(shouldTrace('data:text/plain,hi', allow, ORIGIN)).toBe(false);
-    expect(shouldTrace('blob:https://app.acme.com/abc', allow, ORIGIN)).toBe(false);
+    expect(shouldTrace('blob:https://app.acme.com/abc', allow, ORIGIN)).toBe(
+      false,
+    );
   });
 });
 
 describe('sanitizeUrl', () => {
   it('keeps query keys and drops their values', () => {
-    expect(sanitizeUrl(`${ORIGIN}/search?token=secret&page=2`)).toBe(`${ORIGIN}/search?token&page`);
+    expect(sanitizeUrl(`${ORIGIN}/search?token=secret&page=2`)).toBe(
+      `${ORIGIN}/search?token&page`,
+    );
   });
 
   it('drops the fragment, where implicit-flow tokens live', () => {
-    expect(sanitizeUrl(`${ORIGIN}/cb#access_token=secret`)).toBe(`${ORIGIN}/cb`);
+    expect(sanitizeUrl(`${ORIGIN}/cb#access_token=secret`)).toBe(
+      `${ORIGIN}/cb`,
+    );
   });
 
   it('resolves a relative URL against the page', () => {
@@ -91,12 +112,14 @@ describe('clock calibration', () => {
         { offsetMs: 500, rttMs: 400 },
         { offsetMs: 1000, rttMs: 20 },
         { offsetMs: 900, rttMs: 90 },
-      ])
+      ]),
     ).toEqual({ offsetMs: 1000, rttMs: 20 });
   });
 
   it('falls back to no correction when every attempt fails', async () => {
-    const failing = vi.fn().mockRejectedValue(new Error('offline')) as unknown as typeof fetch;
+    const failing = vi
+      .fn()
+      .mockRejectedValue(new Error('offline')) as unknown as typeof fetch;
     // An uncalibrated session still replays; refusing to record over it would be worse.
     await expect(measureClock('https://s.io', failing, 2)).resolves.toEqual({
       offsetMs: 0,
@@ -105,9 +128,10 @@ describe('clock calibration', () => {
   });
 
   it('ignores a response that is not shaped like a clock reading', async () => {
-    const nonsense = vi
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ serverMs: 'soon' }) }) as unknown as typeof fetch;
+    const nonsense = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ serverMs: 'soon' }),
+    }) as unknown as typeof fetch;
     await expect(measureClock('https://s.io', nonsense, 1)).resolves.toEqual({
       offsetMs: 0,
       rttMs: 0,
@@ -129,7 +153,10 @@ describe('session identity', () => {
   it('reuses the id across a navigation within the tab', () => {
     const now = 1_700_000_000_000;
     const storage = memoryStorage(
-      JSON.stringify({ id: '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD', lastSeenMs: now - 60_000 })
+      JSON.stringify({
+        id: '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD',
+        lastSeenMs: now - 60_000,
+      }),
     );
 
     const session = resolveSession(storage, now);
@@ -139,7 +166,10 @@ describe('session identity', () => {
   it('starts fresh after the idle timeout, rather than recording an overnight gap', () => {
     const now = 1_700_000_000_000;
     const storage = memoryStorage(
-      JSON.stringify({ id: '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD', lastSeenMs: now - 60 * 60 * 1000 })
+      JSON.stringify({
+        id: '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD',
+        lastSeenMs: now - 60 * 60 * 1000,
+      }),
     );
 
     expect(resolveSession(storage, now).isNew).toBe(true);
@@ -218,7 +248,9 @@ describe('pending requests', () => {
   });
 
   it('ignores an end with no matching start', () => {
-    expect(new PendingRequests().finish('deadbeefdeadbeef', 2000, 200)).toBeNull();
+    expect(
+      new PendingRequests().finish('deadbeefdeadbeef', 2000, 200),
+    ).toBeNull();
   });
 
   it('omits status when the request never got one', () => {
@@ -240,7 +272,7 @@ describe('transport', () => {
 
   it('builds the ingest URL the API actually serves', () => {
     expect(chunkUrl('https://s.io', '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD', 3)).toBe(
-      'https://s.io/v1/ingest/session/01JQ8Z3KX9TVFMWQ2Y7B4CN5HD/3'
+      'https://s.io/v1/ingest/session/01JQ8Z3KX9TVFMWQ2Y7B4CN5HD/3',
     );
   });
 

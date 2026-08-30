@@ -32,7 +32,14 @@ export interface NormalizeResult {
 }
 
 /** OTLP SpanKind enum. Index is the wire value. */
-const SPAN_KINDS = ['UNSPECIFIED', 'INTERNAL', 'SERVER', 'CLIENT', 'PRODUCER', 'CONSUMER'] as const;
+const SPAN_KINDS = [
+  'UNSPECIFIED',
+  'INTERNAL',
+  'SERVER',
+  'CLIENT',
+  'PRODUCER',
+  'CONSUMER',
+] as const;
 
 /** OTLP StatusCode enum. */
 const STATUS_CODES = ['UNSET', 'OK', 'ERROR'] as const;
@@ -79,7 +86,8 @@ export function decodeId(value: unknown, byteLength: 8 | 16): string | null {
 /** Nanosecond timestamps exceed Number.MAX_SAFE_INTEGER, so they arrive as strings — usually. */
 function toBigInt(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value;
-  if (typeof value === 'number') return Number.isFinite(value) ? BigInt(Math.trunc(value)) : null;
+  if (typeof value === 'number')
+    return Number.isFinite(value) ? BigInt(Math.trunc(value)) : null;
   if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
   return null;
 }
@@ -104,11 +112,15 @@ export function decodeAnyValue(value: unknown): unknown {
   if ('doubleValue' in value) return value['doubleValue'];
   if ('bytesValue' in value) return value['bytesValue'];
   if ('arrayValue' in value) {
-    const values = asArray((value['arrayValue'] as Json | undefined)?.['values']);
+    const values = asArray(
+      (value['arrayValue'] as Json | undefined)?.['values'],
+    );
     return values.map(decodeAnyValue);
   }
   if ('kvlistValue' in value) {
-    return decodeAttributes((value['kvlistValue'] as Json | undefined)?.['values']);
+    return decodeAttributes(
+      (value['kvlistValue'] as Json | undefined)?.['values'],
+    );
   }
 
   return null;
@@ -140,13 +152,15 @@ function decodeStatus(raw: unknown): { code?: string; message?: string } {
 
   const rawCode = raw['code'];
   let code: string | undefined;
-  if (typeof rawCode === 'number' && STATUS_CODES[rawCode]) code = STATUS_CODES[rawCode];
+  if (typeof rawCode === 'number' && STATUS_CODES[rawCode])
+    code = STATUS_CODES[rawCode];
   if (typeof rawCode === 'string') {
     const name = rawCode.replace(/^STATUS_CODE_/, '').toUpperCase();
     if ((STATUS_CODES as readonly string[]).includes(name)) code = name;
   }
 
-  const message = typeof raw['message'] === 'string' ? raw['message'] : undefined;
+  const message =
+    typeof raw['message'] === 'string' ? raw['message'] : undefined;
   return { ...(code ? { code } : {}), ...(message ? { message } : {}) };
 }
 
@@ -166,7 +180,9 @@ export function normalizeOtlp(payload: unknown): NormalizeResult {
   for (const resourceSpan of asArray(payload['resourceSpans'])) {
     if (!isObject(resourceSpan)) continue;
 
-    const resource = isObject(resourceSpan['resource']) ? resourceSpan['resource'] : {};
+    const resource = isObject(resourceSpan['resource'])
+      ? resourceSpan['resource']
+      : {};
     const resourceAttributes = decodeAttributes(resource['attributes']);
     const serviceName =
       typeof resourceAttributes['service.name'] === 'string'
@@ -201,11 +217,16 @@ function toSpanRecord(raw: unknown, serviceName: string): SpanRecord | null {
   const spanId = decodeId(raw['spanId'] ?? raw['span_id'], 8);
   if (!traceId || !spanId) return null;
 
-  const startNs = toBigInt(raw['startTimeUnixNano'] ?? raw['start_time_unix_nano']);
+  const startNs = toBigInt(
+    raw['startTimeUnixNano'] ?? raw['start_time_unix_nano'],
+  );
   const endNs = toBigInt(raw['endTimeUnixNano'] ?? raw['end_time_unix_nano']);
   if (startNs === null || endNs === null) return null;
 
-  const parentSpanId = decodeId(raw['parentSpanId'] ?? raw['parent_span_id'], 8);
+  const parentSpanId = decodeId(
+    raw['parentSpanId'] ?? raw['parent_span_id'],
+    8,
+  );
   const status = decodeStatus(raw['status']);
 
   return {

@@ -22,7 +22,10 @@ export interface RawBody {
  * The limit is enforced as bytes arrive, not afterwards, so an oversized upload stops being read
  * rather than being buffered to completion and then rejected.
  */
-export function readBody(req: IncomingMessage, limitBytes: number): Promise<RawBody> {
+export function readBody(
+  req: IncomingMessage,
+  limitBytes: number,
+): Promise<RawBody> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -40,7 +43,9 @@ export function readBody(req: IncomingMessage, limitBytes: number): Promise<RawB
         // once the response goes out on a request that was never fully read.
         req.pause();
         req.removeListener('data', onData);
-        reject(new PayloadTooLargeException(`body exceeds ${limitBytes} bytes`));
+        reject(
+          new PayloadTooLargeException(`body exceeds ${limitBytes} bytes`),
+        );
         return;
       }
 
@@ -62,7 +67,10 @@ export function readBody(req: IncomingMessage, limitBytes: number): Promise<RawB
       const bytes = Buffer.concat(chunks);
       resolve({
         bytes,
-        gzipped: bytes.length >= 2 && bytes[0] === GZIP_MAGIC[0] && bytes[1] === GZIP_MAGIC[1],
+        gzipped:
+          bytes.length >= 2 &&
+          bytes[0] === GZIP_MAGIC[0] &&
+          bytes[1] === GZIP_MAGIC[1],
       });
     });
 

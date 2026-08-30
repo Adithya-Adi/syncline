@@ -1,4 +1,5 @@
-import type { SpanRecord } from '@syncline/models';
+import type { SpanRecord } from './span-store.js';
+import { describe, expect, it } from 'vitest';
 import { buildSpanTree } from './span-tree.js';
 
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -26,7 +27,7 @@ describe('ordering', () => {
         span({ spanId: 'aa', startNs: BASE_NS }),
         span({ spanId: 'bb', parentSpanId: 'aa', startNs: BASE_NS + 1n }),
       ],
-      0
+      0,
     );
 
     expect(tree.map((s) => s.spanId)).toEqual(['aa', 'bb', 'cc']);
@@ -38,9 +39,13 @@ describe('ordering', () => {
       [
         span({ spanId: 'aa' }),
         span({ spanId: 'later', parentSpanId: 'aa', startNs: BASE_NS + 500n }),
-        span({ spanId: 'earlier', parentSpanId: 'aa', startNs: BASE_NS + 100n }),
+        span({
+          spanId: 'earlier',
+          parentSpanId: 'aa',
+          startNs: BASE_NS + 100n,
+        }),
       ],
-      0
+      0,
     );
 
     expect(tree.map((s) => s.spanId)).toEqual(['aa', 'earlier', 'later']);
@@ -48,7 +53,10 @@ describe('ordering', () => {
 
   it('treats a span whose parent is absent as a root', () => {
     // The browser's own span is the parent of the server span and was never exported anywhere.
-    const tree = buildSpanTree([span({ spanId: 'server', parentSpanId: 'browser-span' })], 0);
+    const tree = buildSpanTree(
+      [span({ spanId: 'server', parentSpanId: 'browser-span' })],
+      0,
+    );
 
     expect(tree).toHaveLength(1);
     expect(tree[0].depth).toBe(0);
@@ -61,7 +69,7 @@ describe('ordering', () => {
         span({ spanId: 'aa', parentSpanId: 'bb' }),
         span({ spanId: 'bb', parentSpanId: 'aa' }),
       ],
-      0
+      0,
     );
 
     expect(tree.length).toBeLessThanOrEqual(2);
@@ -88,7 +96,7 @@ describe('skew correction', () => {
   it('reports duration from the span itself, not from the shifted endpoints', () => {
     const [only] = buildSpanTree(
       [span({ spanId: 'aa', durationNs: 1_749_000_000n })],
-      12_345
+      12_345,
     );
     expect(only.durationMs).toBe(1_749);
   });
@@ -106,7 +114,7 @@ describe('field mapping', () => {
           attributes: { 'db.system': 'postgresql' },
         }),
       ],
-      0
+      0,
     );
 
     expect(only).toMatchObject({
@@ -120,7 +128,7 @@ describe('field mapping', () => {
   it('falls back for a kind or status it does not recognize', () => {
     const [only] = buildSpanTree(
       [span({ spanId: 'aa', kind: 'SOMETHING_NEW', statusCode: 'WEIRD' })],
-      0
+      0,
     );
 
     expect(only.kind).toBe('INTERNAL');

@@ -71,17 +71,25 @@ export function startRecording(options: SynclineOptions): Recording {
     maskTextClass: 'syncline-mask',
   });
 
-  const uninstallFetch = installFetchPatch(window, { traceOrigins: resolved.traceOrigins, pageOrigin }, {
-    onStart(payload: RequestStartPayload) {
-      pending.start(payload);
-      addCustomEvent(REQUEST_START, payload);
+  const uninstallFetch = installFetchPatch(
+    window,
+    { traceOrigins: resolved.traceOrigins, pageOrigin },
+    {
+      onStart(payload: RequestStartPayload) {
+        pending.start(payload);
+        addCustomEvent(REQUEST_START, payload);
+      },
+      onEnd(payload: RequestEndPayload) {
+        addCustomEvent(REQUEST_END, payload);
+        const link = pending.finish(
+          payload.spanId,
+          payload.endMs,
+          payload.status,
+        );
+        if (link) buffer.addLink(link);
+      },
     },
-    onEnd(payload: RequestEndPayload) {
-      addCustomEvent(REQUEST_END, payload);
-      const link = pending.finish(payload.spanId, payload.endMs, payload.status);
-      if (link) buffer.addLink(link);
-    },
-  });
+  );
 
   // Reached through the window object rather than as a bare global, and skipped when absent: some
   // webviews and worker-ish contexts have no XMLHttpRequest, and referencing it directly would
@@ -97,10 +105,14 @@ export function startRecording(options: SynclineOptions): Recording {
           },
           onEnd(payload) {
             addCustomEvent(REQUEST_END, payload);
-            const link = pending.finish(payload.spanId, payload.endMs, payload.status);
+            const link = pending.finish(
+              payload.spanId,
+              payload.endMs,
+              payload.status,
+            );
             if (link) buffer.addLink(link);
           },
-        }
+        },
       )
     : () => undefined;
 
@@ -126,7 +138,9 @@ export function startRecording(options: SynclineOptions): Recording {
     }
   }
 
-  async function flush(sendOptions: { keepalive?: boolean } = {}): Promise<void> {
+  async function flush(
+    sendOptions: { keepalive?: boolean } = {},
+  ): Promise<void> {
     if (buffer.isEmpty) return;
     if (seq > MAX_CHUNKS_PER_SESSION) return;
 
@@ -158,8 +172,16 @@ export function startRecording(options: SynclineOptions): Recording {
           : {}),
       };
 
-      const ok = await sendChunk(transport, session.id, current, payload, sendOptions);
-      log(`chunk ${current}: ${drained.events.length} events, ${ok ? 'sent' : 'dropped'}`);
+      const ok = await sendChunk(
+        transport,
+        session.id,
+        current,
+        payload,
+        sendOptions,
+      );
+      log(
+        `chunk ${current}: ${drained.events.length} events, ${ok ? 'sent' : 'dropped'}`,
+      );
       touch(safeSessionStorage(), session.id);
     });
 

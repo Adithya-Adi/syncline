@@ -11,11 +11,17 @@
  */
 
 import type { SpanKind, SpanStatus, ViewerSpan } from '@syncline/protocol';
-import type { SpanRecord } from '@syncline/models';
+import type { SpanRecord } from './span-store.js';
 
 const NS_PER_MS = 1_000_000n;
 
-const KINDS: SpanKind[] = ['INTERNAL', 'SERVER', 'CLIENT', 'PRODUCER', 'CONSUMER'];
+const KINDS: SpanKind[] = [
+  'INTERNAL',
+  'SERVER',
+  'CLIENT',
+  'PRODUCER',
+  'CONSUMER',
+];
 const STATUSES: SpanStatus[] = ['UNSET', 'OK', 'ERROR'];
 
 function toMs(ns: bigint): number {
@@ -27,7 +33,9 @@ function asKind(kind: string): SpanKind {
 }
 
 function asStatus(status: string | undefined): SpanStatus {
-  return status && STATUSES.includes(status as SpanStatus) ? (status as SpanStatus) : 'UNSET';
+  return status && STATUSES.includes(status as SpanStatus)
+    ? (status as SpanStatus)
+    : 'UNSET';
 }
 
 /**
@@ -35,7 +43,10 @@ function asStatus(status: string | undefined): SpanStatus {
  * timestamp back into the client's frame. Zero when the session never calibrated, which just means
  * the lanes are drawn against the server's own clock.
  */
-export function buildSpanTree(spans: SpanRecord[], clockOffsetMs: number): ViewerSpan[] {
+export function buildSpanTree(
+  spans: SpanRecord[],
+  clockOffsetMs: number,
+): ViewerSpan[] {
   if (spans.length === 0) return [];
 
   const byParent = new Map<string, SpanRecord[]>();
@@ -55,7 +66,8 @@ export function buildSpanTree(spans: SpanRecord[], clockOffsetMs: number): Viewe
     }
   }
 
-  const byStart = (a: SpanRecord, b: SpanRecord) => (a.startNs < b.startNs ? -1 : a.startNs > b.startNs ? 1 : 0);
+  const byStart = (a: SpanRecord, b: SpanRecord) =>
+    a.startNs < b.startNs ? -1 : a.startNs > b.startNs ? 1 : 0;
   roots.sort(byStart);
   for (const children of byParent.values()) children.sort(byStart);
 

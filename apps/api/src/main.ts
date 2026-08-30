@@ -6,10 +6,13 @@ import { AppModule } from './app/app.module.js';
 import { CONFIG, type AppConfig } from './app/config/config.js';
 
 async function bootstrap() {
-    // No body parser anywhere. The ingest routes read the raw stream themselves so the compressed
+  // No body parser anywhere. The ingest routes read the raw stream themselves so the compressed
   // bytes are stored exactly as they arrived, and so attacker-controlled gzip is never inflated
   // on an HTTP connection. Every other route is a GET.
-  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    bodyParser: false,
+  });
   const config = app.get<AppConfig>(CONFIG);
 
   app.setGlobalPrefix('v1');
@@ -29,7 +32,10 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   await app.listen(config.API_PORT);
-  Logger.log(`syncline api listening on http://localhost:${config.API_PORT}/v1`, 'Bootstrap');
+  Logger.log(
+    `syncline api listening on http://localhost:${config.API_PORT}/v1`,
+    'Bootstrap',
+  );
 }
 
 bootstrap();

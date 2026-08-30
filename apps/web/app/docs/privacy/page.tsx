@@ -109,13 +109,24 @@ export default function Privacy() {
         by hand until this exists. Treat it as disqualifying for production use.
       </div>
 
-      <h2 className="docs__h2">Access control today</h2>
+      <h2 className="docs__h2">Access control</h2>
       <p>
-        Recordings are readable by anyone who knows the session id, which is an
-        unguessable ULID. That is the same property a share link relies on, and
-        it is deliberately all there is for now. Accounts, organizations and
-        per-project access control are being built; until they land, keep the
-        web app on a trusted network.
+        Recordings are readable only by members of the organization that owns
+        the project they were recorded into. The dashboard resolves your session
+        on the server and scopes every query by organization. A recording
+        belonging to someone else is not forbidden, it is simply not found — a
+        403 would confirm it exists.
+      </p>
+      <p>
+        The ingest API&rsquo;s read endpoints require a project&rsquo;s secret
+        key and return only that project&rsquo;s recordings. They were briefly
+        protected by nothing more than session ids being unguessable, which
+        meant the data path went around the dashboard entirely.
+      </p>
+      <p>
+        What is <em>not</em> built yet: invitations, roles beyond owner and
+        member, and audit logging. Anyone you add to an organization can watch
+        every recording in it.
       </p>
     </>
   );

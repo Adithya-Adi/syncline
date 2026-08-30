@@ -39,33 +39,42 @@ async function bootstrap() {
   // real deployment there is no guaranteed start order between the two.
   logger.log(`bucket "${storage.bucket}" ${await storage.ensureBucket()}`);
 
-  const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null });
+  const connection = new IORedis(config.REDIS_URL, {
+    maxRetriesPerRequest: null,
+  });
 
   const chunks = new SessionChunkProcessor(prisma, storage);
-  const traces = new OtlpTracesProcessor(new PostgresSpanStore(prisma), storage);
+  const traces = new OtlpTracesProcessor(
+    new PostgresSpanStore(prisma),
+    storage,
+  );
 
   const workers = [
     new Worker<SessionChunkJob>(
       SESSION_CHUNK_QUEUE,
       (job: Job<SessionChunkJob>) => chunks.process(job),
-      { connection, concurrency: config.WORKER_CONCURRENCY }
+      { connection, concurrency: config.WORKER_CONCURRENCY },
     ),
     new Worker<OtlpTracesJob>(
       OTLP_TRACES_QUEUE,
       (job: Job<OtlpTracesJob>) => traces.process(job),
-      { connection, concurrency: config.WORKER_CONCURRENCY }
+      { connection, concurrency: config.WORKER_CONCURRENCY },
     ),
   ];
 
   for (const worker of workers) {
     worker.on('failed', (job, error) => {
-      logger.error(`${worker.name} job ${job?.id ?? '?'} failed: ${error.message}`);
+      logger.error(
+        `${worker.name} job ${job?.id ?? '?'} failed: ${error.message}`,
+      );
     });
-    worker.on('error', (error) => logger.error(`${worker.name}: ${error.message}`));
+    worker.on('error', (error) =>
+      logger.error(`${worker.name}: ${error.message}`),
+    );
   }
 
   logger.log(
-    `consuming ${SESSION_CHUNK_QUEUE} and ${OTLP_TRACES_QUEUE} at concurrency ${config.WORKER_CONCURRENCY}`
+    `consuming ${SESSION_CHUNK_QUEUE} and ${OTLP_TRACES_QUEUE} at concurrency ${config.WORKER_CONCURRENCY}`,
   );
 
   /**

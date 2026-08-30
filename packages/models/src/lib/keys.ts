@@ -33,7 +33,10 @@ export function hashSecretKey(key: string): string {
  * is checked against a hash already in hand. Unequal lengths short-circuit, which leaks nothing a
  * caller does not already know.
  */
-export function secretKeyMatches(candidate: string, expectedHash: string): boolean {
+export function secretKeyMatches(
+  candidate: string,
+  expectedHash: string,
+): boolean {
   const actual = Buffer.from(hashSecretKey(candidate), 'hex');
   const expected = Buffer.from(expectedHash, 'hex');
   if (actual.length !== expected.length) return false;

@@ -1,5 +1,15 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { createPrismaClient, PostgresSpanStore, type PrismaClient } from '@syncline/models';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+import {
+  createPrismaClient,
+  PostgresSpanStore,
+  type PrismaClient,
+} from '@syncline/models';
 import { CONFIG, type AppConfig } from '../config/config.js';
 
 /**
