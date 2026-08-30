@@ -11,6 +11,7 @@ import { StorageService } from './storage/storage.service.js';
 import { QueueService } from './queue/queue.service.js';
 import { HealthController } from './health/health.controller.js';
 import { ReadController } from './read/read.controller.js';
+import { SessionsListController } from './read/sessions-list.controller.js';
 
 @Module({
   controllers: [
@@ -18,6 +19,9 @@ import { ReadController } from './read/read.controller.js';
     HealthController,
     ProjectController,
     IngestController,
+    // Registered before ReadController so /v1/sessions is matched by the list handler rather
+    // than falling into /v1/sessions/:id with an empty id.
+    SessionsListController,
     ReadController,
   ],
   providers: [

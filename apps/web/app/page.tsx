@@ -154,7 +154,7 @@ export default function Landing() {
       </section>
 
       <footer className="landing__foot">
-        <span>Building in the open</span>
+        <a href="/sessions">Browse recordings →</a>
         <a href="https://github.com/Adithya-Adi/syncline">
           github.com/Adithya-Adi/syncline
         </a>
