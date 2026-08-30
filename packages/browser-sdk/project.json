@@ -1,0 +1,28 @@
+{
+  "name": "browser-sdk",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/browser-sdk/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "main": "packages/browser-sdk/src/index.ts",
+        "outputPath": "packages/browser-sdk/dist",
+        "outputFileName": "index.js",
+        "tsConfig": "packages/browser-sdk/tsconfig.lib.json",
+        "bundle": true,
+        "thirdParty": true,
+        "excludeFromExternal": ["@syncline/protocol"],
+        "format": ["esm"],
+        "platform": "browser",
+        "target": "es2020",
+        "declaration": true,
+        "declarationRootDir": "packages/browser-sdk/src",
+        "sourcemap": "external",
+        "skipTypeCheck": false
+      }
+    }
+  }
+}

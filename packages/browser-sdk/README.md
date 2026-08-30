@@ -4,6 +4,19 @@ The recorder that ships to a customer's site. It records the session with
 [rrweb](https://github.com/rrweb-io/rrweb) and writes trace ids into the recording as it goes, so
 a replay can resolve to its backend spans without a side table.
 
+## Install
+
+Install the alpha prerelease with:
+
+    npm install @syncline/browser
+
+This package is currently an alpha prerelease. The supported public API is startRecording and the
+SynclineOptions type while the SDK integration surface is being validated.
+
+Documentation and the hosted Syncline application will be available at
+[syncline.adiverse.org](https://syncline.adiverse.org). The endpoint remains configurable for
+self-hosted installations.
+
 ```ts
 import { startRecording } from '@syncline/browser';
 
@@ -56,6 +69,19 @@ replay whose DOM jumps between windows.
 **Uploads use `fetch` with `keepalive: true`** on `pagehide` rather than `sendBeacon`, which cannot
 set headers and would push the API key into a query string. Keepalive bodies are capped at 64 KB
 across all in-flight requests, which is where the flush threshold comes from.
+
+## Release checklist
+
+Build and inspect the exact npm artifact from the repository root:
+
+    pnpm nx build browser-sdk
+    cd packages/browser-sdk
+    npm pack --dry-run
+
+The package bundles the internal protocol and runtime dependencies, so consumers only need this
+package. Publish prereleases with:
+
+    npm publish --tag next
 
 ## Options
 
