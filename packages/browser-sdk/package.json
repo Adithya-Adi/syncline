@@ -1,27 +1,45 @@
 {
   "name": "@syncline/browser",
-  "version": "0.0.1",
-  "private": true,
+  "version": "0.1.0-alpha.1",
+  "private": false,
   "type": "module",
+  "description": "Browser session replay with synchronized distributed traces.",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://syncline.adiverse.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Adithya-Adi/syncline.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Adithya-Adi/syncline/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/index.js.map",
+    "dist/index.d.ts",
+    "dist/index.d.ts.map",
+    "README.md"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "syncline": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
-  "dependencies": {
+  "sideEffects": false,
+  "devDependencies": {
     "@syncline/protocol": "workspace:*",
+    "jsdom": "^30.0.1",
     "rrweb": "2.1.1",
     "tslib": "^2.3.0",
     "ulid": "^3.0.2"
-  },
-  "devDependencies": {
-    "jsdom": "^30.0.1"
   }
 }
