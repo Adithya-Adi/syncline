@@ -16,25 +16,28 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          filter: tree:0
+          # nx affected and format:check both diff against a base, so they need history.
           fetch-depth: 0
 
-      # This enables task distribution via Nx Cloud
-      # Run this command as early as possible, before dependencies are installed
-      # Learn more at https://nx.dev/docs/reference/nx-cloud-cli#npx-nxcloud-startcirun
-      - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="e2e"
+      # pnpm has to be on PATH before setup-node, or `cache: pnpm` has no store to cache.
+      # The version comes from the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v4
 
-      # Cache node_modules
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: 'npm'
+          cache: 'pnpm'
 
-      - run: npm ci
+      # --frozen-lockfile is the point of running this in CI: a lockfile that does not match
+      # package.json should fail here rather than resolve to something nobody tested.
+      #
+      # This also runs the root postinstall, which regenerates the Prisma client. That client is
+      # gitignored, so without it nothing typechecks.
+      - run: pnpm install --frozen-lockfile
 
-      # Prepend any command with "nx record --" to record its logs to Nx Cloud
-      - run: npx nx record -- npx nx format:check --base="remotes/origin/main"
-      - run: npx nx run-many -t lint test build typecheck e2e
-      # Nx Cloud recommends fixes for failures to help you get CI green faster. Learn more: https://nx.dev/docs/features/ci-features/self-healing-ci
-      - run: npx nx fix-ci
-        if: always()
+      - run: pnpm exec nx format:check
+
+      # Only targets that exist. `lint` and `e2e` are configured nowhere yet, and asking Nx for a
+      # target no project defines makes the failure look like a broken pipeline rather than an
+      # absent one.
+      - run: pnpm exec nx run-many -t typecheck build test
