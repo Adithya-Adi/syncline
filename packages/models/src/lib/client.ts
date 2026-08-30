@@ -39,10 +39,14 @@ export function createPrismaClient(options: DatabaseOptions): PrismaClient {
  * A missing URL surfaces here, at startup, rather than as a connection error on the first ingest
  * request half an hour later.
  */
-export function createPrismaClientFromEnv(env: NodeJS.ProcessEnv = process.env): PrismaClient {
+export function createPrismaClientFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): PrismaClient {
   const url = env['DATABASE_URL'];
   if (!url) {
-    throw new Error('DATABASE_URL is not set. Copy .env.example to .env for local development.');
+    throw new Error(
+      'DATABASE_URL is not set. Copy .env.example to .env for local development.',
+    );
   }
 
   return createPrismaClient({

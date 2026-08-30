@@ -64,7 +64,9 @@ export function formatTraceparent(ctx: TraceContext): string {
  * rather than rejected — that is what the spec asks implementations to do. A `version` of `ff` is
  * invalid, as are malformed or all-zero IDs.
  */
-export function parseTraceparent(header: string): (TraceContext & { version: string }) | null {
+export function parseTraceparent(
+  header: string,
+): (TraceContext & { version: string }) | null {
   const parts = header.trim().split('-');
   if (parts.length < 4) return null;
 

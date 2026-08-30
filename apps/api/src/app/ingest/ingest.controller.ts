@@ -1,4 +1,11 @@
-import { BadRequestException, Controller, HttpCode, Param, Post, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  HttpCode,
+  Param,
+  Post,
+  Req,
+} from '@nestjs/common';
 import type { IncomingMessage } from 'node:http';
 import { ulid } from 'ulid';
 import {
@@ -29,7 +36,7 @@ const MAX_OTLP_BYTES = 8 * 1024 * 1024;
 export class IngestController {
   constructor(
     private readonly storage: StorageService,
-    private readonly queue: QueueService
+    private readonly queue: QueueService,
   ) {}
 
   /**
@@ -48,7 +55,7 @@ export class IngestController {
     @CurrentProject() project: ResolvedProject,
     @Param('sessionId') sessionId: string,
     @Param('seq') seqParam: string,
-    @Req() req: IncomingMessage
+    @Req() req: IncomingMessage,
   ): Promise<{ ok: true }> {
     if (!sessionIdSchema.safeParse(sessionId).success) {
       throw new BadRequestException('sessionId must be a ULID');
@@ -56,7 +63,9 @@ export class IngestController {
 
     const seq = Number(seqParam);
     if (!Number.isInteger(seq) || seq < 0 || seq > MAX_CHUNKS_PER_SESSION) {
-      throw new BadRequestException(`seq must be an integer between 0 and ${MAX_CHUNKS_PER_SESSION}`);
+      throw new BadRequestException(
+        `seq must be an integer between 0 and ${MAX_CHUNKS_PER_SESSION}`,
+      );
     }
 
     const body = await readBody(req, MAX_CHUNK_BYTES);
@@ -94,7 +103,7 @@ export class IngestController {
   @HttpCode(202)
   async traces(
     @CurrentProject() project: ResolvedProject,
-    @Req() req: IncomingMessage
+    @Req() req: IncomingMessage,
   ): Promise<{ ok: true }> {
     const body = await readBody(req, MAX_OTLP_BYTES);
     if (body.bytes.length === 0) throw new BadRequestException('empty body');

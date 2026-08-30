@@ -17,7 +17,7 @@ export class OtlpTracesProcessor {
 
   constructor(
     private readonly spans: SpanStore,
-    private readonly storage: ObjectStore
+    private readonly storage: ObjectStore,
   ) {}
 
   async process(job: Job<OtlpTracesJob>): Promise<void> {
@@ -30,7 +30,7 @@ export class OtlpTracesProcessor {
       payload = JSON.parse(raw.toString('utf8'));
     } catch (error) {
       throw new UnrecoverableChunkError(
-        `${storageKey} is not valid JSON: ${(error as Error).message}`
+        `${storageKey} is not valid JSON: ${(error as Error).message}`,
       );
     }
 

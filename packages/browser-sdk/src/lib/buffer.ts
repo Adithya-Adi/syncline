@@ -7,7 +7,12 @@
  * get to send.
  */
 
-import { FLUSH_BYTES, FLUSH_INTERVAL_MS, MAX_EVENTS_PER_CHUNK, type RequestLink } from '@syncline/protocol';
+import {
+  FLUSH_BYTES,
+  FLUSH_INTERVAL_MS,
+  MAX_EVENTS_PER_CHUNK,
+  type RequestLink,
+} from '@syncline/protocol';
 
 export interface PendingChunk {
   events: unknown[];
@@ -22,7 +27,7 @@ export class EventBuffer {
 
   constructor(
     private readonly maxBytes: number = FLUSH_BYTES,
-    private readonly maxEvents: number = MAX_EVENTS_PER_CHUNK
+    private readonly maxEvents: number = MAX_EVENTS_PER_CHUNK,
   ) {}
 
   addEvent(event: unknown, approximateSize = 0): void {
@@ -44,7 +49,10 @@ export class EventBuffer {
   }
 
   shouldFlush(): boolean {
-    return this.approximateBytes >= this.maxBytes || this.events.length >= this.maxEvents;
+    return (
+      this.approximateBytes >= this.maxBytes ||
+      this.events.length >= this.maxEvents
+    );
   }
 
   /** Hands over everything buffered and resets. */
@@ -67,9 +75,18 @@ export const FLUSH_EVERY_MS = FLUSH_INTERVAL_MS;
  * number on the timeline, which is worse than a link arriving a few seconds late.
  */
 export class PendingRequests {
-  private readonly started = new Map<string, Omit<RequestLink, 'status' | 'endMs'>>();
+  private readonly started = new Map<
+    string,
+    Omit<RequestLink, 'status' | 'endMs'>
+  >();
 
-  start(payload: { traceId: string; spanId: string; method: string; url: string; startMs: number }): void {
+  start(payload: {
+    traceId: string;
+    spanId: string;
+    method: string;
+    url: string;
+    startMs: number;
+  }): void {
     this.started.set(payload.spanId, payload);
   }
 

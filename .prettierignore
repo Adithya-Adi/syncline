@@ -10,3 +10,12 @@ out-tsc
 packages/models/src/generated
 
 pnpm-lock.yaml
+
+# Vendored agent-plugin docs. Not ours to reformat.
+.agents
+.github/skills
+.github/prompts
+.opencode
+.cursor
+.gemini
+.codex

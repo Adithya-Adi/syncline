@@ -11,7 +11,7 @@ interface HealthReport {
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly queue: QueueService
+    private readonly queue: QueueService,
   ) {}
 
   /**
@@ -38,7 +38,8 @@ export class HealthController {
       : { ok: false, error: 'ping failed' };
 
     const ok = Object.values(checks).every((c) => c.ok);
-    if (!ok) throw new ServiceUnavailableException({ status: 'degraded', checks });
+    if (!ok)
+      throw new ServiceUnavailableException({ status: 'degraded', checks });
 
     return { status: 'ok', checks };
   }

@@ -35,7 +35,11 @@ export const DEFAULT_JOB_OPTIONS = {
   removeOnFail: false,
 };
 
-export function sessionChunkKey(projectId: string, sessionId: string, seq: number): string {
+export function sessionChunkKey(
+  projectId: string,
+  sessionId: string,
+  seq: number,
+): string {
   return `sessions/${projectId}/${sessionId}/${seq}.json.gz`;
 }
 

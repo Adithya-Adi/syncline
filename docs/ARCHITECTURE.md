@@ -13,7 +13,7 @@ Given a session ID, Syncline can draw three lanes against a single clock:
 2. the backend spans that each of their requests produced (OpenTelemetry),
 3. the database calls inside those spans.
 
-The hard part is not storing any one of these. It is knowing that *this* click produced *that* span
+The hard part is not storing any one of these. It is knowing that _this_ click produced _that_ span
 tree, and drawing them against the same timeline when the two clocks disagree.
 
 ## 2. Components
@@ -90,7 +90,7 @@ Two events, not one, because **rrweb's event log is append-only** — the SDK ca
 stamp a duration onto an event it already emitted. Start and end are separate records correlated by
 `spanId`.
 
-The consequence worth the trouble: the trace ID lives *inside* the recording. Export a session as a
+The consequence worth the trouble: the trace ID lives _inside_ the recording. Export a session as a
 file, hand it to someone else, and it still resolves to its traces. The recording is
 self-describing rather than depending on a side table that has to be kept in sync.
 
@@ -113,14 +113,14 @@ alongside an existing tracing vendor via a collector fan-out instead of competin
 Normally the backend decides what to sample and the frontend finds out later. That produces the
 worst possible artifact: a replay of a slow request whose spans were thrown away.
 
-So the *browser* decides. If a session is being recorded, the SDK sets `sampled=1`, and standard
+So the _browser_ decides. If a session is being recorded, the SDK sets `sampled=1`, and standard
 OTel parent-based sampling honors it. A recorded session always has its spans; an unrecorded one
 costs nothing.
 
 ### 3.5 Clock skew
 
 Client clocks are wrong — user-set time zones, dead CMOS batteries, VMs that suspended. Skew is
-handled for *drawing* only. It can never affect *attribution*, because attribution is by trace ID.
+handled for _drawing_ only. It can never affect _attribution_, because attribution is by trace ID.
 
 The SDK calibrates once per session against `GET /v1/clock`:
 
@@ -195,23 +195,31 @@ access logs. The body carries them too; the worker checks that the two agree.
 
 ```jsonc
 {
-  "sessionId": "01JQ8Z3K...",          // ULID, minted client-side
-  "seq": 3,                            // monotonic; gaps are detectable
+  "sessionId": "01JQ8Z3K...", // ULID, minted client-side
+  "seq": 3, // monotonic; gaps are detectable
   "sdk": { "name": "syncline-browser", "version": "0.1.0" },
   "clock": { "offsetMs": -142, "rttMs": 38 },
-  "meta": {                            // seq 0 only
+  "meta": {
+    // seq 0 only
     "url": "https://app.acme.com/checkout",
     "userAgent": "...",
     "viewport": { "w": 1512, "h": 856 },
     "user": { "id": "u_123" },
-    "release": "web@2.4.1"
+    "release": "web@2.4.1",
   },
-  "events": [ /* raw rrweb events, unmodified */ ],
-  "links": [                           // completed requests only
-    { "traceId": "4bf92f...", "spanId": "00f067...", "method": "POST",
-      "url": "/api/checkout", "status": 500,
-      "startMs": 1724832000123, "endMs": 1724832001901 }
-  ]
+  "events": [/* raw rrweb events, unmodified */],
+  "links": [
+    // completed requests only
+    {
+      "traceId": "4bf92f...",
+      "spanId": "00f067...",
+      "method": "POST",
+      "url": "/api/checkout",
+      "status": 500,
+      "startMs": 1724832000123,
+      "endMs": 1724832001901,
+    },
+  ],
 }
 ```
 
@@ -246,10 +254,10 @@ the calibration in §3.5.
 
 ## 5. Queues
 
-| Queue | Payload | Worker does |
-| --- | --- | --- |
+| Queue           | Payload                                     | Worker does                                                                              |
+| --------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `session-chunk` | `{ projectId, sessionId, seq, storageKey }` | decompress, validate, upsert `Session`, insert `SessionChunk`, bulk-insert `RequestLink` |
-| `otlp-traces` | `{ projectId, storageKey }` | normalize `ResourceSpans` to `Span[]`, bulk insert |
+| `otlp-traces`   | `{ projectId, storageKey }`                 | normalize `ResourceSpans` to `Span[]`, bulk insert                                       |
 
 Both are idempotent. `SessionChunk` is keyed `(sessionId, seq)` and `Span` is keyed
 `(traceId, spanId)`, so a retried job upserts rather than duplicates. BullMQ defaults: 3 attempts,
@@ -392,12 +400,20 @@ no arithmetic:
 {
   "traceId": "4bf92f...",
   "spans": [
-    { "spanId": "00f067...", "parentSpanId": null, "depth": 0,
-      "name": "POST /api/checkout", "serviceName": "api", "kind": "SERVER",
-      "startClientMs": 1724832000131, "endClientMs": 1724832001880, "durationMs": 1749,
+    {
+      "spanId": "00f067...",
+      "parentSpanId": null,
+      "depth": 0,
+      "name": "POST /api/checkout",
+      "serviceName": "api",
+      "kind": "SERVER",
+      "startClientMs": 1724832000131,
+      "endClientMs": 1724832001880,
+      "durationMs": 1749,
       "status": "ERROR",
-      "attributes": { "http.status_code": 500 } }
-  ]
+      "attributes": { "http.status_code": 500 },
+    },
+  ],
 }
 ```
 
@@ -429,16 +445,16 @@ Route `/s/[sessionId]`.
 
 ## 9. Failure modes
 
-| Situation | Behavior |
-| --- | --- |
+| Situation                           | Behavior                                                                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Customer's CORS omits `traceparent` | Their requests fail preflight. Documented prominently; SDK logs a specific, greppable warning; a future `doctor` command checks it. |
-| Third-party origin | No header injected, no trace. Request still appears on the network lane from client timings. |
-| No backend instrumentation at all | Network lane renders from client timings alone. Backend and database lanes render an explanatory empty state, not an error. |
-| Traces arrive before the session | Normal. Joined at read time on `traceId`. |
-| Session chunk lost | The `seq` gap is detectable; the viewer marks a discontinuity rather than silently playing across it. |
-| Client clock wildly wrong | Attribution unaffected (ID-based). Lanes drawn via `offset`; uncertainty band shown when `rtt` is high. |
-| Backend samples the trace away | Cannot happen for recorded sessions — see §3.4. |
-| Duplicate chunk delivery | Upsert on `(sessionId, seq)`. |
+| Third-party origin                  | No header injected, no trace. Request still appears on the network lane from client timings.                                        |
+| No backend instrumentation at all   | Network lane renders from client timings alone. Backend and database lanes render an explanatory empty state, not an error.         |
+| Traces arrive before the session    | Normal. Joined at read time on `traceId`.                                                                                           |
+| Session chunk lost                  | The `seq` gap is detectable; the viewer marks a discontinuity rather than silently playing across it.                               |
+| Client clock wildly wrong           | Attribution unaffected (ID-based). Lanes drawn via `offset`; uncertainty band shown when `rtt` is high.                             |
+| Backend samples the trace away      | Cannot happen for recorded sessions — see §3.4.                                                                                     |
+| Duplicate chunk delivery            | Upsert on `(sessionId, seq)`.                                                                                                       |
 
 ---
 
@@ -447,7 +463,7 @@ Route `/s/[sessionId]`.
 rrweb records the DOM, which means it records whatever the user is looking at. This is the
 project's sharpest edge and the default must be the safe one.
 
-- `maskAllInputs: true` by default. Opting *out* is the explicit act.
+- `maskAllInputs: true` by default. Opting _out_ is the explicit act.
 - `.syncline-block` blocks a subtree; `.syncline-mask` masks its text.
 - URLs are sanitized before they enter `links` — query values dropped, keys kept.
 - Headers and bodies are never captured. Only method, URL, status, and timing.
@@ -475,5 +491,5 @@ OTLP over protobuf; ClickHouse.
 - **Long sessions.** A 45-minute session is a lot of chunks to fetch before the player can seek.
   Chunk-level lazy loading is probably necessary sooner than expected.
 - **Whether `RequestLink` should absorb server-side status.** The client sees `500`; the span knows
-  *why*. Denormalizing the span's status onto the link would make the network lane colorable
+  _why_. Denormalizing the span's status onto the link would make the network lane colorable
   without loading trace trees.

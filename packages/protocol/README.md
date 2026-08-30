@@ -6,15 +6,15 @@ ingest API, the worker, and the viewer all import their types from here.
 It has no runtime dependencies beyond zod and imports nothing from the rest of the workspace, so
 it stays a leaf in the dependency graph.
 
-| Module | What |
-| --- | --- |
-| `ids.ts` | W3C trace context — id generation, validation, `traceparent` format and parse |
-| `events.ts` | The rrweb custom events that carry trace ids inside the replay stream |
-| `ingest.ts` | Browser → API wire schemas (zod) |
-| `read.ts` | API → viewer response types |
-| `jobs.ts` | Queue payloads shared by `apps/api` and `apps/worker` |
-| `keys.ts` | `pk_*` / `sk_*` key shapes |
-| `limits.ts` | Ingest limits and SDK flush tuning, agreed by both sides |
+| Module      | What                                                                          |
+| ----------- | ----------------------------------------------------------------------------- |
+| `ids.ts`    | W3C trace context — id generation, validation, `traceparent` format and parse |
+| `events.ts` | The rrweb custom events that carry trace ids inside the replay stream         |
+| `ingest.ts` | Browser → API wire schemas (zod)                                              |
+| `read.ts`   | API → viewer response types                                                   |
+| `jobs.ts`   | Queue payloads shared by `apps/api` and `apps/worker`                         |
+| `keys.ts`   | `pk_*` / `sk_*` key shapes                                                    |
+| `limits.ts` | Ingest limits and SDK flush tuning, agreed by both sides                      |
 
 Two conventions worth knowing before adding to it:
 

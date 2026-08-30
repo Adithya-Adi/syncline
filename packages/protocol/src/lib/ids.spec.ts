@@ -44,7 +44,7 @@ describe('traceparent', () => {
 
   it('formats the header the way the spec spells it', () => {
     expect(formatTraceparent(ctx)).toBe(
-      '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'
+      '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
     );
   });
 
@@ -54,25 +54,45 @@ describe('traceparent', () => {
 
   it('encodes the sampled flag, which is what keeps a replay from losing its spans', () => {
     expect(formatTraceparent({ ...ctx, sampled: false })).toMatch(/-00$/);
-    expect(parseTraceparent(formatTraceparent({ ...ctx, sampled: false }))?.sampled).toBe(false);
+    expect(
+      parseTraceparent(formatTraceparent({ ...ctx, sampled: false }))?.sampled,
+    ).toBe(false);
   });
 
   it('accepts a longer header from a future version, as the spec asks', () => {
-    const future = '01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-something';
-    expect(parseTraceparent(future)).toMatchObject({ version: '01', sampled: true });
+    const future =
+      '01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-something';
+    expect(parseTraceparent(future)).toMatchObject({
+      version: '01',
+      sampled: true,
+    });
   });
 
   it('rejects a version-00 header with extra fields', () => {
     expect(
-      parseTraceparent('00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra')
+      parseTraceparent(
+        '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra',
+      ),
     ).toBeNull();
   });
 
   it('rejects ff, malformed, and all-zero ids', () => {
-    expect(parseTraceparent('ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01')).toBeNull();
-    expect(parseTraceparent('00-4bf92f3577b34da6-00f067aa0ba902b7-01')).toBeNull();
-    expect(parseTraceparent(`00-${INVALID_TRACE_ID}-00f067aa0ba902b7-01`)).toBeNull();
-    expect(parseTraceparent(`00-4bf92f3577b34da6a3ce929d0e0e4736-${INVALID_SPAN_ID}-01`)).toBeNull();
+    expect(
+      parseTraceparent(
+        'ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+      ),
+    ).toBeNull();
+    expect(
+      parseTraceparent('00-4bf92f3577b34da6-00f067aa0ba902b7-01'),
+    ).toBeNull();
+    expect(
+      parseTraceparent(`00-${INVALID_TRACE_ID}-00f067aa0ba902b7-01`),
+    ).toBeNull();
+    expect(
+      parseTraceparent(
+        `00-4bf92f3577b34da6a3ce929d0e0e4736-${INVALID_SPAN_ID}-01`,
+      ),
+    ).toBeNull();
     expect(parseTraceparent('garbage')).toBeNull();
     expect(parseTraceparent('')).toBeNull();
   });

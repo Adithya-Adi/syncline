@@ -47,8 +47,14 @@ export interface RrwebCustomEvent<Tag extends string, Payload> {
   data: { tag: Tag; payload: Payload };
 }
 
-export type RequestStartEvent = RrwebCustomEvent<typeof REQUEST_START, RequestStartPayload>;
-export type RequestEndEvent = RrwebCustomEvent<typeof REQUEST_END, RequestEndPayload>;
+export type RequestStartEvent = RrwebCustomEvent<
+  typeof REQUEST_START,
+  RequestStartPayload
+>;
+export type RequestEndEvent = RrwebCustomEvent<
+  typeof REQUEST_END,
+  RequestEndPayload
+>;
 export type SynclineEvent = RequestStartEvent | RequestEndEvent;
 
 /**

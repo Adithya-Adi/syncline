@@ -236,23 +236,24 @@ export default function Landing() {
               </span>
             </div>
             <div className="status__row">
-              <span className="status__mark">□ Building</span>
+              <span className="status__mark status__mark--done">■ Works</span>
               <span>
-                Accounts and organizations, projects and API keys, per-project
-                access control
+                Accounts and organizations, projects and API keys,
+                per-organization access control
               </span>
             </div>
             <div className="status__row">
               <span className="status__mark">□ Not yet</span>
               <span>
-                Published SDK bundle, retention and deletion, deployment guide
+                Invitations and roles, retention and deletion, a published SDK
+                bundle, container images
               </span>
             </div>
           </div>
           <p className="lede">
-            Read access is currently protected only by recordings having
-            unguessable ids. Run it on a trusted network until that changes — it
-            is the next thing being built.
+            Recordings are readable only by members of the organization that
+            owns them. Still missing before production: invitations, roles,
+            retention and deletion, and an official container image.
           </p>
         </section>
 

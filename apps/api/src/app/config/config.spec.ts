@@ -19,7 +19,11 @@ describe('loadConfig', () => {
   });
 
   it('coerces numbers and booleans out of the strings the environment gives us', () => {
-    const config = loadConfig({ ...VALID, API_PORT: '8080', S3_FORCE_PATH_STYLE: 'false' });
+    const config = loadConfig({
+      ...VALID,
+      API_PORT: '8080',
+      S3_FORCE_PATH_STYLE: 'false',
+    });
     expect(config.API_PORT).toBe(8080);
     expect(config.S3_FORCE_PATH_STYLE).toBe(false);
   });

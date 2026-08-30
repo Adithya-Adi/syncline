@@ -8,5 +8,9 @@ export { sanitizeUrl } from './lib/url.js';
 export { calibrate, bestOf, measureClock } from './lib/clock.js';
 export { resolveSession, IDLE_TIMEOUT_MS } from './lib/session.js';
 export { EventBuffer, PendingRequests } from './lib/buffer.js';
-export { installFetchPatch, installXhrPatch, type TraceHooks } from './lib/trace.js';
+export {
+  installFetchPatch,
+  installXhrPatch,
+  type TraceHooks,
+} from './lib/trace.js';
 export { encodeBody, sendChunk, chunkUrl } from './lib/transport.js';

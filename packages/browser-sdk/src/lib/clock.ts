@@ -39,14 +39,16 @@ export function bestOf(samples: ClockCalibration[]): ClockCalibration {
 export async function measureClock(
   endpoint: string,
   fetchImpl: typeof fetch,
-  attempts = 3
+  attempts = 3,
 ): Promise<ClockCalibration> {
   const samples: ClockCalibration[] = [];
 
   for (let i = 0; i < attempts; i++) {
     try {
       const t0 = Date.now();
-      const response = await fetchImpl(`${endpoint}/v1/clock`, { cache: 'no-store' });
+      const response = await fetchImpl(`${endpoint}/v1/clock`, {
+        cache: 'no-store',
+      });
       const t1 = Date.now();
       if (!response.ok) continue;
 

@@ -29,9 +29,9 @@ describe('getMaybeGzipped', () => {
   it('decides from the bytes, not the key or a stored header', async () => {
     // Stored under a .json.gz key by the API, but sent uncompressed by hand with curl.
     const store = storeReturning(Buffer.from('plain'));
-    await expect(store.getMaybeGzipped('sessions/p/s/0.json.gz')).resolves.toEqual(
-      Buffer.from('plain')
-    );
+    await expect(
+      store.getMaybeGzipped('sessions/p/s/0.json.gz'),
+    ).resolves.toEqual(Buffer.from('plain'));
   });
 
   it('does not mistake a short body for gzip', async () => {

@@ -8,16 +8,23 @@ import {
   createParamDecorator,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { INGEST_KEY_HEADER, isWellFormedKey, keyKind, type KeyKind } from '@syncline/protocol';
+import {
+  INGEST_KEY_HEADER,
+  isWellFormedKey,
+  keyKind,
+  type KeyKind,
+} from '@syncline/protocol';
 import { ProjectService, type ResolvedProject } from './project.service.js';
 
 const REQUIRED_KEY_KIND = Symbol('REQUIRED_KEY_KIND');
 
 /** Declares which kind of key an endpoint accepts. Public keys can never reach a secret route. */
-export const RequireKey = (kind: KeyKind) => SetMetadata(REQUIRED_KEY_KIND, kind);
+export const RequireKey = (kind: KeyKind) =>
+  SetMetadata(REQUIRED_KEY_KIND, kind);
 
 export const CurrentProject = createParamDecorator(
-  (_: unknown, ctx: ExecutionContext): ResolvedProject => ctx.switchToHttp().getRequest().project
+  (_: unknown, ctx: ExecutionContext): ResolvedProject =>
+    ctx.switchToHttp().getRequest().project,
 );
 
 /**
@@ -30,13 +37,13 @@ export const CurrentProject = createParamDecorator(
 export class IngestKeyGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly projects: ProjectService
+    private readonly projects: ProjectService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const required = this.reflector.get<KeyKind | undefined>(
       REQUIRED_KEY_KIND,
-      context.getHandler()
+      context.getHandler(),
     );
     if (!required) return true;
 
@@ -44,14 +51,18 @@ export class IngestKeyGuard implements CanActivate {
     const key = request.headers[INGEST_KEY_HEADER];
 
     if (typeof key !== 'string' || !isWellFormedKey(key)) {
-      throw new UnauthorizedException(`missing or malformed ${INGEST_KEY_HEADER}`);
+      throw new UnauthorizedException(
+        `missing or malformed ${INGEST_KEY_HEADER}`,
+      );
     }
 
     const kind = keyKind(key);
     if (kind !== required) {
       // Naming the expectation is a deliberate trade: it tells an attacker nothing they cannot
       // infer from the docs, and saves an integrator an afternoon.
-      throw new UnauthorizedException(`this endpoint requires a ${required} key`);
+      throw new UnauthorizedException(
+        `this endpoint requires a ${required} key`,
+      );
     }
 
     const project =
@@ -64,10 +75,14 @@ export class IngestKeyGuard implements CanActivate {
     if (kind === 'public') {
       const origin = request.headers.origin;
       if (typeof origin !== 'string') {
-        throw new ForbiddenException('browser ingest requires an Origin header');
+        throw new ForbiddenException(
+          'browser ingest requires an Origin header',
+        );
       }
       if (!project.origins.includes(origin)) {
-        throw new ForbiddenException(`origin ${origin} is not allowed for this project`);
+        throw new ForbiddenException(
+          `origin ${origin} is not allowed for this project`,
+        );
       }
     }
 

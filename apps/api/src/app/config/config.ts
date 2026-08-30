@@ -10,7 +10,9 @@ import { z } from 'zod';
 export const CONFIG = Symbol('SYNCLINE_CONFIG');
 
 const schema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  NODE_ENV: z
+    .enum(['development', 'test', 'production'])
+    .default('development'),
   API_PORT: z.coerce.number().int().positive().default(4000),
 
   DATABASE_URL: z.string().min(1),
@@ -38,7 +40,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       .join('\n');
     throw new Error(
       `Invalid environment configuration:\n${problems}\n\n` +
-        'Copy .env.example to .env for local development.'
+        'Copy .env.example to .env for local development.',
     );
   }
 

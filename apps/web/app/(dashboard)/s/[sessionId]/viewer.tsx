@@ -16,7 +16,14 @@ import type {
   ViewerSpan,
 } from '@syncline/protocol';
 
-const API = process.env.NEXT_PUBLIC_SYNCLINE_API ?? 'http://localhost:4000';
+/**
+ * Recording data comes from this app, not from the ingest API.
+ *
+ * The API's read endpoints were reachable by anyone holding a session id, so fetching from them
+ * meant the viewer bypassed every access check the dashboard had. These routes resolve the
+ * signed-in viewer and scope each query to their organization; the browser sends its session
+ * cookie because every request below is same-origin.
+ */
 
 type LaneKey = 'network' | 'backend' | 'database';
 
@@ -58,8 +65,16 @@ export function Viewer({ sessionId }: { sessionId: string }) {
 
     (async () => {
       try {
-        const res = await fetch(`${API}/v1/sessions/${sessionId}`);
-        if (!res.ok) throw new Error(`session ${res.status}`);
+        const res = await fetch(`/api/recordings/${sessionId}`);
+        // A recording in another organization and one that never existed are both 404, and the
+        // message says so without distinguishing them — the difference would confirm it exists.
+        if (res.status === 404) {
+          throw new Error(
+            'That recording does not exist, or is not in your organization.',
+          );
+        }
+        if (!res.ok)
+          throw new Error(`Could not load the recording (${res.status}).`);
         const data = (await res.json()) as SessionResponse;
         if (!cancelled) setSession(data);
       } catch (e) {
@@ -84,7 +99,9 @@ export function Viewer({ sessionId }: { sessionId: string }) {
     (async () => {
       for (const traceId of ids) {
         try {
-          const res = await fetch(`${API}/v1/traces/${traceId}`);
+          const res = await fetch(
+            `/api/recordings/${sessionId}/traces/${traceId}`,
+          );
           if (!res.ok) continue;
           const data = (await res.json()) as TraceResponse;
           if (cancelled) return;
@@ -98,7 +115,7 @@ export function Viewer({ sessionId }: { sessionId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, sessionId]);
 
   // ---------------------------------------------------------------- player
 
@@ -116,7 +133,7 @@ export function Viewer({ sessionId }: { sessionId: string }) {
     (async () => {
       const events: unknown[] = [];
       for (const chunk of session.chunks) {
-        const res = await fetch(`${API}${chunk.url}`);
+        const res = await fetch(chunk.url);
         if (!res.ok) continue;
         const body = (await res.json()) as { events: unknown[] };
         events.push(...body.events);

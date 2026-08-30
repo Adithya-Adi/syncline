@@ -29,12 +29,17 @@ export interface SynclineOptions {
   debug?: boolean;
 }
 
-export interface ResolvedOptions extends Required<Omit<SynclineOptions, 'release' | 'user'>> {
+export interface ResolvedOptions extends Required<
+  Omit<SynclineOptions, 'release' | 'user'>
+> {
   release?: string;
   user?: { id: string };
 }
 
-export function resolveOptions(options: SynclineOptions, pageOrigin: string): ResolvedOptions {
+export function resolveOptions(
+  options: SynclineOptions,
+  pageOrigin: string,
+): ResolvedOptions {
   if (!options.key) throw new Error('syncline: `key` is required');
   if (!options.endpoint) throw new Error('syncline: `endpoint` is required');
 
@@ -66,7 +71,11 @@ function normalizeOrigin(origin: string): string {
  * an allowlisted origin exactly — no subdomain wildcards, because "*.acme.com" would happily
  * include a third-party widget someone parked on a subdomain.
  */
-export function shouldTrace(url: string, allowlist: string[], pageOrigin: string): boolean {
+export function shouldTrace(
+  url: string,
+  allowlist: string[],
+  pageOrigin: string,
+): boolean {
   let target: URL;
   try {
     target = new URL(url, pageOrigin);
