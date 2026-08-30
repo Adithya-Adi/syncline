@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { ChevronDown, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,9 +30,13 @@ import { signOut } from '@/lib/auth-client';
 export function AccountMenu({
   organizationName,
   email,
+  align = 'end',
+  className,
 }: {
   organizationName: string;
   email: string;
+  align?: 'start' | 'center' | 'end';
+  className?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -43,15 +48,21 @@ export function AccountMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1.5">
-          {organizationName}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('min-w-0 gap-1.5', className)}
+        >
+          <span className="truncate">{organizationName}</span>
           <ChevronDown className="size-3 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-60">
+      <DropdownMenuContent align={align} className="w-60">
         <DropdownMenuLabel className="font-normal">
-          <span className="block text-xs text-muted-foreground">Signed in as</span>
+          <span className="block text-xs text-muted-foreground">
+            Signed in as
+          </span>
           <span className="block truncate font-mono text-xs">{email}</span>
         </DropdownMenuLabel>
 

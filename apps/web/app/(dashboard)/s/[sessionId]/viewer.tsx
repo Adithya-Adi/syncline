@@ -333,7 +333,7 @@ export function Viewer({ sessionId }: { sessionId: string }) {
   return (
     <div className="viewer">
       <div className="railbar">
-        <a className="wordmark" href="/sessions">
+        <a className="wordmark" href="/dashboard">
           syncline
         </a>
         <Field label="session" value={session.id} />

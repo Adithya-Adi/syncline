@@ -132,7 +132,7 @@ export default function Quickstart() {
 
       <h2 className="docs__h2">8. Watch it arrive</h2>
       <p>
-        Open <code>/sessions</code>. The first chunk lands within a few seconds
+        Open <code>/dashboard</code>. The first chunk lands within a few seconds
         of the page loading — the SDK flushes every five seconds or 64 KB,
         whichever comes first. Click a recording, then click a bar in any lane
         to zoom the timeline to that request.
