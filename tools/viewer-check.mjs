@@ -12,7 +12,6 @@ Error: Invalid installation targets: 'chromium'. Expecting one of: android, chro
  * same shape of data the SDK produces. Only the API is faked, which is what makes this runnable
  * without Postgres, Redis or MinIO.
  */
-import { JSDOM } from 'jsdom';
 import { createServer } from 'node:http';
 import { chromium } from 'playwright';
 
@@ -21,9 +20,17 @@ const TRACE_ID = '4bf92f3577b34da6a3ce929d0e0e4736';
 const API_PORT = 4000;
 const WEB = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
 
+// With SYNCLINE_SESSION set, the mock is skipped entirely and the viewer is pointed at whatever is
+// already serving the API — the real one.
+const REAL_SESSION = process.env.SYNCLINE_SESSION;
+
 // ---------------------------------------------------------------- fixtures
 
 async function captureEvents() {
+  // Only needed for the mock path, and it lives in the SDK package rather than at the root.
+  const { JSDOM } =
+    await import('../packages/browser-sdk/node_modules/jsdom/lib/api.js');
+
   const dom = new JSDOM(
     `<!doctype html><html><body>
        <h1 id="title">Checkout</h1><div id="cart"></div>
@@ -64,9 +71,9 @@ async function captureEvents() {
   return events;
 }
 
-const events = await captureEvents();
-const first = events[0].timestamp;
-const last = events[events.length - 1].timestamp;
+const events = REAL_SESSION ? [] : await captureEvents();
+const first = REAL_SESSION ? Date.now() : events[0].timestamp;
+const last = REAL_SESSION ? first + 1000 : events[events.length - 1].timestamp;
 
 const session = {
   id: SESSION_ID,
@@ -155,8 +162,12 @@ const server = createServer((req, res) => {
   res.statusCode = 404;
   res.end('{}');
 });
-await new Promise((r) => server.listen(API_PORT, r));
-console.log(`mock api on :${API_PORT} — ${events.length} real rrweb events`);
+if (!REAL_SESSION) {
+  await new Promise((r) => server.listen(API_PORT, r));
+  console.log(`mock api on :${API_PORT} — ${events.length} real rrweb events`);
+} else {
+  console.log(`using the live API for session ${REAL_SESSION}`);
+}
 
 // ------------------------------------------------------------------ render
 
@@ -169,7 +180,9 @@ page.on('console', (m) => {
 });
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
 
-await page.goto(`${WEB}/s/${SESSION_ID}`, { waitUntil: 'networkidle' });
+await page.goto(`${WEB}/s/${REAL_SESSION ?? SESSION_ID}`, {
+  waitUntil: 'networkidle',
+});
 await page.waitForTimeout(2500);
 
 const report = await page.evaluate(() => {
@@ -232,8 +245,9 @@ console.log('  core left after :', after.left);
 console.log('  readout         :', after.readout);
 console.log('  core moved      :', before !== after.left);
 
-await page.screenshot({ path: 'viewer.png', fullPage: false });
-console.log('\nscreenshot: packages/browser-sdk/viewer.png');
+const shot = process.env.SCREENSHOT ?? 'viewer.png';
+await page.screenshot({ path: shot, fullPage: false });
+console.log(`\nscreenshot: ${shot}`);
 
 if (problems.length) {
   console.log('\n--- browser problems ---');
@@ -241,5 +255,5 @@ if (problems.length) {
 }
 
 await browser.close();
-server.close();
+if (!REAL_SESSION) server.close();
 process.exit(0);
