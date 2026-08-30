@@ -1,6 +1,6 @@
 {
-  "name": "@syncline/browser",
-  "version": "0.1.0-alpha.1",
+  "name": "syncline-browser",
+  "version": "0.1.0-alpha.2",
   "private": false,
   "type": "module",
   "description": "Browser session replay with synchronized distributed traces.",

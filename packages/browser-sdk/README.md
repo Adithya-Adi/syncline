@@ -1,4 +1,4 @@
-# @syncline/browser
+# syncline-browser
 
 The recorder that ships to a customer's site. It records the session with
 [rrweb](https://github.com/rrweb-io/rrweb) and writes trace ids into the recording as it goes, so
@@ -8,7 +8,7 @@ a replay can resolve to its backend spans without a side table.
 
 Install the alpha prerelease with:
 
-    npm install @syncline/browser
+    npm install syncline-browser
 
 This package is currently an alpha prerelease. The supported public API is startRecording and the
 SynclineOptions type while the SDK integration surface is being validated.
@@ -18,7 +18,7 @@ Documentation and the hosted Syncline application will be available at
 self-hosted installations.
 
 ```ts
-import { startRecording } from '@syncline/browser';
+import { startRecording } from 'syncline-browser';
 
 startRecording({
   key: 'pk_live_...',
