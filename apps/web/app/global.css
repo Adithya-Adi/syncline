@@ -570,3 +570,122 @@ a {
 .notice code {
   color: var(--bone-300);
 }
+
+/* ------------------------------------------------------------------ list */
+
+.list {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+}
+
+.list__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: var(--rule);
+}
+
+.list__empty {
+  color: var(--bone-500);
+  margin: 32px 0 0;
+  max-width: 62ch;
+  line-height: 1.7;
+}
+
+.list__rows {
+  margin-top: 4px;
+}
+
+.list__head,
+.list__row {
+  display: grid;
+  grid-template-columns: 160px 1fr 110px 88px 84px 72px;
+  gap: 16px;
+  align-items: center;
+  padding: 9px 8px;
+}
+
+.list__head {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+  border-bottom: 1px solid rgba(39, 51, 67, 0.6);
+}
+
+.list__row {
+  border-bottom: 1px solid rgba(39, 51, 67, 0.4);
+  color: var(--bone-300);
+  font-size: 12.5px;
+  transition: background 100ms ease;
+}
+
+.list__row:hover {
+  background: var(--rock-850);
+  color: var(--bone-100);
+}
+
+.list__when {
+  color: var(--bone-500);
+}
+
+.list__page,
+.list__user {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list__page {
+  color: var(--bone-100);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The only red on the page, so a broken recording is the thing your eye lands on. */
+.list__errors {
+  color: var(--fault);
+}
+
+@media (max-width: 760px) {
+  .list__head {
+    display: none;
+  }
+
+  .list__row {
+    grid-template-columns: 1fr auto;
+    grid-auto-rows: min-content;
+    row-gap: 4px;
+  }
+}
+
+.strata__focus {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.6);
+  background: var(--rock-800);
+}
+
+.strata__fit {
+  background: transparent;
+  border: var(--rule);
+  border-radius: var(--radius);
+  color: var(--bone-300);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+
+.strata__fit:hover {
+  color: var(--bone-100);
+  border-color: var(--rock-500);
+}

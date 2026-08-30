@@ -48,7 +48,8 @@ export interface SessionResponse {
 
 export type SpanStatus = 'UNSET' | 'OK' | 'ERROR';
 
-export type SpanKind = 'INTERNAL' | 'SERVER' | 'CLIENT' | 'PRODUCER' | 'CONSUMER';
+export type SpanKind =
+  'INTERNAL' | 'SERVER' | 'CLIENT' | 'PRODUCER' | 'CONSUMER';
 
 export interface ViewerSpan {
   spanId: string;
@@ -80,4 +81,29 @@ export interface TraceResponse {
 /** True for spans the database lane should render. */
 export function isDatabaseSpan(span: ViewerSpan): boolean {
   return typeof span.attributes['db.system'] === 'string';
+}
+
+/**
+ * A row in the recordings list.
+ *
+ * Deliberately not a trimmed `SessionResponse`: a list wants counts and a reason to click, while a
+ * single session wants chunks and links. Sharing one type would make both worse.
+ */
+export interface SessionSummary {
+  id: string;
+  startedMs: number;
+  durationMs: number;
+  url?: string;
+  userId?: string;
+  release?: string;
+  chunkCount: number;
+  linkCount: number;
+  /** Requests the browser saw fail. The reason to open one recording rather than another. */
+  errorCount: number;
+}
+
+export interface SessionListResponse {
+  sessions: SessionSummary[];
+  /** Pass back as `before` to page further. Absent when the end has been reached. */
+  nextCursor?: string;
 }

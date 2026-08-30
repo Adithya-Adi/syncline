@@ -250,9 +250,30 @@ export function Viewer({ sessionId }: { sessionId: string }) {
     return { bars: out, startMs: min, durationMs: Math.max(1, max - min) };
   }, [session, traces]);
 
+  /**
+   * The window the strata are drawn against.
+   *
+   * Without this the timeline is useless on any real recording: a 17ms request inside a five
+   * second session is a third of a percent of the width. `null` means the whole recording; picking
+   * a bar narrows to that request, which is the only time the backend and database lanes are
+   * legible.
+   */
+  const [focus, setFocus] = useState<{ from: number; to: number } | null>(null);
+
+  const view = useMemo(() => {
+    if (!focus) return { from: startMs, span: durationMs };
+    // A quarter of the window as padding on each side, so the request has visible context rather
+    // than sitting flush against both edges.
+    const width = Math.max(1, focus.to - focus.from);
+    const pad = width * 0.25;
+    const from = Math.max(startMs, focus.from - pad);
+    const to = Math.min(startMs + durationMs, focus.to + pad);
+    return { from, span: Math.max(1, to - from) };
+  }, [focus, startMs, durationMs]);
+
   const pct = useCallback(
-    (ms: number) => ((ms - startMs) / durationMs) * 100,
-    [startMs, durationMs],
+    (ms: number) => ((ms - view.from) / view.span) * 100,
+    [view],
   );
 
   // The player keeps counting past the last recorded event, so the playhead can exceed the
@@ -264,6 +285,12 @@ export function Viewer({ sessionId }: { sessionId: string }) {
   );
 
   const playheadMs = session ? session.startedMs + currentMs : startMs;
+
+  // Once the timeline is zoomed, the playhead is usually outside the window. Clamping it to an
+  // edge would draw a cursor claiming the player is somewhere it is not, so it is simply not drawn
+  // — the same answer a scrolled-away cursor gets in any editor.
+  const playheadInView =
+    playheadMs >= view.from && playheadMs <= view.from + view.span;
   // From this session's own calibration rather than whichever trace happened to arrive first:
   // the band describes how well this recording's clock is known, and every trace it references
   // inherits that same uncertainty.
@@ -289,7 +316,9 @@ export function Viewer({ sessionId }: { sessionId: string }) {
   return (
     <div className="viewer">
       <div className="railbar">
-        <span className="wordmark">syncline</span>
+        <a className="wordmark" href="/sessions">
+          syncline
+        </a>
         <Field label="session" value={session.id} />
         {session.meta.url && (
           <Field label="page" value={shortPath(session.meta.url)} />
@@ -310,7 +339,22 @@ export function Viewer({ sessionId }: { sessionId: string }) {
       <div className="stage" ref={stageRef} />
 
       <div className="strata">
-        <Ruler durationMs={durationMs} />
+        {focus && (
+          <div className="strata__focus">
+            <span className="eyebrow">
+              showing {Math.round(view.span)}ms of {Math.round(durationMs)}ms
+            </span>
+            <button
+              type="button"
+              className="strata__fit"
+              onClick={() => setFocus(null)}
+            >
+              Fit whole recording
+            </button>
+          </div>
+        )}
+
+        <Ruler fromMs={view.from - startMs} spanMs={view.span} />
 
         <div className="strata__lanes">
           {LANES.map((lane) => (
@@ -334,7 +378,14 @@ export function Viewer({ sessionId }: { sessionId: string }) {
                       <button
                         key={bar.key}
                         type="button"
-                        onClick={() => setSelected(bar)}
+                        onClick={() => {
+                          setSelected(bar);
+                          // Selecting is also how you zoom. On a real recording a request is a
+                          // fraction of a percent of the width, so inspecting one and narrowing to
+                          // it are the same intent — asking for a separate gesture would just mean
+                          // performing two.
+                          setFocus({ from: bar.startMs, to: bar.endMs });
+                        }}
                         className={`bar${live ? ' bar--live' : ''}${bar.error ? ' bar--error' : ''}`}
                         style={{
                           left: `${left}%`,
@@ -360,24 +411,28 @@ export function Viewer({ sessionId }: { sessionId: string }) {
             The clock was measured over a round trip, so a server timestamp is only known to within
             half of it. Drawing a band is more honest than drawing a line that implies otherwise.
           */}
-          {uncertaintyMs > 0 && (
+          {uncertaintyMs > 0 && playheadInView && (
             <div
               className="uncertainty"
               style={{
                 left: `calc(108px + (100% - 108px) * ${clampedPct(playheadMs - uncertaintyMs) / 100})`,
-                width: `calc((100% - 108px) * ${(uncertaintyMs * 2) / durationMs})`,
+                // Scaled to the visible window, not the whole recording: zoomed in, the same
+                // number of milliseconds of uncertainty covers proportionally more of the screen.
+                width: `calc((100% - 108px) * ${(uncertaintyMs * 2) / view.span})`,
               }}
             />
           )}
 
-          <div
-            className="core"
-            style={{
-              left: `calc(108px + (100% - 108px) * ${clampedPct(playheadMs) / 100})`,
-            }}
-          >
-            <span className="core__readout">{Math.round(currentMs)}ms</span>
-          </div>
+          {playheadInView && (
+            <div
+              className="core"
+              style={{
+                left: `calc(108px + (100% - 108px) * ${clampedPct(playheadMs) / 100})`,
+              }}
+            >
+              <span className="core__readout">{Math.round(currentMs)}ms</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -395,7 +450,12 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Ruler({ durationMs }: { durationMs: number }) {
+/**
+ * Labels are offsets from the start of the recording, not from the start of the window. When you
+ * zoom into a request 4 seconds in, the ruler should say 4,012ms — a window that restarted at zero
+ * would lose the only number that ties the strata back to the video.
+ */
+function Ruler({ fromMs, spanMs }: { fromMs: number; spanMs: number }) {
   const steps = 6;
   return (
     <div className="strata__ruler">
@@ -407,7 +467,7 @@ function Ruler({ durationMs }: { durationMs: number }) {
             className={`strata__tick${i === steps ? ' strata__tick--last' : ''}`}
             style={{ left: `calc(108px + (100% - 108px) * ${at / 100})` }}
           >
-            {Math.round((durationMs * i) / steps)}ms
+            {Math.round(fromMs + (spanMs * i) / steps)}ms
           </span>
         );
       })}
