@@ -1,6 +1,16 @@
 import Link from 'next/link';
-import { db } from '../../../lib/db';
-import { requireViewer } from '../../../lib/session';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { db } from '@/lib/db';
+import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Projects · Syncline' };
@@ -15,50 +25,68 @@ export default async function ProjectsPage() {
   });
 
   return (
-    <main className="list">
-      <div className="list__header">
-        <h1 className="list__h1">Projects</h1>
-        <Link href="/projects/new" className="button">
-          New project
-        </Link>
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
+        <Button asChild size="sm">
+          <Link href="/projects/new">New project</Link>
+        </Button>
       </div>
 
       {projects.length === 0 ? (
-        <p className="list__empty">
+        <p className="mt-10 max-w-prose text-sm leading-relaxed text-muted-foreground">
           No projects yet. A project is what an API key belongs to — create one
           to get a key and start recording.
         </p>
       ) : (
-        <div className="list__rows">
-          <div className="list__head list__head--projects">
-            <span>Name</span>
-            <span>Public key</span>
-            <span>Allowed origins</span>
-            <span className="num">Recordings</span>
-          </div>
-
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}`}
-              className="list__row list__row--projects"
-            >
-              <span className="list__page">{project.name}</span>
-              <span className="list__when">
-                {truncateKey(project.publicKey)}
-              </span>
-              <span className="list__user">
-                {project.origins.length > 0 ? project.origins.join(', ') : '—'}
-              </span>
-              <span className="num">
-                {project._count.sessions > 0 ? (
-                  project._count.sessions
-                ) : (
-                  <span className="list__setup">set up</span>
-                )}
-              </span>
-            </Link>
-          ))}
+        <div className="mt-6 rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-[230px]">Public key</TableHead>
+                <TableHead>Allowed origins</TableHead>
+                <TableHead className="w-[130px] text-right">
+                  Recordings
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {projects.map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell className="p-0" colSpan={4}>
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="grid grid-cols-[1fr_230px_1fr_130px] items-center px-4 py-2.5 text-sm"
+                    >
+                      <span className="truncate pr-4 font-medium">
+                        {project.name}
+                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {truncateKey(project.publicKey)}
+                      </span>
+                      <span className="truncate pr-4 font-mono text-xs text-muted-foreground">
+                        {project.origins.length > 0
+                          ? project.origins.join(', ')
+                          : '—'}
+                      </span>
+                      <span className="text-right">
+                        {project._count.sessions > 0 ? (
+                          <span className="font-mono text-xs tabular-nums">
+                            {project._count.sessions}
+                          </span>
+                        ) : (
+                          // A project that has never received anything needs a next action, not a
+                          // zero it cannot act on.
+                          <Badge variant="secondary">Set up</Badge>
+                        )}
+                      </span>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
     </main>

@@ -1,8 +1,11 @@
 'use client';
 
+import { CircleCheck, Circle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import type { SetupStatus } from '../../../../../lib/setup-status';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import type { SetupStatus } from '@/lib/setup-status';
 
 /**
  * The diagnostic ladder.
@@ -10,9 +13,9 @@ import type { SetupStatus } from '../../../../../lib/setup-status';
  * Four different failures all look like an empty recordings list, so each rung names the one thing
  * that has not happened yet and what to do about it.
  *
- * A rung only diagnoses when the rung below it has passed. Otherwise it is merely waiting, and
- * saying "recording works, but no requests were captured" while nothing has been recorded at all
- * would be three contradictory claims on one screen.
+ * A rung only diagnoses when the rung below it has passed. Otherwise it is merely waiting — saying
+ * "recording works, but no requests were captured" while nothing has been recorded at all would put
+ * three contradictory claims on one screen.
  */
 
 const POLL_MS = 3000;
@@ -79,8 +82,8 @@ export function SetupProgress({
 }) {
   const [status, setStatus] = useState(initial);
 
-  // Polling stops once the pipeline is complete. There is nothing left to wait for, and a page
-  // left open overnight should not keep asking.
+  // Polling stops once the pipeline is complete. There is nothing left to wait for, and a page left
+  // open overnight should not keep asking.
   const complete = status.step === 'complete';
 
   useEffect(() => {
@@ -105,47 +108,75 @@ export function SetupProgress({
     };
   }, [projectId, complete]);
 
-  const steps = rungs(status);
-
   return (
-    <section
-      className={`panel progress${complete ? ' progress--complete' : ''}`}
-    >
-      <div className="progress__head">
-        <h2 className="panel__title">
+    <Card className={cn('mt-6', complete && 'border-primary/40')}>
+      <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+        <CardTitle>
           {complete ? 'Everything is working' : 'Waiting for data'}
-        </h2>
+        </CardTitle>
         {!complete && (
-          <span className="progress__pulse">checking every 3s</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" />
+            checking every 3s
+          </span>
         )}
-      </div>
+      </CardHeader>
 
-      <ol className="progress__list">
-        {steps.map((rung) => (
-          <li
-            key={rung.label}
-            className={`progress__item${rung.done ? ' progress__item--done' : ''}${
-              rung.blocked ? ' progress__item--blocked' : ''
-            }`}
-          >
-            <span className="progress__mark">{rung.done ? '■' : '□'}</span>
-            <div>
-              <strong>{rung.label}</strong>
-              <p className="progress__detail">{rung.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      <CardContent>
+        <ol className="space-y-4">
+          {rungs(status).map((rung) => (
+            <li key={rung.label} className="flex gap-3">
+              {rung.done ? (
+                <CircleCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+              ) : (
+                <Circle
+                  className={cn(
+                    'mt-0.5 size-4 shrink-0',
+                    rung.blocked
+                      ? 'text-muted-foreground/40'
+                      : 'text-muted-foreground',
+                  )}
+                />
+              )}
+              <div className="space-y-1">
+                <p
+                  className={cn(
+                    'text-sm',
+                    !rung.done && 'text-muted-foreground',
+                  )}
+                >
+                  {rung.label}
+                </p>
+                <p
+                  className={cn(
+                    'max-w-prose text-xs leading-relaxed',
+                    rung.blocked
+                      ? 'text-muted-foreground/60'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {rung.detail}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
 
-      {status.latestRecordingId && (
-        <p className="panel__note">
-          Latest recording:{' '}
-          <Link href={`/s/${status.latestRecordingId}`}>watch it</Link>
-          {status.latestRecordingAt
-            ? ` · ${new Date(status.latestRecordingAt).toISOString().slice(11, 19)} UTC`
-            : ''}
-        </p>
-      )}
-    </section>
+        {status.latestRecordingId && (
+          <p className="mt-5 text-xs text-muted-foreground">
+            Latest recording:{' '}
+            <Link
+              href={`/s/${status.latestRecordingId}`}
+              className="text-foreground underline underline-offset-4"
+            >
+              watch it
+            </Link>
+            {status.latestRecordingAt
+              ? ` · ${new Date(status.latestRecordingAt).toISOString().slice(11, 19)} UTC`
+              : ''}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

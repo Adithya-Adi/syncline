@@ -1,6 +1,10 @@
 'use client';
 
+import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 /**
  * A key with a copy button.
@@ -35,15 +39,38 @@ export function CopyField({
   }
 
   return (
-    <div className={`keyfield${reveal ? ' keyfield--reveal' : ''}`}>
-      <span className="field__label">{label}</span>
-      <div className="keyfield__row">
-        <code className="keyfield__value">{value}</code>
-        <button type="button" className="button keyfield__copy" onClick={copy}>
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex items-stretch gap-2">
+        <code
+          className={cn(
+            'flex-1 select-all overflow-x-auto whitespace-nowrap rounded-md border px-3 py-2 font-mono text-xs leading-6',
+            // A value that will never be shown again earns the one emphasis on the page.
+            reveal
+              ? 'border-primary/40 bg-primary/5 text-foreground'
+              : 'bg-muted/40',
+          )}
+        >
+          {value}
+        </code>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={copy}
+          className="shrink-0"
+        >
+          {copied ? (
+            <Check className="size-3.5" />
+          ) : (
+            <Copy className="size-3.5" />
+          )}
           {copied ? 'Copied' : 'Copy'}
-        </button>
+        </Button>
       </div>
-      {hint && <span className="field__hint">{hint}</span>}
+      {hint && (
+        <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>
+      )}
     </div>
   );
 }
