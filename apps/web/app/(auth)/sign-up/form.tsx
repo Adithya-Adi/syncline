@@ -2,7 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { signUp } from '../../../lib/auth-client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { signUp } from '@/lib/auth-client';
 
 const MIN_PASSWORD_LENGTH = 10;
 
@@ -18,7 +22,7 @@ export function SignUpForm() {
     event.preventDefault();
     setError(null);
 
-    // Checked here as well as by the server so the message arrives before a round trip, not
+    // Checked here as well as on the server so the message arrives without a round trip, not
     // because the client is trusted.
     if (password.length < MIN_PASSWORD_LENGTH) {
       setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
@@ -39,34 +43,34 @@ export function SignUpForm() {
   }
 
   return (
-    <form className="auth__form" onSubmit={onSubmit}>
-      <label className="field">
-        <span className="field__label">Name</span>
-        <input
-          className="field__input"
+    <form className="mt-8 space-y-4" onSubmit={onSubmit}>
+      <div className="space-y-2">
+        <Label htmlFor="name">Name</Label>
+        <Input
+          id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoComplete="name"
           required
         />
-      </label>
+      </div>
 
-      <label className="field">
-        <span className="field__label">Email</span>
-        <input
-          className="field__input"
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
           required
         />
-      </label>
+      </div>
 
-      <label className="field">
-        <span className="field__label">Password</span>
-        <input
-          className="field__input"
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -74,20 +78,20 @@ export function SignUpForm() {
           minLength={MIN_PASSWORD_LENGTH}
           required
         />
-        <span className="field__hint">
+        <p className="text-xs text-muted-foreground">
           At least {MIN_PASSWORD_LENGTH} characters.
-        </span>
-      </label>
+        </p>
+      </div>
 
-      {error && <p className="field__error">{error}</p>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <button
-        className="button button--primary"
-        type="submit"
-        disabled={pending}
-      >
+      <Button type="submit" className="w-full" disabled={pending}>
         {pending ? 'Creating account…' : 'Create account and claim instance'}
-      </button>
+      </Button>
     </form>
   );
 }

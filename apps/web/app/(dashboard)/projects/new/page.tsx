@@ -1,6 +1,11 @@
 import Link from 'next/link';
-import { createProject } from '../../../../lib/projects';
-import { requireViewer } from '../../../../lib/session';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { createProject } from '@/lib/projects';
+import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'New project · Syncline' };
@@ -9,48 +14,58 @@ export default async function NewProjectPage() {
   const viewer = await requireViewer();
 
   return (
-    <main className="form-page">
-      <Link href="/projects" className="form-page__back">
+    <main className="mx-auto max-w-2xl px-6 py-10">
+      <Link
+        href="/projects"
+        className="text-sm text-muted-foreground hover:text-foreground"
+      >
         ← Projects
       </Link>
 
-      <h1 className="form-page__title">New project</h1>
-      <p className="form-page__sub">
+      <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+        New project
+      </h1>
+      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
         A project owns a pair of API keys and the list of origins allowed to
-        send recordings to it. Most teams want one per application, not one per
-        environment — a recording already carries its release.
+        send recordings to it. Most teams want one per application rather than
+        one per environment — a recording already carries its release.
       </p>
 
-      <form className="auth__form" action={createProject}>
-        <label className="field">
-          <span className="field__label">Name</span>
-          <input
-            className="field__input"
-            name="name"
-            required
-            autoFocus
-            placeholder="Checkout"
-          />
-        </label>
+      <Card className="mt-6">
+        <CardContent>
+          <form action={createProject} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                name="name"
+                required
+                autoFocus
+                placeholder="Checkout"
+              />
+            </div>
 
-        <label className="field">
-          <span className="field__label">Allowed origins</span>
-          <textarea
-            className="field__input field__input--area"
-            name="origins"
-            rows={3}
-            placeholder={'https://app.acme.com\nhttp://localhost:3000'}
-          />
-          <span className="field__hint">
-            One per line. Recordings are refused from anywhere else, which is
-            what makes the public key safe to ship in a bundle.
-          </span>
-        </label>
+            <div className="space-y-2">
+              <Label htmlFor="origins">Allowed origins</Label>
+              <Textarea
+                id="origins"
+                name="origins"
+                rows={3}
+                className="font-mono text-xs"
+                placeholder={'https://app.acme.com\nhttp://localhost:3000'}
+              />
+              <p className="text-xs text-muted-foreground">
+                One per line. Recordings are refused from anywhere else, which
+                is what makes the public key safe to ship in a bundle.
+              </p>
+            </div>
 
-        <button className="button button--primary" type="submit">
-          Create project in {viewer.organizationName}
-        </button>
-      </form>
+            <Button type="submit">
+              Create project in {viewer.organizationName}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }

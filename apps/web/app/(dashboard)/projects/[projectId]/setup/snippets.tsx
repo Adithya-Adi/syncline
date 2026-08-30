@@ -1,6 +1,10 @@
 'use client';
 
+import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
  * Install snippets, with this project's real key already in them.
@@ -114,46 +118,55 @@ export function SetupSnippets({
   }
 
   return (
-    <section className="panel">
-      <div className="progress__head">
-        <h2 className="panel__title">First: record the browser</h2>
-        <button type="button" className="button" onClick={copy}>
+    <Card className="mt-6">
+      <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+        <CardTitle>First: record the browser</CardTitle>
+        <Button type="button" variant="outline" size="sm" onClick={copy}>
+          {copied ? (
+            <Check className="size-3.5" />
+          ) : (
+            <Copy className="size-3.5" />
+          )}
           {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
+        </Button>
+      </CardHeader>
 
-      <div className="tabs">
-        {(Object.keys(LABELS) as Framework[]).map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={`tabs__tab${framework === value ? ' tabs__tab--active' : ''}`}
-            onClick={() => setFramework(value)}
-          >
-            {LABELS[value]}
-          </button>
-        ))}
-      </div>
+      <CardContent>
+        <Tabs
+          value={framework}
+          onValueChange={(value) => setFramework(value as Framework)}
+        >
+          <TabsList>
+            {(Object.keys(LABELS) as Framework[]).map((value) => (
+              <TabsTrigger key={value} value={value}>
+                {LABELS[value]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-      <pre className="snippet">
-        <code>{code}</code>
-      </pre>
+          <TabsContent value={framework} className="mt-4">
+            <pre className="overflow-x-auto rounded-md border bg-muted/40 p-4 font-mono text-xs leading-6">
+              <code>{code}</code>
+            </pre>
+          </TabsContent>
+        </Tabs>
 
-      <p className="panel__note">
-        {origins.length > 0 ? (
-          <>
-            <code>traceOrigins</code> is filled from this project&rsquo;s
-            allowlist. Only requests to those origins get a{' '}
-            <code>traceparent</code> — the SDK never adds headers to anyone
-            else&rsquo;s domain.
-          </>
-        ) : (
-          <>
-            This project has no allowed origins yet, so ingest will refuse every
-            recording. Add them on the project page before installing.
-          </>
-        )}
-      </p>
-    </section>
+        <p className="mt-3 max-w-prose text-xs leading-relaxed text-muted-foreground">
+          {origins.length > 0 ? (
+            <>
+              <code className="font-mono">traceOrigins</code> is filled from
+              this project&rsquo;s allowlist. Only requests to those origins get
+              a <code className="font-mono">traceparent</code> — the SDK never
+              adds headers to anyone else&rsquo;s domain.
+            </>
+          ) : (
+            <>
+              This project has no allowed origins yet, so ingest will refuse
+              every recording. Add them on the project page before installing.
+            </>
+          )}
+        </p>
+      </CardContent>
+    </Card>
   );
 }

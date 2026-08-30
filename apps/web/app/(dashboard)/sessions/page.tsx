@@ -1,6 +1,15 @@
 import Link from 'next/link';
-import { db } from '../../../lib/db';
-import { requireViewer } from '../../../lib/session';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { db } from '@/lib/db';
+import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Recordings · Syncline' };
@@ -9,9 +18,9 @@ export const metadata = { title: 'Recordings · Syncline' };
  * Recordings for the viewer's organization.
  *
  * Read from Postgres rather than through the API. The API's list endpoint authenticates with a
- * project's secret key, and we deliberately store only the hash of those — so the web app could not
- * call it even if we wanted to. Reading directly is also what lets the query be scoped by
- * organization in one place instead of trusting a key to imply a tenant.
+ * project's secret key and we deliberately store only the hash, so the web app has no key to
+ * present. Reading directly also keeps the tenant scope in one query instead of being implied by
+ * whichever key happened to be configured.
  */
 export default async function SessionsPage() {
   const viewer = await requireViewer();
@@ -46,56 +55,92 @@ export default async function SessionsPage() {
   );
 
   return (
-    <main className="list">
-      <div className="list__header">
-        <h1 className="list__h1">Recordings</h1>
-        <span className="eyebrow">
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <div className="flex items-baseline justify-between gap-4">
+        <h1 className="text-xl font-semibold tracking-tight">Recordings</h1>
+        <p className="text-sm text-muted-foreground">
           {sessions.length} in {viewer.organizationName}
-        </span>
+        </p>
       </div>
 
       {sessions.length === 0 ? (
-        <p className="list__empty">
+        <p className="mt-10 max-w-prose text-sm leading-relaxed text-muted-foreground">
           No recordings yet. Add the browser SDK to a page using one of your{' '}
-          <Link href="/projects">project keys</Link> — the first chunk arrives
-          within a few seconds of the page loading.
+          <Link
+            href="/projects"
+            className="text-foreground underline underline-offset-4"
+          >
+            project keys
+          </Link>{' '}
+          — the first chunk arrives within a few seconds of the page loading.
         </p>
       ) : (
-        <div className="list__rows">
-          <div className="list__head">
-            <span>Recorded</span>
-            <span>Page</span>
-            <span>User</span>
-            <span className="num">Duration</span>
-            <span className="num">Requests</span>
-            <span className="num">Errors</span>
-          </div>
-
-          {sessions.map((session) => {
-            const errorCount = errorBySession.get(session.id) ?? 0;
-            return (
-              <Link
-                key={session.id}
-                href={`/s/${session.id}`}
-                className="list__row"
-              >
-                <span className="list__when">
-                  {formatWhen(session.startedAt)}
-                </span>
-                <span className="list__page">
-                  {shortPath(session.url ?? undefined)}
-                </span>
-                <span className="list__user">{session.userId ?? '—'}</span>
-                <span className="num">
-                  {formatDuration(session.durationMs ?? 0)}
-                </span>
-                <span className="num">{session._count.links}</span>
-                <span className={`num${errorCount > 0 ? ' list__errors' : ''}`}>
-                  {errorCount > 0 ? errorCount : '—'}
-                </span>
-              </Link>
-            );
-          })}
+        <div className="mt-6 rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[190px]">Recorded</TableHead>
+                <TableHead>Page</TableHead>
+                <TableHead className="w-[150px]">Project</TableHead>
+                <TableHead className="w-[110px]">User</TableHead>
+                <TableHead className="w-[100px] text-right">Duration</TableHead>
+                <TableHead className="w-[90px] text-right">Requests</TableHead>
+                <TableHead className="w-[90px] text-right">Errors</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((session) => {
+                const errorCount = errorBySession.get(session.id) ?? 0;
+                return (
+                  <TableRow key={session.id} className="cursor-pointer">
+                    <TableCell className="p-0" colSpan={7}>
+                      {/*
+                        The link wraps the whole row so the entire strip is clickable, and keyboard
+                        focus lands on one target per recording rather than seven.
+                      */}
+                      <Link
+                        href={`/s/${session.id}`}
+                        className="grid grid-cols-[190px_1fr_150px_110px_100px_90px_90px] items-center px-4 py-2.5 text-sm"
+                      >
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {formatWhen(session.startedAt)}
+                        </span>
+                        <span className="truncate pr-4 font-mono text-xs">
+                          {shortPath(session.url ?? undefined)}
+                        </span>
+                        <span className="truncate pr-4 text-muted-foreground">
+                          {session.project.name}
+                        </span>
+                        <span className="truncate pr-4 text-muted-foreground">
+                          {session.userId ?? '—'}
+                        </span>
+                        <span className="text-right font-mono text-xs tabular-nums">
+                          {formatDuration(session.durationMs ?? 0)}
+                        </span>
+                        <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                          {session._count.links}
+                        </span>
+                        <span className="text-right">
+                          {errorCount > 0 ? (
+                            <Badge
+                              variant="destructive"
+                              className="font-mono tabular-nums"
+                            >
+                              {errorCount}
+                            </Badge>
+                          ) : (
+                            <span className="font-mono text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
     </main>
