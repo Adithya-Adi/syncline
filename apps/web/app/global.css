@@ -1315,3 +1315,126 @@ a {
 .keyfield__copy {
   flex: 0 0 auto;
 }
+
+/* ----------------------------------------------------------------- setup */
+
+.form-page--wide {
+  max-width: 860px;
+}
+
+.panel--warn {
+  border-left: 2px solid var(--fault);
+}
+
+.panel__note--lead {
+  color: var(--bone-300);
+  font-size: 12.5px;
+  margin-top: 0;
+}
+
+.progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.progress__head .panel__title {
+  margin: 0;
+}
+
+.progress__pulse {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+.progress--complete {
+  border-left: 2px solid var(--stratum-network);
+}
+
+.progress__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.progress__item {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  color: var(--bone-500);
+}
+
+.progress__item strong {
+  color: var(--bone-300);
+  font-weight: 400;
+  font-size: 12.5px;
+}
+
+.progress__item--done strong {
+  color: var(--bone-100);
+}
+
+.progress__mark {
+  color: var(--rock-500);
+  line-height: 1.5;
+}
+
+.progress__item--done .progress__mark {
+  color: var(--stratum-network);
+}
+
+.progress__detail {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  max-width: 74ch;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.tabs__tab {
+  background: transparent;
+  border: var(--rule);
+  border-radius: var(--radius);
+  color: var(--bone-500);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.tabs__tab:hover {
+  color: var(--bone-100);
+}
+
+.tabs__tab--active {
+  color: var(--rock-900);
+  background: var(--bone-100);
+  border-color: var(--bone-100);
+}
+
+.snippet code {
+  white-space: pre;
+}
+
+/* A project that has never received anything needs a next action, not a zero. */
+.list__setup {
+  color: var(--stratum-network);
+  font-size: 11px;
+}
+
+/* A rung waiting on an earlier step is not a failure, and should not read like one. */
+.progress__item--blocked .progress__detail {
+  color: var(--rock-500);
+}
