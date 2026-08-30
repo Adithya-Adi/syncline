@@ -49,13 +49,20 @@ export default async function ProjectPage({
         ← Projects
       </Link>
 
-      <div className="mt-4 flex items-center justify-between gap-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">
           {project.name}
         </h1>
-        <Button asChild variant="secondary" size="sm">
-          <Link href={`/projects/${project.id}/setup`}>Set up the SDK</Link>
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/projects/${project.id}/recordings`}>
+              View recordings
+            </Link>
+          </Button>
+          <Button asChild variant="secondary" size="sm">
+            <Link href={`/projects/${project.id}/setup`}>Set up the SDK</Link>
+          </Button>
+        </div>
       </div>
 
       {created && (

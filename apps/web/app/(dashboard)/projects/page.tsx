@@ -1,16 +1,13 @@
 import Link from 'next/link';
-import { Badge } from '@/components/ui/badge';
+import { ArrowUpRight, FolderKanban, FolderPlus } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
 import { EmptyState, PageHeader } from '@/components/page-header';
-import { FolderPlus } from 'lucide-react';
 import { db } from '@/lib/db';
 import { requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Projects' };
-
-const COLUMNS = 'minmax(0,1fr) 230px minmax(0,1fr) 110px';
 
 export default async function ProjectsPage() {
   const viewer = await requireViewer();
@@ -24,8 +21,9 @@ export default async function ProjectsPage() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <PageHeader
+        eyebrow="Workspace"
         title="Projects"
-        description="A project is what an API key pair belongs to, and the boundary an allowed origin is checked against."
+        description="Choose a project to view its recordings."
         actions={
           <Button asChild size="sm">
             <Link href="/projects/new">New project</Link>
@@ -43,51 +41,42 @@ export default async function ProjectsPage() {
             </Button>
           }
         >
-          A project is what an API key belongs to — create one to get a key and
-          start recording.
+          Create a project to get an API key and start recording.
         </EmptyState>
       ) : (
-        <DataList columns={COLUMNS}>
-          <DataListHeader columns={COLUMNS}>
-            <span>Name</span>
-            <span>Public key</span>
-            <span>Allowed origins</span>
-            <span className="text-right">Recordings</span>
-          </DataListHeader>
-
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
-            <DataListRow
+            <Link
               key={project.id}
-              href={`/projects/${project.id}`}
-              columns={COLUMNS}
+              href={`/projects/${project.id}/recordings`}
+              className="group rounded-lg border border-border/80 bg-background p-5 transition-colors duration-200 hover:border-network/50 hover:bg-accent/40"
             >
-              <span className="truncate font-medium">{project.name}</span>
-              <span className="font-mono text-xs text-muted-foreground">
+              <div className="flex items-start justify-between gap-4">
+                <span className="flex size-10 items-center justify-center rounded-md border border-border bg-muted/50 text-network">
+                  <FolderKanban className="size-4" />
+                </span>
+                <ArrowUpRight className="size-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+              </div>
+              <div className="mt-6 truncate font-display text-base font-semibold">
+                {project.name}
+              </div>
+              <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
                 {truncateKey(project.publicKey)}
-              </span>
-              <span className="truncate font-mono text-xs text-muted-foreground">
-                {project.origins.length > 0 ? project.origins.join(', ') : '—'}
-              </span>
-              <span className="text-right">
-                {project._count.sessions > 0 ? (
-                  <span className="font-mono text-xs tabular-nums">
-                    {project._count.sessions}
-                  </span>
-                ) : (
-                  // A project that has never received anything needs a next action, not a zero it
-                  // cannot act on.
-                  <Badge variant="secondary">Set up</Badge>
-                )}
-              </span>
-            </DataListRow>
+              </div>
+              <div className="mt-6 flex items-center justify-between gap-3 border-t border-border/70 pt-3 text-xs">
+                <span className="text-muted-foreground">Recordings</span>
+                <span className="font-mono tabular-nums">
+                  {project._count.sessions}
+                </span>
+              </div>
+            </Link>
           ))}
-        </DataList>
+        </div>
       )}
     </main>
   );
 }
 
-/** Enough of the key to recognise, not enough to copy by eye — the detail page has the full one. */
 function truncateKey(key: string): string {
-  return `${key.slice(0, 11)}…${key.slice(-4)}`;
+  return `${key.slice(0, 11)}...${key.slice(-4)}`;
 }

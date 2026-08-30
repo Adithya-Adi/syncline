@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -17,14 +17,26 @@ import { cn } from '@/lib/utils';
 export function DataList({
   columns,
   children,
+  className,
+  minWidth = '760px',
 }: {
   columns: string;
   children: ReactNode;
+  className?: string;
+  minWidth?: string;
 }) {
+  const style = {
+    '--data-list-min-width': minWidth,
+  } as CSSProperties;
+
   return (
     <div
-      className="mt-6 overflow-hidden rounded-lg border"
+      className={cn(
+        'mt-6 overflow-x-auto rounded-lg border border-border/80 bg-card/35',
+        className,
+      )}
       data-columns={columns}
+      style={style}
     >
       {children}
     </div>
@@ -40,7 +52,7 @@ export function DataListHeader({
 }) {
   return (
     <div
-      className="sticky top-14 z-10 grid items-center gap-4 border-b bg-muted/40 px-4 py-2.5 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase backdrop-blur"
+      className="grid min-w-[var(--data-list-min-width)] items-center gap-4 border-b bg-muted/45 px-4 py-2.5 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
       style={{ gridTemplateColumns: columns }}
     >
       {children}
@@ -61,10 +73,10 @@ export function DataListRow({
     <Link
       href={href}
       className={cn(
-        'grid items-center gap-4 px-4 py-3 text-sm transition-colors',
-        'border-b last:border-b-0 hover:bg-muted/40',
+        'grid min-w-[var(--data-list-min-width)] items-center gap-4 px-4 py-3.5 text-sm transition-colors',
+        'border-b last:border-b-0 hover:bg-muted/45',
         'ease-brand duration-200',
-        'focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+        'focus-visible:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
       )}
       style={{ gridTemplateColumns: columns }}
     >

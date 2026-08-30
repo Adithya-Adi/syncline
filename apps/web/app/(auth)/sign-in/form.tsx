@@ -31,7 +31,7 @@ export function SignInForm() {
       return;
     }
 
-    router.push('/sessions');
+    router.push('/dashboard');
     router.refresh();
   }
 
