@@ -1072,3 +1072,108 @@ a {
     gap: 10px;
   }
 }
+
+/* ---------------------------------------------------------------- auth */
+
+.auth {
+  max-width: 380px;
+  margin: 0 auto;
+  padding: 88px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth__title {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin: 28px 0 0;
+}
+
+.auth__sub {
+  color: var(--bone-300);
+  font-size: 12.5px;
+  line-height: 1.65;
+  margin: 10px 0 0;
+}
+
+.auth__notice {
+  border: var(--rule);
+  border-left: 2px solid var(--stratum-backend);
+  border-radius: var(--radius);
+  background: var(--rock-850);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--bone-300);
+  margin: 16px 0 0;
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 26px 0 0;
+}
+
+.auth__foot {
+  color: var(--bone-500);
+  font-size: 12px;
+  margin: 22px 0 0;
+}
+
+.auth__foot a {
+  color: var(--stratum-network);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field__label {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-500);
+}
+
+.field__input {
+  background: var(--rock-850);
+  border: var(--rule);
+  border-radius: var(--radius);
+  color: var(--bone-100);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 9px 11px;
+  width: 100%;
+}
+
+.field__input:focus {
+  border-color: var(--rock-500);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(78, 195, 217, 0.18);
+}
+
+.field__hint {
+  font-size: 11px;
+  color: var(--bone-500);
+}
+
+.field__error {
+  color: var(--fault);
+  font-size: 12px;
+  margin: 0;
+}
+
+.auth .button {
+  text-align: center;
+  padding: 9px 16px;
+}
+
+.auth .button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
