@@ -1,6 +1,4 @@
-
-
-The landing page is at , and a recording at .<h1 align="center">Syncline</h1>
+<h1 align="center">Syncline</h1>
 
 <p align="center"><strong>Every layer of your stack, folded onto one timeline.</strong></p>
 
@@ -21,7 +19,7 @@ Drag to `00:42`, and you see all of it at once: the user clicked **Checkout**, t
 ## Why
 
 Session replay tools show you the browser. Tracing tools show you the backend. Neither shows you
-the *seam*, so "a user said checkout was slow" is still archaeology — you eyeball a video, guess a
+the _seam_, so "a user said checkout was slow" is still archaeology — you eyeball a video, guess a
 timestamp, then go hunting in a separate tool with a different clock.
 
 Syncline stitches the two into a single timeline.
@@ -87,15 +85,15 @@ and the data model.
 
 Nx monorepo, pnpm, TypeScript.
 
-| Path | What |
-| --- | --- |
-| `apps/api` | Ingest + query API (NestJS) |
-| `apps/worker` | Queue processors (NestJS standalone) |
-| `apps/web` | Viewer and landing page (Next.js) |
+| Path                   | What                                    |
+| ---------------------- | --------------------------------------- |
+| `apps/api`             | Ingest + query API (NestJS)             |
+| `apps/worker`          | Queue processors (NestJS standalone)    |
+| `apps/web`             | Viewer and landing page (Next.js)       |
 | `packages/browser-sdk` | The recorder that ships to users' sites |
-| `packages/protocol` | Shared wire types |
-| `packages/models` | Prisma schema and client |
-| `packages/otlp` | OTLP → internal span normalizer |
+| `packages/protocol`    | Shared wire types                       |
+| `packages/models`      | Prisma schema and client                |
+| `packages/otlp`        | OTLP → internal span normalizer         |
 
 ## Development
 
