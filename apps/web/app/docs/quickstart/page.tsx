@@ -7,8 +7,9 @@ export default function Quickstart() {
     <>
       <h1 className="docs__h1">Quickstart</h1>
       <p className="docs__lede">
-        Postgres, Redis and MinIO in Docker; three Node processes; one seeded
-        project. About five minutes, most of it pulling images.
+        Postgres, Redis and MinIO in Docker; three Node processes; an account
+        and a project you create in the browser. About five minutes, most of it
+        pulling images.
       </p>
 
       <h2 className="docs__h2">1. Clone and install</h2>
@@ -30,33 +31,29 @@ export default function Quickstart() {
         <code>cp .env.example .env</code>
       </pre>
       <p>
-        The defaults match the Docker services. Note the ports:{' '}
-        <strong>5442</strong> for Postgres and <strong>6399</strong> for Redis,
-        not the standard ones. If you already run either natively, the standard
-        port is taken, and on some systems a host connection will silently reach{' '}
-        <em>your</em> server instead of the container with nothing to say so.
+        The defaults match the Docker services. Two things to set yourself:
+        <code>BETTER_AUTH_SECRET</code>, which signs session cookies, and
+        nothing else — API keys are created in the app rather than in a file.
+      </p>
+      <pre className="snippet">
+        <code>
+          node -e
+          &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&apos;base64url&apos;))&quot;
+        </code>
+      </pre>
+      <p>
+        Note the ports: <strong>5442</strong> for Postgres and{' '}
+        <strong>6399</strong> for Redis, not the standard ones. If you already
+        run either natively, the standard port is taken, and on some systems a
+        host connection will silently reach <em>your</em> server instead of the
+        container with nothing to say so.
       </p>
 
       <h2 className="docs__h2">3. Start the infrastructure</h2>
       <pre className="snippet">
         <code>
           pnpm infra:up{'\n'}
-          pnpm db:migrate{'\n'}
-          pnpm db:seed
-        </code>
-      </pre>
-      <p>
-        The seed prints a public key and a secret key. The secret is shown once
-        and never again — only its hash is stored — so copy both into{' '}
-        <code>.env</code> now:
-      </p>
-      <pre className="snippet">
-        <code>
-          <span className="k">SYNCLINE_SECRET_KEY</span>=
-          <span className="s">sk_...</span>
-          {'\n'}
-          <span className="k">NEXT_PUBLIC_SYNCLINE_API</span>=
-          <span className="s">http://localhost:4000</span>
+          pnpm db:migrate
         </code>
       </pre>
 
@@ -77,17 +74,43 @@ export default function Quickstart() {
       </pre>
       <p>
         The API logs <code>database connected</code> and{' '}
-        <code>bucket &quot;syncline&quot; ready</code>
-        at startup. If it does not, that is the thing to fix before going
-        further — <code>curl localhost:4000/v1/health</code> names the failing
-        dependency.
+        <code>bucket &quot;syncline&quot; ready</code> at startup. If it does
+        not, fix that before going further —{' '}
+        <code>curl localhost:4000/v1/health</code> names the failing dependency.
       </p>
 
-      <h2 className="docs__h2">5. Record something</h2>
+      <h2 className="docs__h2">5. Claim the instance</h2>
       <p>
-        Add the SDK to a page you control. The <code>traceOrigins</code> list
-        decides which requests get a <code>traceparent</code> — it defaults to
-        the page&rsquo;s own origin.
+        Open <code>http://localhost:3000/sign-up</code>. The first account
+        becomes the owner and takes the default organization; sign-up closes
+        afterwards, so an instance briefly exposed does not collect
+        strangers&rsquo; accounts.
+      </p>
+
+      <h2 className="docs__h2">6. Create a project</h2>
+      <p>
+        A project owns a pair of API keys and the list of origins allowed to
+        send recordings to it. Create one at <code>/projects/new</code>, listing
+        the origins your app is served from.
+      </p>
+      <ul className="docs__list">
+        <li>
+          The <strong>public key</strong> (<code>pk_</code>) ships in your
+          browser bundle. It is public by design — the origin allowlist is what
+          protects it.
+        </li>
+        <li>
+          The <strong>secret key</strong> (<code>sk_</code>) is shown once,
+          because only its hash is stored. It is for your OpenTelemetry
+          exporter. Lost it? Rotate.
+        </li>
+      </ul>
+
+      <h2 className="docs__h2">7. Record something</h2>
+      <p>
+        The project page shows this snippet with your real key already in it.
+        The <code>traceOrigins</code> list decides which requests get a{' '}
+        <code>traceparent</code>; it defaults to the page&rsquo;s own origin.
       </p>
       <pre className="snippet">
         <code>
@@ -103,18 +126,16 @@ export default function Quickstart() {
         </code>
       </pre>
       <p>
-        The project&rsquo;s origin allowlist has to include the page&rsquo;s
-        origin, or ingest answers <code>403</code> naming the origin it
-        rejected. The seed allows <code>http://localhost:3000</code> and{' '}
-        <code>http://localhost:4200</code>.
+        The page&rsquo;s origin has to be on the project&rsquo;s allowlist, or
+        ingest answers <code>403</code> naming the origin it rejected.
       </p>
 
-      <h2 className="docs__h2">6. Watch it arrive</h2>
+      <h2 className="docs__h2">8. Watch it arrive</h2>
       <p>
-        Open <code>http://localhost:3000/sessions</code>. The first chunk lands
-        within a few seconds of the page loading — the SDK flushes every five
-        seconds or 64 KB, whichever comes first. Click a recording, then click a
-        bar in any lane to zoom the timeline to that request.
+        Open <code>/sessions</code>. The first chunk lands within a few seconds
+        of the page loading — the SDK flushes every five seconds or 64 KB,
+        whichever comes first. Click a recording, then click a bar in any lane
+        to zoom the timeline to that request.
       </p>
 
       <div className="callout">
@@ -152,6 +173,13 @@ export default function Quickstart() {
             <td>
               Your API must allow the <code>traceparent</code> header in{' '}
               <code>Access-Control-Allow-Headers</code>
+            </td>
+          </tr>
+          <tr>
+            <td>Sign-up says the instance already has an owner</td>
+            <td>
+              Someone claimed it. Sign-up is first-run only; ask them for an
+              invitation
             </td>
           </tr>
           <tr>
