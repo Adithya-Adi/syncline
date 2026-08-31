@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { isInstanceUnclaimed } from '@/lib/auth';
+import { safeNextPath } from '@/lib/next-path';
 import { SignInForm } from './form';
 
 export const dynamic = 'force-dynamic';
@@ -9,10 +8,10 @@ export const metadata = { title: 'Sign in' };
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ closed?: string }>;
+  searchParams: Promise<{ next?: string }>;
 }) {
-  const { closed } = await searchParams;
-  const unclaimed = await isInstanceUnclaimed();
+  const { next } = await searchParams;
+  const destination = safeNextPath(next);
 
   return (
     <>
@@ -22,28 +21,17 @@ export default async function SignInPage({
         them.
       </p>
 
-      {closed && (
-        <Alert className="mt-4">
-          <AlertDescription>
-            This instance already has an owner, so sign-up is closed. Ask them
-            for an invitation.
-          </AlertDescription>
-        </Alert>
-      )}
+      <SignInForm next={destination} />
 
-      <SignInForm />
-
-      {unclaimed && (
-        <p className="mt-6 text-sm text-muted-foreground">
-          Nobody owns this instance yet.{' '}
-          <Link
-            href="/sign-up"
-            className="text-foreground underline underline-offset-4"
-          >
-            Claim it
-          </Link>
-        </p>
-      )}
+      <p className="mt-6 text-sm text-muted-foreground">
+        No account yet?{' '}
+        <Link
+          href={`/sign-up?next=${encodeURIComponent(destination)}`}
+          className="text-foreground underline underline-offset-4"
+        >
+          Create one
+        </Link>
+      </p>
     </>
   );
 }

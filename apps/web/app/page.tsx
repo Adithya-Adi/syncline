@@ -127,7 +127,7 @@ const BACKEND_ENV = `# any OpenTelemetry exporter, any language
 OTEL_EXPORTER_OTLP_ENDPOINT=https://syncline.example.com/v1/ingest
 OTEL_EXPORTER_OTLP_HEADERS=x-syncline-key=sk_live_...`;
 
-const FRONTEND_SNIPPET = `import { startRecording } from '@syncline/browser';
+const FRONTEND_SNIPPET = `import { startRecording } from 'syncline-browser';
 
 startRecording({
   key: 'pk_live_...',
@@ -313,7 +313,7 @@ export default function Landing() {
                     caption="Once, at the top level"
                   >
                     <K>import</K> {'{ startRecording }'} <K>from</K>{' '}
-                    <S>&apos;@syncline/browser&apos;</S>;{'\n\n'}
+                    <S>&apos;syncline-browser&apos;</S>;{'\n\n'}
                     startRecording({'{'}
                     {'\n  '}key: <S>&apos;pk_live_...&apos;</S>,{'\n  '}
                     endpoint: <S>&apos;https://syncline.example.com&apos;</S>,

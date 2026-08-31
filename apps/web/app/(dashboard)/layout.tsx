@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { requireViewer } from '@/lib/session';
+import { requireViewer, viewerOrganizations } from '@/lib/session';
 import { DashboardShell } from './dashboard-shell';
 
 /**
@@ -16,12 +16,10 @@ export default async function DashboardLayout({
   children: ReactNode;
 }) {
   const viewer = await requireViewer();
+  const organizations = await viewerOrganizations(viewer);
 
   return (
-    <DashboardShell
-      organizationName={viewer.organizationName}
-      email={viewer.email}
-    >
+    <DashboardShell organizations={organizations} email={viewer.email}>
       {children}
     </DashboardShell>
   );

@@ -7,7 +7,7 @@ export default function BrowserSdk() {
     <>
       <h1 className="docs__h1">Browser SDK</h1>
       <p className="docs__lede">
-        <code>@syncline/browser</code> records the session with rrweb and mints
+        <code>syncline-browser</code> records the session with rrweb and mints
         the trace context that makes the stitch possible. It is written on the
         assumption that it is a guest in someone else&rsquo;s page.
       </p>
@@ -17,7 +17,7 @@ export default function BrowserSdk() {
         <code>
           <span className="k">import</span> {'{ startRecording }'}{' '}
           <span className="k">from</span>{' '}
-          <span className="s">&apos;@syncline/browser&apos;</span>;{'\n\n'}
+          <span className="s">&apos;syncline-browser&apos;</span>;{'\n\n'}
           <span className="k">const</span> recording = startRecording({'{'}
           {'\n  '}key: <span className="s">&apos;pk_live_...&apos;</span>,
           {'\n  '}endpoint:{' '}

@@ -135,7 +135,7 @@ export default function Architecture() {
           </tr>
           <tr>
             <td>
-              <code>@syncline/browser</code>
+              <code>syncline-browser</code>
             </td>
             <td>The recorder that ships to your site</td>
           </tr>
