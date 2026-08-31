@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Syncline example storefront</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <span class="brand">syncline<span class="dim">/example</span></span>
+      <nav class="nav">
+        <a href="/" data-route>Shop</a>
+        <a href="/cart" data-route>Cart</a>
+        <a href="/orders" data-route>Orders</a>
+      </nav>
+      <span class="session" id="session">recording…</span>
+    </header>
+
+    <main class="page">
+      <section class="intro">
+        <h1>A storefront that records itself</h1>
+        <p>
+          Every button below makes a real request. The browser SDK records the
+          page with rrweb and attaches a <code>traceparent</code> to each call;
+          this server continues that trace and exports spans back to Syncline.
+          Open the recording in the dashboard and the click, the request, and
+          the database span underneath it are on one timeline.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Who is this session?</h2>
+        <p class="hint">
+          Sent as the session's user id, which is how you find this recording
+          again later. Changing it starts a new recording.
+        </p>
+        <form class="row" id="identity">
+          <input
+            id="user-id"
+            name="user-id"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="User id"
+          />
+          <button type="submit" class="secondary">Record as this user</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Products</h2>
+        <p class="hint">
+          <code>GET /api/products</code> — fast, one database span.
+        </p>
+        <ul class="products" id="products">
+          <li class="empty">Loading…</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Requests worth investigating</h2>
+        <div class="row wrap">
+          <button data-action="checkout" class="primary">Checkout cart</button>
+          <button data-action="checkout-empty" class="secondary">
+            Checkout with an empty cart (422)
+          </button>
+          <button data-action="inventory" class="danger">
+            Check stock (fails, 500)
+          </button>
+          <button data-action="slow" class="secondary">
+            Sales report (slow, ~1.2s)
+          </button>
+        </div>
+        <p class="hint">
+          The 500 has a failing database span naming a missing table — a failure
+          you cannot diagnose from the browser alone. The slow one spends its
+          time in a sequential scan.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Activity</h2>
+        <ol class="log" id="log">
+          <li class="empty">Nothing yet.</li>
+        </ol>
+      </section>
+    </main>
+
+    <script src="/config.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
