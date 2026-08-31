@@ -57,8 +57,14 @@ model Session {
   durationMs Int?
   meta       Json?
 
-  chunks SessionChunk[]
-  links  RequestLink[]
+  /// True for a recording with nothing in it: too short to watch, no requests, no failures. A
+  /// label rather than a deletion — the recordings list hides these by default, and anything that
+  /// failed is never marked, because that is the recording someone will come looking for.
+  trivial Boolean @default(false)
+
+  chunks    SessionChunk[]
+  links     RequestLink[]
+  pageviews Pageview[]
 
   /// The session list: newest first, per project.
   @@index([projectId, startedAt(sort: Desc)])
@@ -74,11 +80,46 @@ model SessionChunk {
   endedAt    DateTime
   eventCount Int
   sizeBytes  Int
+  /// Which page these events belong to. Chunks flush at page boundaries, so one chunk is one page —
+  /// which is what lets the viewer load a single page of a long session. Null for chunks from an
+  /// SDK that predates pageviews.
+  pageviewOrdinal Int?
   /// sessions/{projectId}/{sessionId}/{seq}.json.gz
   storageKey String
 
   /// Makes a redelivered job an upsert instead of a duplicate.
   @@unique([sessionId, seq])
+}
+
+/// A page the session visited: one step in the user's flow.
+///
+/// The flow is what makes a recording navigable. Without it a session is an undifferentiated span of
+/// time, and answering "where was the user when this broke" means scrubbing.
+model Pageview {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  /// Position in the flow, assigned by the SDK. Not derived from timestamps: chunks arrive out of
+  /// order, and two route changes in the same millisecond are indistinguishable by time.
+  ordinal Int
+  /// Origin, path and query keys, plus a route-shaped fragment for hash routers.
+  url     String
+  /// Split out so it can be indexed and filtered on without parsing a URL per row.
+  path    String
+  /// What moved the user here: load, pushState, replaceState, popstate, hashchange.
+  trigger String
+
+  startedAt DateTime
+  /// Set when the next page begins, or from the session's last event for the final page. Null while
+  /// the page is still the one being recorded.
+  endedAt    DateTime?
+  durationMs Int?
+
+  /// Read order for the flow, and the uniqueness that makes a redelivered chunk an upsert.
+  @@unique([sessionId, ordinal])
+  /// "Which sessions reached /checkout" — the query the flow exists to answer.
+  @@index([path])
 }
 
 model RequestLink {
