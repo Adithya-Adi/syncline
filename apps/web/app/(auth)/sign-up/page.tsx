@@ -1,40 +1,53 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { isInstanceUnclaimed } from '@/lib/auth';
+import { safeNextPath } from '@/lib/next-path';
 import { SignUpForm } from './form';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Create your account' };
 
 /**
- * First-run only.
+ * Registration is open.
  *
- * Sign-up closes the moment the instance has an owner. A self-hosted tool that leaves registration
- * open collects strangers' accounts the first time it is exposed.
- *
- * The same check runs in a database hook, which is the version that actually enforces it — this one
- * only decides what to render.
+ * Each account is provisioned its own organization, so a new sign-up starts on an empty dashboard
+ * and can never see recordings belonging to anyone else. Joining an existing organization is by
+ * invitation only, which keeps that an explicit act by an existing member.
  */
-export default async function SignUpPage() {
-  if (!(await isInstanceUnclaimed())) redirect('/sign-in?closed=1');
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  const destination = safeNextPath(next);
+  const invited = destination.startsWith('/accept-invitation/');
 
   return (
     <>
       <h1 className="mt-8 text-2xl font-semibold lg:mt-0">
-        Claim this instance
+        Create your account
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Nobody owns this Syncline yet. The account you create becomes the owner,
-        takes the default organization, and adopts any projects already seeded
-        here. Sign-up closes afterwards.
+        {invited ? (
+          <>
+            Sign up with the address the invitation was sent to — it will not
+            accept any other one. You are returned to the invitation as soon as
+            the account exists.
+          </>
+        ) : (
+          <>
+            You get your own organization, with nothing in it but the projects
+            you create. To work on someone else&rsquo;s recordings, ask them for
+            an invitation instead.
+          </>
+        )}
       </p>
 
-      <SignUpForm />
+      <SignUpForm next={destination} />
 
       <p className="mt-6 text-sm text-muted-foreground">
         Already have an account?{' '}
         <Link
-          href="/sign-in"
+          href={`/sign-in?next=${encodeURIComponent(destination)}`}
           className="text-foreground underline underline-offset-4"
         >
           Sign in
