@@ -19,7 +19,7 @@ import {
   updateProject,
 } from '@/lib/projects';
 import { projectForViewer, requireViewer } from '@/lib/session';
-import { CopyField } from './copy-field';
+import { CopyField } from '@/components/copy-field';
 
 export const dynamic = 'force-dynamic';
 

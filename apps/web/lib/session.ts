@@ -38,17 +38,21 @@ export async function requireViewer(): Promise<Viewer> {
 
   const activeId = session.session.activeOrganizationId ?? undefined;
 
-  const membership = await db.member.findFirst({
-    where: {
-      userId: session.user.id,
-      ...(activeId ? { organizationId: activeId } : {}),
-    },
+  const memberships = await db.member.findMany({
+    where: { userId: session.user.id },
     orderBy: { createdAt: 'asc' },
     include: { organization: { select: { id: true, name: true } } },
   });
 
-  // A user with no membership cannot be shown anything, and silently rendering an empty dashboard
-  // would hide a broken invitation flow rather than surface it.
+  // The active id can outlive the membership it names — someone removed from an organization, or
+  // one that was deleted, keeps it on their session. Falling back to the earliest membership rather
+  // than trusting the id means that strands nobody who still belongs somewhere.
+  const membership =
+    memberships.find((row) => row.organizationId === activeId) ??
+    memberships[0];
+
+  // Belonging nowhere is the only case left, and rendering an empty dashboard for it would hide a
+  // broken invitation flow rather than surface it.
   if (!membership) redirect('/no-organization');
 
   return {
@@ -59,6 +63,54 @@ export async function requireViewer(): Promise<Viewer> {
     organizationName: membership.organization.name,
     role: membership.role,
   };
+}
+
+/** Roles that may invite, remove, and re-role other members. */
+const MANAGING_ROLES = new Set(['owner', 'admin']);
+
+/**
+ * Better Auth stores roles as a comma-separated string once more than one is assigned, so a plain
+ * equality check silently denies an owner who also holds another role.
+ */
+export function canManageMembers(role: string): boolean {
+  return role
+    .split(',')
+    .map((part) => part.trim())
+    .some((part) => MANAGING_ROLES.has(part));
+}
+
+export interface ViewerOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
+  active: boolean;
+}
+
+/**
+ * Every organization the viewer belongs to, for the switcher.
+ *
+ * Read from membership rows rather than from the session, because the session knows only which
+ * organization is active — and a switcher that cannot see the alternatives is a label.
+ */
+export async function viewerOrganizations(
+  viewer: Viewer,
+): Promise<ViewerOrganization[]> {
+  const memberships = await db.member.findMany({
+    where: { userId: viewer.userId },
+    orderBy: { createdAt: 'asc' },
+    include: {
+      organization: { select: { id: true, name: true, slug: true } },
+    },
+  });
+
+  return memberships.map((membership) => ({
+    id: membership.organization.id,
+    name: membership.organization.name,
+    slug: membership.organization.slug,
+    role: membership.role,
+    active: membership.organization.id === viewer.organizationId,
+  }));
 }
 
 /**
