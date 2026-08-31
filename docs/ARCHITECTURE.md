@@ -233,7 +233,17 @@ indexing. A request still in flight at a chunk boundary appears in a later chunk
 
 Limits (initial, tunable): 2 MB gzipped per chunk, 5000 events per chunk, 100 chunks per session.
 
-Transport: flush every 5 s or 64 KB, whichever comes first; `navigator.sendBeacon` on `pagehide`.
+The chunk limit is a validation bound, not a policy. The SDK rotates the session at 90 chunks — a
+new id, sequence numbers from zero, metadata sent again — so a session that actually reaches 100 is
+a bug rather than a busy page. The gap is headroom: rotating flushes the tail of the outgoing
+session, and that chunk needs a sequence number ingest will still accept.
+
+Sessions are also bounded in time: 30 minutes idle ends one, and an absolute ceiling of 60 minutes
+rotates it. Either limit alone leaves a hole — time alone lets a busy page exhaust the chunk budget
+in minutes, and chunk count alone lets an idle open tab record for a day into one recording.
+
+Transport: flush every 5 s or 64 KB, whichever comes first, and at every page boundary;
+`navigator.sendBeacon` on `pagehide`.
 
 ### `POST /v1/ingest/traces`
 

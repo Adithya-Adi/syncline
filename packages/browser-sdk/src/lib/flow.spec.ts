@@ -7,10 +7,15 @@ import {
 import { PageviewTracker } from './pageviews.js';
 import {
   hasOutlivedCeiling,
+  needsRotation,
   resolveSession,
   MAX_DURATION_MS,
   IDLE_TIMEOUT_MS,
 } from './session.js';
+import {
+  CHUNKS_BEFORE_ROTATION,
+  MAX_CHUNKS_PER_SESSION,
+} from '@syncline/protocol';
 
 const ORIGIN = 'https://app.acme.com';
 
@@ -270,5 +275,36 @@ describe('session lifetime', () => {
       false,
     );
     expect(hasOutlivedCeiling({ startedMs: 0 }, MAX_DURATION_MS)).toBe(true);
+  });
+});
+
+describe('rotation', () => {
+  it('rotates on time, however few chunks were used', () => {
+    expect(
+      needsRotation({ startedMs: 0, chunkCount: 3 }, MAX_DURATION_MS),
+    ).toBe(true);
+  });
+
+  it('rotates on the chunk budget, however recently it started', () => {
+    // The case the old code got wrong: a busy page exhausts the budget in minutes, and the
+    // one-hour ceiling would not have saved it for another fifty.
+    expect(
+      needsRotation(
+        { startedMs: 0, chunkCount: CHUNKS_BEFORE_ROTATION },
+        60_000,
+      ),
+    ).toBe(true);
+  });
+
+  it('leaves an ordinary session alone', () => {
+    expect(needsRotation({ startedMs: 0, chunkCount: 12 }, 120_000)).toBe(
+      false,
+    );
+  });
+
+  it('rotates with sequence numbers left for the closing flush', () => {
+    // Rotation flushes the tail of the outgoing session, and that chunk needs a sequence number
+    // ingest still accepts. Without headroom, the last seconds before every rotation are lost.
+    expect(CHUNKS_BEFORE_ROTATION).toBeLessThan(MAX_CHUNKS_PER_SESSION);
   });
 });
