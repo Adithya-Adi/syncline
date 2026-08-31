@@ -17,8 +17,35 @@ export interface ChunkIndexEntry {
   endedMs: number;
   eventCount: number;
   sizeBytes: number;
+  /**
+   * Which page's events these are.
+   *
+   * Chunks flush at page boundaries, so a chunk belongs to exactly one page — which is what lets a
+   * viewer fetch one page of a long session instead of all of it. Absent for recordings made by an
+   * SDK that predates pageviews.
+   */
+  pageviewOrdinal?: number;
   /** Where to fetch it. May be a presigned URL pointing straight at object storage. */
   url: string;
+}
+
+/**
+ * One step in the session's flow.
+ *
+ * The flow is the readable spine of a recording: which pages, in which order, for how long. Ordered
+ * by `ordinal`, which the SDK assigned — not by arrival, which a lossy connection reshuffles.
+ */
+export interface SessionPageview {
+  ordinal: number;
+  url: string;
+  /** Pathname, or the hash route for a hash router. Split out so it can be filtered on. */
+  path: string;
+  /** load, pushState, replaceState, popstate, hashchange. */
+  trigger: string;
+  startedMs: number;
+  /** Absent only while a page is the one still being recorded. */
+  endedMs?: number;
+  durationMs?: number;
 }
 
 export interface SessionLink {
@@ -44,6 +71,8 @@ export interface SessionResponse {
    */
   chunks: ChunkIndexEntry[];
   links: SessionLink[];
+  /** The flow, in order. Empty for a recording made before pageviews existed. */
+  pageviews: SessionPageview[];
 }
 
 export type SpanStatus = 'UNSET' | 'OK' | 'ERROR';
@@ -100,6 +129,14 @@ export interface SessionSummary {
   linkCount: number;
   /** Requests the browser saw fail. The reason to open one recording rather than another. */
   errorCount: number;
+  /** How many pages the session visited, and where it came in. The flow at a glance. */
+  pageCount: number;
+  entryPath?: string;
+  /**
+   * Short, and with nothing in it. Hidden by default in a list, never deleted, and never true for a
+   * recording that saw a failure.
+   */
+  trivial: boolean;
 }
 
 export interface SessionListResponse {

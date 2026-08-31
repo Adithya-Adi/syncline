@@ -38,9 +38,12 @@ const timeWithYearFormat = new Intl.DateTimeFormat('en-US', {
 export async function RecordingsSurface({
   viewer,
   project,
+  showAll = false,
 }: {
   viewer: Viewer;
   project: { id: string; name: string };
+  /** Include recordings marked trivial — short, and with nothing in them. */
+  showAll?: boolean;
 }) {
   const sessions = await db.session.findMany({
     where: {
@@ -48,6 +51,9 @@ export async function RecordingsSurface({
         organizationId: viewer.organizationId,
         id: project.id,
       },
+      // Recordings with nothing in them are hidden rather than deleted, so a direct link to one
+      // still works and the "show empty" toggle brings them back.
+      ...(showAll ? {} : { trivial: false }),
     },
     orderBy: { startedAt: 'desc' },
     take: 50,
@@ -57,7 +63,14 @@ export async function RecordingsSurface({
       durationMs: true,
       url: true,
       userId: true,
-      _count: { select: { links: true } },
+      trivial: true,
+      _count: { select: { links: true, pageviews: true } },
+      // The flow, trimmed to what a row can show: where they came in, and the first few steps.
+      pageviews: {
+        orderBy: { ordinal: 'asc' },
+        take: 4,
+        select: { ordinal: true, path: true },
+      },
     },
   });
 
@@ -112,6 +125,21 @@ export async function RecordingsSurface({
         }
         actions={
           <>
+            {/*
+             * A link rather than a checkbox, so the state lives in the URL and can be shared. The
+             * hidden recordings are the ones with nothing in them — never one that failed.
+             */}
+            <Button asChild variant="ghost" size="sm">
+              <Link
+                href={
+                  showAll
+                    ? `/projects/${project.id}/recordings`
+                    : `/projects/${project.id}/recordings?all=1`
+                }
+              >
+                {showAll ? 'Hide empty' : 'Show empty'}
+              </Link>
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={`/projects/${project.id}`}>Settings</Link>
             </Button>
@@ -200,7 +228,7 @@ export async function RecordingsSurface({
             >
               <DataListHeader columns={COLUMNS}>
                 <span>Recorded</span>
-                <span>Page</span>
+                <span>Flow</span>
                 <span>User</span>
                 <span className="text-right">Duration</span>
                 <span className="text-right">Requests</span>
@@ -224,12 +252,35 @@ export async function RecordingsSurface({
                         {formatRecency(session.startedAt)}
                       </span>
                     </span>
+                    {/*
+                     * The flow rather than the landing URL. Which pages a session went through is
+                     * the thing that tells you whether it is worth opening; the host it happened on
+                     * is the same for every row in a project.
+                     */}
                     <span className="min-w-0">
                       <span className="block truncate font-mono text-[13px] text-foreground">
-                        {page.path}
+                        {session.pageviews.length > 0
+                          ? session.pageviews
+                              .map((view) => view.path)
+                              .join(' → ')
+                          : page.path}
+                        {session._count.pageviews >
+                          session.pageviews.length && (
+                          <span className="text-muted-foreground">
+                            {' '}
+                            → +
+                            {session._count.pageviews -
+                              session.pageviews.length}
+                          </span>
+                        )}
                       </span>
                       <span className="mt-1 block truncate text-xs text-muted-foreground">
-                        {page.host}
+                        {session._count.pageviews > 0
+                          ? `${formatCount(session._count.pageviews)} ${plural(
+                              session._count.pageviews,
+                              'page',
+                            )} · ${page.host}`
+                          : page.host}
                       </span>
                     </span>
                     <span className="truncate text-muted-foreground">

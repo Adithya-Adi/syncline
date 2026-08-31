@@ -122,7 +122,6 @@
   color: var(--bone-500);
 }
 
-
 /* ---------------------------------------------------------------- viewer */
 
 .viewer {
@@ -431,8 +430,86 @@
   border-color: var(--rock-500);
 }
 
-/* --------------------------------------------------------- site chrome */
+/* ----------------------------------------------------------------- flow */
 
+/*
+ * The flow rail: the session's pages, in order, proportional to how long each one lasted.
+ *
+ * It sits above the ruler because it is the coarsest reading of the recording — which page, then
+ * which request, then which span. Segments are buttons: clicking one seeks the replay there.
+ */
+
+.flow {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.6);
+  background: var(--rock-800);
+}
+
+.flow__label {
+  align-self: center;
+  flex: 0 0 auto;
+  color: var(--bone-500);
+}
+
+.flow__track {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.flow__page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px 7px;
+  border: var(--rule);
+  border-radius: var(--radius);
+  background: var(--rock-850);
+  color: var(--bone-300);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 160ms,
+    color 160ms;
+}
+
+.flow__page:hover {
+  color: var(--bone-100);
+  border-color: var(--rock-500);
+}
+
+/* The page the playhead is inside, so the rail reads as a position and not just a list. */
+.flow__page--here {
+  border-color: var(--stratum-network);
+  color: var(--bone-100);
+}
+
+/* A failure on this page. The rail is what gets read first, so it has to carry this. */
+.flow__page--failed {
+  border-color: color-mix(in oklab, var(--fault) 60%, var(--rock-700));
+  color: var(--fault);
+}
+
+.flow__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flow__ms {
+  flex: 0 0 auto;
+  color: var(--bone-500);
+  font-size: 10px;
+}
+
+/* --------------------------------------------------------- site chrome */
 
 /* ---------------------------------------------------------------- docs */
 
@@ -536,7 +613,10 @@
   padding: 5px 8px;
   margin-left: -8px;
   border-left: 1px solid transparent;
-  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .docs__link:hover {
