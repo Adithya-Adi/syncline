@@ -50,7 +50,7 @@ function snippet(
   switch (framework) {
     case 'react':
       return `// Once, at the top level — not inside a component that remounts.
-import { startRecording } from '@syncline/browser';
+import { startRecording } from 'syncline-browser';
 
 startRecording(${options});`;
 
@@ -59,7 +59,7 @@ startRecording(${options});`;
 'use client';
 
 import { useEffect } from 'react';
-import { startRecording } from '@syncline/browser';
+import { startRecording } from 'syncline-browser';
 
 export function Recording() {
   useEffect(() => {
@@ -79,12 +79,12 @@ export function Recording() {
 // Then render <Recording /> once in app/layout.tsx.`;
 
     case 'vanilla':
-      return `import { startRecording } from '@syncline/browser';
+      return `import { startRecording } from 'syncline-browser';
 
 startRecording(${options});`;
 
     case 'script':
-      return `<!-- Not published to a CDN yet. Bundle @syncline/browser and serve it yourself. -->
+      return `<!-- Install syncline-browser from npm and bundle it with your app. -->
 <script type="module">
   import { startRecording } from '/js/syncline.js';
 
