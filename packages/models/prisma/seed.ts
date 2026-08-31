@@ -22,17 +22,34 @@ async function main() {
   const prisma = createPrismaClientFromEnv();
 
   /**
-   * Every project belongs to an organization, so the seed has to pick one.
+   * Every project belongs to an organization, so the seed has to pick one — and picking wrong is
+   * not a harmless default. A project seeded into an organization the developer is not a member of
+   * ingests recordings perfectly well and shows none of them in their dashboard, which looks like a
+   * broken pipeline rather than a misfiled project.
    *
-   * It joins whichever organization already exists — on a machine where someone has signed up,
-   * that is theirs, and a seeded project they cannot see would be a puzzle rather than a
-   * convenience. Only on an untouched database does it create one, and it uses the same id the
-   * multi-tenancy migration used so the first account to register adopts both.
+   * So: the newest organization that somebody actually belongs to. An organization with no members
+   * is invisible to everyone, and on a machine where several people or several sign-ups have
+   * accumulated, the most recent one is the one being worked in. `SEED_ORGANIZATION` overrides it
+   * by id or slug when that guess is wrong.
    */
-  const existing = await prisma.organization.findFirst({
-    orderBy: { createdAt: 'asc' },
-    select: { id: true, name: true },
-  });
+  const requested = process.env['SEED_ORGANIZATION'];
+
+  const existing = requested
+    ? await prisma.organization.findFirst({
+        where: { OR: [{ id: requested }, { slug: requested }] },
+        select: { id: true, name: true },
+      })
+    : await prisma.organization.findFirst({
+        where: { members: { some: {} } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, name: true },
+      });
+
+  if (requested && !existing) {
+    throw new Error(
+      `SEED_ORGANIZATION=${requested} matched no organization by id or slug.`,
+    );
+  }
 
   const organization =
     existing ??
