@@ -12,8 +12,27 @@ export const MAX_CHUNK_BYTES = 2 * 1024 * 1024;
 /** A chunk carrying more rrweb events than this is malformed or hostile. */
 export const MAX_EVENTS_PER_CHUNK = 5000;
 
-/** Past this many chunks a session is cut off rather than grown without bound. */
+/**
+ * The hard ceiling on chunks in one session. Ingest rejects a higher sequence number.
+ *
+ * This is a validation bound, not a policy: the SDK rotates well before reaching it, so a session
+ * arriving at 100 chunks means something is wrong rather than something is busy.
+ */
 export const MAX_CHUNKS_PER_SESSION = 100;
+
+/**
+ * Where the SDK rotates the session instead of continuing to number chunks.
+ *
+ * The gap to `MAX_CHUNKS_PER_SESSION` is deliberate headroom. Rotating means flushing the tail of
+ * the old session first, and that flush needs a sequence number the API will still accept — at the
+ * hard limit there would be nowhere to put it, and the last few seconds before every rotation would
+ * be lost.
+ *
+ * Without this the cap was a silent death: past 100 chunks the SDK kept recording into a buffer it
+ * never uploaded, and a busy page reaches 100 long before the one-hour ceiling would have rotated
+ * it.
+ */
+export const CHUNKS_BEFORE_ROTATION = 90;
 
 /** Upper bound on `links` per chunk. Requests outstanding at the boundary roll to the next one. */
 export const MAX_LINKS_PER_CHUNK = 1000;

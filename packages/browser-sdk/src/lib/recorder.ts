@@ -23,7 +23,7 @@ import { installNavigationWatch } from './navigation.js';
 import { PageviewTracker } from './pageviews.js';
 import {
   clearSession,
-  hasOutlivedCeiling,
+  needsRotation,
   resolveSession,
   touch,
 } from './session.js';
@@ -141,7 +141,7 @@ export function startRecording(options: SynclineOptions): Recording {
   async function enterPage(url: string, trigger: PageviewTrigger) {
     if (stopped) return;
 
-    if (trigger !== 'load') await flush();
+    if (trigger !== 'load') await flush({ rotate: false });
 
     const now = Date.now();
     const pageview = pageviews.enter(url, trigger, now);
@@ -168,48 +168,67 @@ export function startRecording(options: SynclineOptions): Recording {
   }, FLUSH_EVERY_MS);
 
   /**
-   * Flushes, and rotates the session once it has outlived its ceiling.
+   * Flushes, and rotates the session when it has run too long or used too many chunks.
    *
    * Rotation rather than truncation: the recording continues under a new id, so a dashboard left
-   * open all day becomes a series of loadable hour-long recordings instead of one that nothing can
-   * open. Checked here rather than per event — crossing the hour mark is not urgent to the
-   * millisecond, and a clock read in the emit path would be the hottest line in the SDK.
+   * open all day becomes a series of loadable recordings instead of one that nothing can open.
+   * Checked here rather than per event — crossing either limit is not urgent to the millisecond,
+   * and a clock read in the emit path would be the hottest line in the SDK.
    */
   async function tick(): Promise<void> {
     if (stopped) return;
 
-    if (hasOutlivedCeiling(session, Date.now())) {
+    if (needsRotation({ startedMs: session.startedMs, chunkCount: seq })) {
       await rotate();
       return;
     }
 
-    await flush();
+    await flush({ rotate: false });
   }
 
+  /**
+   * Set synchronously, before `rotate` reaches its first await.
+   *
+   * `rotate` begins by flushing the tail of the old session, and that flush must not look at the
+   * limits and decide to rotate again — which would be a rotation waiting on a flush waiting on
+   * that same rotation. A promise guard cannot express this: `rotating ??= rotate()` assigns only
+   * once `rotate` has already suspended.
+   */
+  let rotating = false;
+
   async function rotate(): Promise<void> {
-    await flush();
+    if (rotating) return;
+    rotating = true;
 
-    const storage = safeSessionStorage();
-    clearSession(storage);
-    session = resolveSession(storage);
-    seq = 0;
-    pageviews.reset();
-    log(`session rotated to ${session.id}`);
-
-    // A new flow starts at its first page, and seq 0 carries the metadata again — so the new
-    // recording is complete on its own rather than depending on the one before it.
-    await enterPage(window.location.href, 'load');
     try {
-      record.takeFullSnapshot(true);
-      pageviews.noteSnapshot(Date.now());
-    } catch {
-      /* see enterPage */
+      // The tail of the outgoing session. This is why rotation happens at CHUNKS_BEFORE_ROTATION
+      // rather than at the hard cap: this flush needs a sequence number ingest still accepts.
+      await flush({ rotate: false });
+
+      const storage = safeSessionStorage();
+      clearSession(storage);
+      session = resolveSession(storage);
+      seq = 0;
+      pageviews.reset();
+      log(`session rotated to ${session.id}`);
+
+      // A new flow starts at its first page, and seq 0 carries the metadata again — so the new
+      // recording is complete on its own rather than depending on the one before it.
+      await enterPage(window.location.href, 'load');
+      try {
+        record.takeFullSnapshot(true);
+        pageviews.noteSnapshot(Date.now());
+      } catch {
+        /* see enterPage */
+      }
+    } finally {
+      rotating = false;
     }
   }
 
   // `pagehide` rather than `unload`: it is the only one that fires reliably on mobile Safari, and
   // it also fires when a page enters the back/forward cache.
-  const onPageHide = () => void flush({ keepalive: true });
+  const onPageHide = () => void flush({ keepalive: true, rotate: false });
   window.addEventListener('pagehide', onPageHide);
 
   void measureClock(resolved.endpoint, rawFetch)
@@ -228,9 +247,32 @@ export function startRecording(options: SynclineOptions): Recording {
   }
 
   async function flush(
-    sendOptions: { keepalive?: boolean } = {},
+    options: { keepalive?: boolean; rotate?: boolean } = {},
   ): Promise<void> {
+    const { keepalive, rotate: mayRotate = true } = options;
+
     if (buffer.isEmpty) return;
+
+    /**
+     * The chunk budget is a reason to rotate, not a reason to stop.
+     *
+     * This path is what a busy page hits: the buffer fills on size long before the next tick, and
+     * without this the flush would simply return and the recording would go on filming into a
+     * buffer nothing ever uploads. Not awaited — the caller is usually rrweb's emit, and blocking
+     * it on a network round trip would be worse than a rotation landing a moment later.
+     */
+    if (
+      mayRotate &&
+      !stopped &&
+      !rotating &&
+      needsRotation({ startedMs: session.startedMs, chunkCount: seq })
+    ) {
+      void rotate();
+      return;
+    }
+
+    // The hard bound. Unreachable while rotation works, and kept because "silently stops uploading"
+    // is a bad enough failure to deserve a second guard.
     if (seq > MAX_CHUNKS_PER_SESSION) return;
 
     // Serialize flushes. Two in flight would race on `seq` and could file two different chunks
@@ -265,13 +307,9 @@ export function startRecording(options: SynclineOptions): Recording {
           : {}),
       };
 
-      const ok = await sendChunk(
-        transport,
-        session.id,
-        current,
-        payload,
-        sendOptions,
-      );
+      const ok = await sendChunk(transport, session.id, current, payload, {
+        ...(keepalive ? { keepalive } : {}),
+      });
       log(
         `chunk ${current}: ${drained.events.length} events, ${ok ? 'sent' : 'dropped'}`,
       );
@@ -291,7 +329,7 @@ export function startRecording(options: SynclineOptions): Recording {
     uninstallFetch();
     uninstallXhr();
     stopRrweb?.();
-    await flush();
+    await flush({ rotate: false });
   }
 
   // A getter, not a value: a session that rotates past its ceiling gets a new id, and a host that
@@ -300,7 +338,7 @@ export function startRecording(options: SynclineOptions): Recording {
     get sessionId() {
       return session.id;
     },
-    flush: () => flush(),
+    flush: () => flush({ rotate: false }),
     stop,
   };
 }

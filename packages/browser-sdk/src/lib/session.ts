@@ -16,6 +16,7 @@
 
 import { ulid } from 'ulid';
 import {
+  CHUNKS_BEFORE_ROTATION,
   SESSION_IDLE_TIMEOUT_MS,
   SESSION_MAX_DURATION_MS,
 } from '@syncline/protocol';
@@ -131,4 +132,28 @@ export function hasOutlivedCeiling(
   maxDurationMs = MAX_DURATION_MS,
 ): boolean {
   return now - session.startedMs >= maxDurationMs;
+}
+
+/**
+ * Whether the session should be rotated: too long, or too many chunks.
+ *
+ * Two limits, because either one alone leaves a hole. Time alone lets a busy page exhaust the chunk
+ * budget in minutes and then record into a buffer nothing uploads. Chunk count alone lets a page
+ * that is open but idle run for a day inside one recording.
+ */
+export function needsRotation(
+  state: { startedMs: number; chunkCount: number },
+  now = Date.now(),
+  limits: {
+    maxDurationMs?: number;
+    chunksBeforeRotation?: number;
+  } = {},
+): boolean {
+  const {
+    maxDurationMs = MAX_DURATION_MS,
+    chunksBeforeRotation = CHUNKS_BEFORE_ROTATION,
+  } = limits;
+
+  if (state.chunkCount >= chunksBeforeRotation) return true;
+  return hasOutlivedCeiling(state, now, maxDurationMs);
 }
