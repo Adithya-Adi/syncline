@@ -1,30 +1,33 @@
 # Example: a storefront that records itself
 
-A working Syncline integration in about 250 lines, with no dependencies of its own. It exists for
-two reasons:
+A working Syncline integration in a Next.js app. It exists for two reasons:
 
 - **To see what Syncline is for.** Click a button, open the recording, and the click, the request it
   made, the server span it caused, and the database query underneath that span are all on one
   timeline against one clock.
 - **To test Syncline while developing it.** It produces real sessions, real request links, real
-  traces, failing requests, slow requests, and identifiable users — which is what the dashboard,
-  the setup doctor, and session search all need in order to be tested at all.
+  traces, failing requests, slow requests, and identifiable users — which is what the dashboard, the
+  setup doctor, and session search all need in order to be tested at all.
+
+The whole integration is `app/recording.tsx`, which is the Next.js snippet the dashboard's setup page
+hands out, pasted in unchanged. Everything else is a storefront to click on.
 
 ## What it exercises
 
-| Feature                 | How                                                                      |
-| ----------------------- | ------------------------------------------------------------------------ |
-| rrweb session replay    | The page records itself from the first paint                             |
-| Request → trace linking | `fetch` is patched by the SDK; every call carries a `traceparent`        |
-| Backend spans           | The server continues the browser's trace and exports OTLP/JSON           |
-| Database lane           | Spans carry `db.system` and `db.statement`                               |
-| Failed requests         | `GET /api/inventory` returns 500 with a failing DB span                  |
-| Slow requests           | `GET /api/slow` spends ~1.2s in a sequential scan                        |
-| Client errors           | `POST /api/checkout` with an empty cart returns 422                      |
-| Route changes           | The nav uses `history.pushState`                                         |
-| User identity           | The user id is editable, so a specific session can be found again        |
-| Clock calibration       | The server timestamps spans from a monotonic clock anchored to the epoch |
-| The CORS failure        | `BREAK_CORS=1` reproduces the missing `traceparent` allow-header         |
+| Feature                 | How                                                                   |
+| ----------------------- | --------------------------------------------------------------------- |
+| rrweb session replay    | The recorder starts in the root layout and survives client navigation |
+| Request → trace linking | `fetch` is patched by the SDK; every call carries a `traceparent`     |
+| Backend spans           | Route handlers continue the browser's trace and export OTLP/JSON      |
+| Database lane           | Spans carry `db.system` and `db.statement`                            |
+| Failed requests         | `GET /api/inventory` returns 500 with a failing DB span               |
+| Slow requests           | `GET /api/slow` spends ~1.2s in a sequential scan                     |
+| Client errors           | Checkout with an empty cart returns 422                               |
+| Route changes           | `next/link` between `/`, `/cart`, `/orders` — one continuous session  |
+| Requests with no trace  | Next's own `?_rsc` navigation fetches appear with no backend spans    |
+| User identity           | The user id is editable, so a specific session can be found again     |
+| Clock calibration       | Spans are timestamped from a monotonic clock anchored to the epoch    |
+| The CORS failure        | `BREAK_CORS=1` reproduces the missing `traceparent` allow-header      |
 
 ## Running it
 
@@ -46,20 +49,30 @@ two reasons:
    pnpm db:seed
    ```
 
+   The seed joins the newest organization that has members. Pass `SEED_ORGANIZATION=<id|slug>` if
+   that guesses wrong — a project in an organization you are not a member of ingests recordings and
+   shows none of them.
+
 3. **Configure and run.**
 
    ```sh
-   cp examples/storefront/.env.example examples/storefront/.env
-   # fill in SYNCLINE_PUBLIC_KEY and SYNCLINE_SECRET_KEY
-   pnpm nx run example-storefront:start
+   cp examples/storefront/.env.example examples/storefront/.env.local
+   # fill in NEXT_PUBLIC_SYNCLINE_PUBLIC_KEY and SYNCLINE_SECRET_KEY
+   pnpm nx run example-storefront:dev
    ```
 
    Then open <http://localhost:4321> and click things. The first chunk is uploaded within about five
    seconds; the recording appears under the project in the dashboard.
 
-The `start` target builds the browser SDK first, because the page loads the bundle that build
-produces — that is the "script tag" install path from the setup page, served from
-`/js/syncline.js`.
+The `dev` target builds the browser SDK first, because `syncline-browser` is linked as a workspace
+package and its entry point is the built bundle.
+
+## Which key goes where
+
+`NEXT_PUBLIC_SYNCLINE_PUBLIC_KEY` is prefixed because it is meant to reach the browser — that is what
+makes it public, and it is safe there because ingest gates it on the project's origin allowlist.
+`SYNCLINE_SECRET_KEY` has no prefix, so Next refuses to inline it into client code; it is read only
+inside route handlers, which is where the spans are exported from.
 
 ## Reproducing the CORS failure
 
@@ -68,7 +81,7 @@ produces — that is the "script tag" install path from the setup page, served f
 looks like Syncline broke the application.
 
 ```sh
-BREAK_CORS=1 pnpm nx run example-storefront:start
+BREAK_CORS=1 pnpm nx run example-storefront:dev
 ```
 
 Requests from the storefront itself keep working — the page and the API share an origin, so no
@@ -78,7 +91,7 @@ flag set.
 
 ## What is not idiomatic here
 
-`otlp.mjs` builds the OTLP payload by hand. A real service should not: set
+`lib/otlp.ts` builds the OTLP payload by hand. A real service should not: set
 `OTEL_EXPORTER_OTLP_ENDPOINT` to `<endpoint>/v1/ingest` and let the OpenTelemetry SDK do it. It is
-hand-written here so the example installs nothing, and so the wire format Syncline accepts is
-visible in one readable file.
+hand-written so the example needs no dependency beyond Next itself, and so the wire format Syncline
+accepts is visible in one readable file.

@@ -1,6 +1,7 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  - 'examples/*'
 
 # pnpm 11 gates postinstall scripts. Add entries here as deps that need them arrive
 # (prisma, esbuild) — `pnpm approve-builds` writes them for you.

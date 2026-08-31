@@ -2,13 +2,27 @@
   "name": "example-storefront",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "implicitDependencies": ["browser-sdk"],
   "targets": {
-    "start": {
+    "dev": {
       "executor": "nx:run-commands",
       "dependsOn": [{ "projects": ["browser-sdk"], "target": "build" }],
       "options": {
-        "command": "node server.mjs",
+        "command": "next dev -p 4321",
+        "cwd": "examples/storefront"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["browser-sdk"], "target": "build" }],
+      "options": {
+        "command": "next build",
+        "cwd": "examples/storefront"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "next start -p 4321",
         "cwd": "examples/storefront"
       }
     }
