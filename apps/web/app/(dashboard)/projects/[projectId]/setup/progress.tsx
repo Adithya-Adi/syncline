@@ -198,6 +198,46 @@ export function SetupProgress({
               : ''}
           </p>
         )}
+
+        {/*
+         * Evidence, not a count. Counts are a claim someone has to take on trust; a real URL with a
+         * real trace id is how they confirm the traffic on this page is their own — and the trace
+         * id is what they paste into their own tracing tool when Syncline shows no spans for it.
+         */}
+        {status.latestRequest && (
+          <dl className="mt-4 space-y-1.5 border-t pt-4 text-xs">
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 text-muted-foreground">Request</dt>
+              <dd className="min-w-0 truncate font-mono">
+                {status.latestRequest.method} {status.latestRequest.url}
+                {status.latestRequest.status
+                  ? ` → ${status.latestRequest.status}`
+                  : ''}
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 text-muted-foreground">Trace</dt>
+              <dd className="min-w-0 truncate font-mono">
+                {status.latestRequest.traceId}
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 text-muted-foreground">Spans</dt>
+              <dd className="min-w-0 text-muted-foreground">
+                {status.latestRequest.stitched ? (
+                  <Link
+                    href={`/s/${status.latestRequest.sessionId}`}
+                    className="text-foreground underline underline-offset-4"
+                  >
+                    stitched — open the replay
+                  </Link>
+                ) : (
+                  'none on this trace id yet'
+                )}
+              </dd>
+            </div>
+          </dl>
+        )}
       </CardContent>
     </Card>
   );
