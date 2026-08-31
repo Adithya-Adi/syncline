@@ -11,7 +11,7 @@ import { signUp } from '@/lib/auth-client';
 
 const MIN_PASSWORD_LENGTH = 10;
 
-export function SignUpForm() {
+export function SignUpForm({ next }: { next: string }) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -39,7 +39,7 @@ export function SignUpForm() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push(next);
     router.refresh();
   }
 
@@ -92,7 +92,7 @@ export function SignUpForm() {
 
       <Button type="submit" className="w-full" disabled={pending}>
         {pending && <Loader2 className="animate-spin" />}
-        {pending ? 'Creating account…' : 'Create account and claim instance'}
+        {pending ? 'Creating account…' : 'Create account'}
       </Button>
     </form>
   );

@@ -79,12 +79,12 @@ export default function Quickstart() {
         <code>curl localhost:4000/v1/health</code> names the failing dependency.
       </p>
 
-      <h2 className="docs__h2">5. Claim the instance</h2>
+      <h2 className="docs__h2">5. Create an account</h2>
       <p>
-        Open <code>http://localhost:3000/sign-up</code>. The first account
-        becomes the owner and takes the default organization; sign-up closes
-        afterwards, so an instance briefly exposed does not collect
-        strangers&rsquo; accounts.
+        Open <code>http://localhost:3000/sign-up</code>. Registration is open,
+        and every account is provisioned its own organization — a new sign-up
+        sees an empty dashboard, never anyone else&rsquo;s recordings. To share
+        a project, invite someone into your organization.
       </p>
 
       <h2 className="docs__h2">6. Create a project</h2>
@@ -116,7 +116,7 @@ export default function Quickstart() {
         <code>
           <span className="k">import</span> {'{ startRecording }'}{' '}
           <span className="k">from</span>{' '}
-          <span className="s">&apos;@syncline/browser&apos;</span>;{'\n\n'}
+          <span className="s">&apos;syncline-browser&apos;</span>;{'\n\n'}
           startRecording({'{'}
           {'\n  '}key: <span className="s">&apos;pk_...&apos;</span>,{'\n  '}
           endpoint: <span className="s">&apos;http://localhost:4000&apos;</span>
@@ -176,10 +176,10 @@ export default function Quickstart() {
             </td>
           </tr>
           <tr>
-            <td>Sign-up says the instance already has an owner</td>
+            <td>New account sees no projects</td>
             <td>
-              Someone claimed it. Sign-up is first-run only; ask them for an
-              invitation
+              Expected — each account gets its own organization. Ask an existing
+              member for an invitation to theirs
             </td>
           </tr>
           <tr>
