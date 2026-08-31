@@ -12,6 +12,7 @@ import { projectForViewer, requireViewer } from '@/lib/session';
 import { setupStatus } from '@/lib/setup-status';
 import { SetupSnippets } from './snippets';
 import { SetupProgress } from './progress';
+import { SetupDoctor } from './doctor';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,12 @@ export default async function SetupPage({
 
       <SetupProgress projectId={project.id} initial={status} />
 
+      <SetupDoctor
+        endpoint={endpoint}
+        publicKey={project.publicKey}
+        origins={project.origins}
+      />
+
       <SetupSnippets
         publicKey={project.publicKey}
         endpoint={endpoint}
@@ -80,6 +87,32 @@ export default async function SetupPage({
             </Link>
             , when created or rotated.
           </p>
+
+          {/*
+           * Most teams already run a Collector, and pointing it here is the only change they need
+           * to make — no per-service redeploy, and the key stays in one place rather than in every
+           * service's environment.
+           */}
+          <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+            Already running an OpenTelemetry Collector? Add Syncline as one more
+            exporter instead of changing every service:
+          </p>
+          <pre className="overflow-x-auto rounded-md border bg-muted/40 p-4 font-mono text-xs leading-6">
+            <code>
+              {`exporters:
+  otlphttp/syncline:
+    endpoint: ${endpoint}/v1/ingest
+    headers:
+      x-syncline-key: sk_...
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      # Syncline alongside whatever you already export to.
+      exporters: [otlphttp/syncline]`}
+            </code>
+          </pre>
         </CardContent>
       </Card>
 

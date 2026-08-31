@@ -4,7 +4,7 @@ export default defineConfig(() => ({
   root: __dirname,
   cacheDir: '../../node_modules/.vite/packages/browser-sdk',
   test: {
-    name: '@syncline/browser',
+    name: 'syncline-browser',
     watch: false,
     globals: true,
     environment: 'node',

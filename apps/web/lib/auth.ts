@@ -1,5 +1,4 @@
 import { betterAuth } from 'better-auth';
-import { APIError } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { organization } from 'better-auth/plugins/organization';
 import { nextCookies } from 'better-auth/next-js';
@@ -21,50 +20,81 @@ import { db } from './db';
 const DEFAULT_ORGANIZATION_ID = 'org_default';
 
 /**
- * Sign-up is open only while the instance has no users.
+ * Registration is open, and every account lands in an organization of its own.
  *
- * `disableSignUp` cannot express this: it is read once when the config is built, and the answer
- * changes the moment somebody registers. Enforcing it here rather than on the sign-up page means
- * the rule holds for anyone calling the endpoint directly, which is the only version of the rule
- * worth having.
+ * The isolation is the reason it can be open at all: a new account sees an empty dashboard, never
+ * anybody else's recordings. Sharing happens by invitation into an existing organization, which is
+ * an explicit act by someone who is already a member.
  */
-async function assertInstanceUnclaimed(): Promise<void> {
-  const existing = await db.user.count();
-  if (existing > 0) {
-    throw new APIError('FORBIDDEN', {
-      message:
-        'This Syncline instance already has an owner. Ask them for an invitation rather than signing up.',
-    });
-  }
+
+/** URL-safe, stable, and short enough to read in an address bar. */
+function slugify(raw: string): string {
+  const slug = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return slug.length > 0 ? slug : 'workspace';
 }
 
 /**
- * The first user takes ownership of the instance.
+ * Finds a free slug near the one asked for.
  *
- * The migration that introduced multi-tenancy parked existing projects in an organization with no
- * members, because inventing a user row nobody can log in as would have been worse. This is where
- * that organization gets its owner. `upsert` covers the fresh-install case, where the migration
- * had no projects to adopt and so created nothing.
+ * The column is unique, so a second "Acme" has to become something else, and a suffix is less
+ * surprising than a rejected sign-up. Bounded rather than looping forever: after a few collisions
+ * the random suffix is doing the work, not the base.
  */
-async function claimInstance(userId: string): Promise<void> {
-  const organizationId = DEFAULT_ORGANIZATION_ID;
+async function freeSlug(base: string): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate =
+      attempt === 0 ? base : `${base}-${randomUUID().slice(0, 6)}`;
+    const taken = await db.organization.findUnique({
+      where: { slug: candidate },
+      select: { slug: true },
+    });
+    if (!taken) return candidate;
+  }
+  return `${base}-${randomUUID()}`;
+}
 
-  await db.organization.upsert({
-    where: { id: organizationId },
-    create: {
-      id: organizationId,
-      name: 'Default',
-      slug: 'default',
-      createdAt: new Date(),
-    },
-    update: {},
+/**
+ * Gives a new account somewhere to be.
+ *
+ * One special case, and it is a migration artifact rather than a rule: the multi-tenancy migration
+ * parked pre-existing projects in an organization with no members, because inventing a user row
+ * nobody can log in as would have been worse. Whoever registers first adopts it, along with those
+ * projects. Everybody else — and everybody on a fresh install, where that organization was never
+ * created — gets a new one.
+ */
+async function provisionOrganization(user: {
+  id: string;
+  name?: string | null;
+  email: string;
+}): Promise<void> {
+  const orphaned = await db.organization.findFirst({
+    where: { id: DEFAULT_ORGANIZATION_ID, members: { none: {} } },
+    select: { id: true },
   });
+
+  const organizationId = orphaned?.id ?? randomUUID();
+
+  if (!orphaned) {
+    const name = user.name?.trim() || user.email.split('@')[0] || 'Workspace';
+    await db.organization.create({
+      data: {
+        id: organizationId,
+        name,
+        slug: await freeSlug(slugify(name)),
+        createdAt: new Date(),
+      },
+    });
+  }
 
   await db.member.create({
     data: {
       id: randomUUID(),
       organizationId,
-      userId,
+      userId: user.id,
       role: 'owner',
       createdAt: new Date(),
     },
@@ -94,12 +124,8 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => {
-          await assertInstanceUnclaimed();
-          return { data: user };
-        },
         after: async (user) => {
-          await claimInstance(user.id);
+          await provisionOrganization(user);
         },
       },
     },
@@ -119,8 +145,3 @@ export const auth = betterAuth({
 });
 
 export type Auth = typeof auth;
-
-/** True while nobody has claimed this instance, which is what the sign-up page keys off. */
-export async function isInstanceUnclaimed(): Promise<boolean> {
-  return (await db.user.count()) === 0;
-}

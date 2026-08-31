@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { signIn } from '@/lib/auth-client';
 
-export function SignInForm() {
+export function SignInForm({ next }: { next: string }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +31,7 @@ export function SignInForm() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push(next);
     router.refresh();
   }
 
