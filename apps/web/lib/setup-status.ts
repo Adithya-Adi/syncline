@@ -11,6 +11,22 @@ import { db } from './db';
 
 export type SetupStep = 'waiting' | 'recorded' | 'traced' | 'complete';
 
+/**
+ * The most recent captured request, shown as evidence.
+ *
+ * A count is a claim; a real URL with a real trace id is proof. When someone doubts that the thing
+ * they are looking at is their own traffic, this is what settles it.
+ */
+export interface SetupEvidence {
+  sessionId: string;
+  method: string;
+  url: string;
+  traceId: string;
+  status?: number;
+  /** Whether backend spans have arrived on this exact trace id. */
+  stitched: boolean;
+}
+
 export interface SetupStatus {
   step: SetupStep;
   recordings: number;
@@ -20,6 +36,7 @@ export interface SetupStatus {
   stitched: number;
   latestRecordingId?: string;
   latestRecordingAt?: number;
+  latestRequest?: SetupEvidence;
 }
 
 export async function setupStatus(projectId: string): Promise<SetupStatus> {
@@ -36,12 +53,25 @@ export async function setupStatus(projectId: string): Promise<SetupStatus> {
     return { step: 'waiting', recordings: 0, requests: 0, stitched: 0 };
   }
 
-  const links = await db.requestLink.findMany({
-    where: { session: { projectId } },
-    select: { traceId: true },
-    // Enough to answer "is anything stitched", without loading a busy project's whole history.
-    take: 500,
-  });
+  const [links, latestLink] = await Promise.all([
+    db.requestLink.findMany({
+      where: { session: { projectId } },
+      select: { traceId: true },
+      // Enough to answer "is anything stitched", without loading a busy project's whole history.
+      take: 500,
+    }),
+    db.requestLink.findFirst({
+      where: { session: { projectId } },
+      orderBy: { clientStartMs: 'desc' },
+      select: {
+        sessionId: true,
+        method: true,
+        url: true,
+        traceId: true,
+        status: true,
+      },
+    }),
+  ]);
 
   const base = {
     recordings,
@@ -52,7 +82,13 @@ export async function setupStatus(projectId: string): Promise<SetupStatus> {
 
   if (links.length === 0) return { ...base, step: 'recorded', stitched: 0 };
 
+  // The newest link is what the page shows as evidence, and it is not necessarily inside the
+  // sample above, so it joins the span lookup explicitly rather than being reported unstitched.
   const traceIds = [...new Set(links.map((l) => l.traceId))];
+  if (latestLink && !traceIds.includes(latestLink.traceId)) {
+    traceIds.push(latestLink.traceId);
+  }
+
   const spans = await db.span.findMany({
     where: { traceId: { in: traceIds } },
     select: { traceId: true },
@@ -62,5 +98,19 @@ export async function setupStatus(projectId: string): Promise<SetupStatus> {
   const stitchedTraces = new Set(spans.map((s) => s.traceId));
   const stitched = links.filter((l) => stitchedTraces.has(l.traceId)).length;
 
-  return { ...base, stitched, step: stitched > 0 ? 'complete' : 'traced' };
+  return {
+    ...base,
+    stitched,
+    step: stitched > 0 ? 'complete' : 'traced',
+    latestRequest: latestLink
+      ? {
+          sessionId: latestLink.sessionId,
+          method: latestLink.method,
+          url: latestLink.url,
+          traceId: latestLink.traceId,
+          status: latestLink.status ?? undefined,
+          stitched: stitchedTraces.has(latestLink.traceId),
+        }
+      : undefined,
+  };
 }
