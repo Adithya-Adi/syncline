@@ -50,7 +50,7 @@ export default function DocsOverview() {
         <tbody>
           <tr>
             <td>
-              <code>@syncline/browser</code>
+              <code>syncline-browser</code>
             </td>
             <td>Records with rrweb, patches fetch and XHR, uploads chunks</td>
           </tr>
