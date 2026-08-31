@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'rrweb-player/dist/style.css';
 import type {
+  SessionPageview,
   SessionResponse,
   TraceResponse,
   ViewerSpan,
@@ -49,6 +50,8 @@ export function Viewer({ sessionId }: { sessionId: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<{
     getReplayer: () => { getCurrentTime: () => number };
+    /** rrweb-player's own seek. Offset from the start of the recording, not wall-clock. */
+    goto?: (timeOffset: number, play?: boolean) => void;
   } | null>(null);
   const buildingRef = useRef(false);
 
@@ -275,6 +278,21 @@ export function Viewer({ sessionId }: { sessionId: string }) {
    * a bar narrows to that request, which is the only time the backend and database lanes are
    * legible.
    */
+  /**
+   * When requests failed, in client time.
+   *
+   * Passed to the flow so a page that contained a failure is marked there rather than only in the
+   * lanes below. The flow is what someone reads first, and "the checkout page went red" is the
+   * fastest possible answer to "where do I look".
+   */
+  const failedRequestMs = useMemo(
+    () =>
+      (session?.links ?? [])
+        .filter((link) => (link.status ?? 0) >= 400)
+        .map((link) => link.startMs),
+    [session],
+  );
+
   const [focus, setFocus] = useState<{ from: number; to: number } | null>(null);
 
   const view = useMemo(() => {
@@ -370,6 +388,23 @@ export function Viewer({ sessionId }: { sessionId: string }) {
             </button>
           </div>
         )}
+
+        <Flow
+          pageviews={session.pageviews}
+          startMs={startMs}
+          durationMs={durationMs}
+          playheadMs={playheadMs}
+          failedAt={failedRequestMs}
+          onSelect={(page) => {
+            // Seeking and zooming together: a page is the unit someone means when they say "what
+            // happened on checkout", and answering it with only half the timeline moved would leave
+            // the lanes showing a different moment than the replay.
+            const from = page.startedMs;
+            const to = page.endedMs ?? startMs + durationMs;
+            setFocus({ from, to });
+            playerRef.current?.goto?.(Math.max(0, from - startMs), false);
+          }}
+        />
 
         <Ruler fromMs={view.from - startMs} spanMs={view.span} />
 
@@ -472,6 +507,82 @@ function Field({ label, value }: { label: string; value: string }) {
  * zoom into a request 4 seconds in, the ruler should say 4,012ms — a window that restarted at zero
  * would lose the only number that ties the strata back to the video.
  */
+/**
+ * The flow: which pages, in order, for how long.
+ *
+ * Segments are proportional to time rather than evenly spaced, because "the user sat on /checkout
+ * for two minutes and bounced through everything else" is the shape worth seeing at a glance. A page
+ * that ended in the same millisecond it began still gets a sliver, so a redirect chain is visible
+ * instead of collapsing to nothing.
+ *
+ * Clicking a page seeks the replay to it. That is the whole reason the flow exists: without it,
+ * finding the moment someone reached a page means scrubbing.
+ */
+function Flow({
+  pageviews,
+  startMs,
+  durationMs,
+  playheadMs,
+  failedAt,
+  onSelect,
+}: {
+  pageviews: SessionPageview[];
+  startMs: number;
+  durationMs: number;
+  playheadMs: number;
+  failedAt: number[];
+  onSelect: (page: SessionPageview) => void;
+}) {
+  // A recording from an SDK that predates pageviews has no flow, and an empty rail with a heading
+  // would be a worse answer than no rail.
+  if (pageviews.length === 0) return null;
+
+  const total = Math.max(1, durationMs);
+
+  return (
+    <div className="flow">
+      <span className="flow__label eyebrow">flow</span>
+      <div className="flow__track">
+        {pageviews.map((page) => {
+          const from = page.startedMs;
+          const to = page.endedMs ?? startMs + durationMs;
+          const width = Math.max(1.5, ((to - from) / total) * 100);
+          const here = playheadMs >= from && playheadMs < to;
+          const failed = failedAt.some((at) => at >= from && at < to);
+
+          return (
+            <button
+              key={page.ordinal}
+              type="button"
+              className={[
+                'flow__page',
+                here ? 'flow__page--here' : '',
+                failed ? 'flow__page--failed' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              style={{ width: `${width}%` }}
+              onClick={() => onSelect(page)}
+              title={`${page.path} · ${page.trigger} · ${
+                page.durationMs ?? 0
+              }ms`}
+            >
+              <span className="flow__path">{page.path}</span>
+              <span className="flow__ms">{formatMs(page.durationMs ?? 0)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60_000)}m${Math.round((ms % 60_000) / 1000)}s`;
+}
+
 function Ruler({ fromMs, spanMs }: { fromMs: number; spanMs: number }) {
   const steps = 6;
   return (
