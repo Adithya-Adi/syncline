@@ -1,6 +1,8 @@
 /*
- * Deliberately plain: this page exists to be recorded, not admired, and a demo that ships a design
- * system would make it harder to see what the SDK integration actually amounts to.
+ * Deliberately plain, and deliberately not Tailwind.
+ *
+ * The example exists to be recorded, not admired, and shipping a design system would make it harder
+ * to see that the Syncline integration is four lines in one file.
  */
 
 :root {
@@ -12,13 +14,7 @@
   --accent: #4aa8c7;
   --bad: #d2726b;
   --ok: #7fb886;
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: light) {
@@ -28,6 +24,7 @@
     --line: #e3e6ec;
     --text: #171a1f;
     --dim: #616b7a;
+    color-scheme: light;
   }
 }
 
@@ -39,6 +36,13 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 14px;
   line-height: 1.55;
 }
@@ -46,6 +50,10 @@ body {
 code {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12.5px;
+  color: var(--accent);
+}
+
+a {
   color: var(--accent);
 }
 
@@ -58,11 +66,11 @@ code {
   background: var(--panel);
   position: sticky;
   top: 0;
+  z-index: 2;
 }
 
 .brand {
   font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .dim {
@@ -89,6 +97,10 @@ code {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 11.5px;
   color: var(--dim);
+}
+
+.session.missing {
+  color: var(--bad);
 }
 
 .page {
@@ -148,7 +160,7 @@ input {
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: transparent;
+  background: var(--bg);
   color: var(--text);
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 12.5px;
@@ -159,7 +171,7 @@ button {
   padding: 0 12px;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: transparent;
+  background: var(--bg);
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
@@ -183,7 +195,6 @@ button.primary {
 
 button.danger {
   color: var(--bad);
-  border-color: color-mix(in oklab, var(--bad) 45%, var(--line));
 }
 
 button.ghost {
@@ -196,8 +207,6 @@ button.ghost {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .products li {

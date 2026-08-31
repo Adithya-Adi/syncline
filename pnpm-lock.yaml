@@ -316,11 +316,29 @@ importers:
         specifier: ^11.0.0
         version: 11.2.3(@nestjs/common@11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
 
+  examples/storefront:
+    dependencies:
+      next:
+        specifier: ~16.1.6
+        version: 16.1.7(@babel/core@7.29.7(supports-color@8.1.1))(babel-plugin-macros@3.1.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.103.1)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+      syncline-browser:
+        specifier: workspace:*
+        version: link:../../packages/browser-sdk
+
   packages/browser-sdk:
     devDependencies:
       '@syncline/protocol':
         specifier: workspace:*
         version: link:../protocol
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1(@noble/hashes@2.4.0)
       rrweb:
         specifier: 2.1.1
         version: 2.1.1
@@ -330,9 +348,6 @@ importers:
       ulid:
         specifier: ^3.0.2
         version: 3.0.2
-      jsdom:
-        specifier: ^30.0.1
-        version: 30.0.1(@noble/hashes@2.4.0)
 
   packages/models:
     dependencies:

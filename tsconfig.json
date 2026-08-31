@@ -26,6 +26,9 @@
     },
     {
       "path": "./apps/web"
+    },
+    {
+      "path": "./examples/storefront"
     }
   ],
   "compilerOptions": {}
