@@ -13,6 +13,40 @@ export const RRWEB_CUSTOM_EVENT_TYPE = 5;
 
 export const REQUEST_START = 'syncline.request' as const;
 export const REQUEST_END = 'syncline.response' as const;
+export const PAGEVIEW = 'syncline.pageview' as const;
+
+/**
+ * What moved the user to this page.
+ *
+ * Kept because the three are not equivalent when reading a flow: `load` is the entry point,
+ * `popstate` is the back button — which is a usability signal, not navigation — and a `replaceState`
+ * is usually a router normalizing a URL rather than the user going anywhere.
+ */
+export const PAGEVIEW_TRIGGERS = [
+  'load',
+  'pushState',
+  'replaceState',
+  'popstate',
+  'hashchange',
+] as const;
+
+export type PageviewTrigger = (typeof PAGEVIEW_TRIGGERS)[number];
+
+/**
+ * A page in the session's flow.
+ *
+ * `ordinal` is assigned by the SDK and is the flow's order — not the arrival order of chunks, which
+ * a lossy connection reshuffles. It resets to 0 when a session rotates, because that is a new flow.
+ */
+export const pageviewPayloadSchema = z.object({
+  ordinal: z.number().int().nonnegative(),
+  /** Origin + pathname + sanitized search, same treatment as a request URL. */
+  url: z.string().max(2048),
+  startMs: z.number().int().nonnegative(),
+  trigger: z.enum(PAGEVIEW_TRIGGERS),
+});
+
+export type PageviewPayload = z.infer<typeof pageviewPayloadSchema>;
 
 /**
  * Start and end are separate events because rrweb's log is append-only — the SDK cannot reach back
@@ -38,7 +72,8 @@ export const requestEndPayloadSchema = z.object({
 export type RequestStartPayload = z.infer<typeof requestStartPayloadSchema>;
 export type RequestEndPayload = z.infer<typeof requestEndPayloadSchema>;
 
-export type SynclineEventTag = typeof REQUEST_START | typeof REQUEST_END;
+export type SynclineEventTag =
+  typeof REQUEST_START | typeof REQUEST_END | typeof PAGEVIEW;
 
 /** The shape rrweb wraps a custom event in. */
 export interface RrwebCustomEvent<Tag extends string, Payload> {
@@ -55,7 +90,8 @@ export type RequestEndEvent = RrwebCustomEvent<
   typeof REQUEST_END,
   RequestEndPayload
 >;
-export type SynclineEvent = RequestStartEvent | RequestEndEvent;
+export type PageviewEvent = RrwebCustomEvent<typeof PAGEVIEW, PageviewPayload>;
+export type SynclineEvent = RequestStartEvent | RequestEndEvent | PageviewEvent;
 
 /**
  * Narrows an arbitrary rrweb event to one of ours.
@@ -68,5 +104,5 @@ export function isSynclineEvent(event: unknown): event is SynclineEvent {
   const e = event as { type?: unknown; data?: { tag?: unknown } };
   if (e.type !== RRWEB_CUSTOM_EVENT_TYPE) return false;
   const tag = e.data?.tag;
-  return tag === REQUEST_START || tag === REQUEST_END;
+  return tag === REQUEST_START || tag === REQUEST_END || tag === PAGEVIEW;
 }
