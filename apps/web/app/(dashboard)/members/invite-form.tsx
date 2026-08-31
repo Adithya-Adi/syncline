@@ -78,12 +78,18 @@ export function InviteForm() {
           {/*
            * A native select rather than a styled listbox: three fixed options, and the platform
            * control is the one that already works with a keyboard and a screen reader.
+           *
+           * The background has to be opaque. Chrome paints the dropdown list from the control's own
+           * `background-color`, and a transparent one resolves to white — so in dark mode the popup
+           * came up white with white text, whatever `color-scheme` says. The options are given the
+           * same colours explicitly, because Firefox takes them from the option rather than the
+           * select.
            */}
           <select
             id="invite-role"
             value={role}
             onChange={(event) => setRole(event.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&>option]:bg-background [&>option]:text-foreground"
           >
             <option value="member">Member</option>
             <option value="admin">Admin</option>
