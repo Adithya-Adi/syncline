@@ -55,6 +55,17 @@ export async function requireViewer(): Promise<Viewer> {
   // broken invitation flow rather than surface it.
   if (!membership) redirect('/no-organization');
 
+  // Write the resolved organization back when the session disagrees with it. Better Auth's own
+  // organization endpoints read `activeOrganizationId` and nothing else — a null one is reported as
+  // "Organization not found" — so a fallback that only this file knows about leaves invite, cancel,
+  // re-role, and remove broken for every session issued before one was stamped on.
+  if (session.session.activeOrganizationId !== membership.organizationId) {
+    await db.authSession.update({
+      where: { id: session.session.id },
+      data: { activeOrganizationId: membership.organizationId },
+    });
+  }
+
   return {
     userId: session.user.id,
     email: session.user.email,

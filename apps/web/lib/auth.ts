@@ -129,6 +129,41 @@ export const auth = betterAuth({
         },
       },
     },
+
+    /**
+     * Point a new session at an organization straight away.
+     *
+     * Better Auth leaves `activeOrganizationId` null until something calls `setActive`, and every
+     * organization mutation — invite, cancel an invitation, re-role, remove — falls back to it when
+     * the caller does not name an organization. A null one comes back as "Organization not found",
+     * which reads as a missing tenant rather than an unset pointer on the session.
+     *
+     * The dashboard already resolves the viewer's organization from their earliest membership, so
+     * the session may as well agree from the first request. Anyone who belongs to more than one
+     * overwrites this by switching, which calls `setActive`.
+     */
+    session: {
+      create: {
+        before: async (session) => {
+          if (session.activeOrganizationId) return;
+
+          const membership = await db.member.findFirst({
+            where: { userId: session.userId },
+            orderBy: { createdAt: 'asc' },
+            select: { organizationId: true },
+          });
+
+          if (!membership) return;
+
+          return {
+            data: {
+              ...session,
+              activeOrganizationId: membership.organizationId,
+            },
+          };
+        },
+      },
+    },
   },
 
   plugins: [
