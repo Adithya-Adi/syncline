@@ -11,17 +11,20 @@ import {
   FLUSH_BYTES,
   FLUSH_INTERVAL_MS,
   MAX_EVENTS_PER_CHUNK,
+  type Pageview,
   type RequestLink,
 } from '@syncline/protocol';
 
 export interface PendingChunk {
   events: unknown[];
   links: RequestLink[];
+  pageviews: Pageview[];
 }
 
 export class EventBuffer {
   private events: unknown[] = [];
   private links: RequestLink[] = [];
+  private pageviews: Pageview[] = [];
   /** Rough running total. Exact byte accounting would mean serializing on every event. */
   private approximateBytes = 0;
 
@@ -40,12 +43,21 @@ export class EventBuffer {
     this.approximateBytes += 200;
   }
 
+  addPageview(pageview: Pageview): void {
+    this.pageviews.push(pageview);
+    this.approximateBytes += 200;
+  }
+
   get size(): number {
     return this.events.length;
   }
 
   get isEmpty(): boolean {
-    return this.events.length === 0 && this.links.length === 0;
+    return (
+      this.events.length === 0 &&
+      this.links.length === 0 &&
+      this.pageviews.length === 0
+    );
   }
 
   shouldFlush(): boolean {
@@ -57,9 +69,14 @@ export class EventBuffer {
 
   /** Hands over everything buffered and resets. */
   drain(): PendingChunk {
-    const chunk = { events: this.events, links: this.links };
+    const chunk = {
+      events: this.events,
+      links: this.links,
+      pageviews: this.pageviews,
+    };
     this.events = [];
     this.links = [];
+    this.pageviews = [];
     this.approximateBytes = 0;
     return chunk;
   }

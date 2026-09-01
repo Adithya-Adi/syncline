@@ -11,7 +11,9 @@ import {
   MAX_EVENTS_PER_CHUNK,
   MAX_LINKS_PER_CHUNK,
   MAX_CHUNKS_PER_SESSION,
+  MAX_PAGEVIEWS_PER_CHUNK,
 } from './limits.js';
+import { PAGEVIEW_TRIGGERS } from './events.js';
 
 const traceId = z.string().regex(/^[0-9a-f]{32}$/);
 const spanId = z.string().regex(/^[0-9a-f]{16}$/);
@@ -55,6 +57,19 @@ export const requestLinkSchema = z.object({
   endMs: z.number().int().nonnegative(),
 });
 
+/**
+ * A page the session visited, denormalized out of the rrweb stream like `links` are.
+ *
+ * Same reasoning: the marker is already inside `events`, but the worker must be able to build the
+ * flow without decompressing and walking the event array first.
+ */
+export const pageviewSchema = z.object({
+  ordinal: z.number().int().nonnegative(),
+  url: z.string().max(2048),
+  startMs: z.number().int().nonnegative(),
+  trigger: z.enum(PAGEVIEW_TRIGGERS),
+});
+
 export const sessionChunkSchema = z.object({
   sessionId: sessionIdSchema,
   seq: z.number().int().nonnegative().max(MAX_CHUNKS_PER_SESSION),
@@ -70,6 +85,17 @@ export const sessionChunkSchema = z.object({
    */
   events: z.array(z.unknown()).max(MAX_EVENTS_PER_CHUNK),
   links: z.array(requestLinkSchema).max(MAX_LINKS_PER_CHUNK).default([]),
+  /** Pages that began inside this chunk. Empty when the chunk flushed mid-page on size or time. */
+  pageviews: z.array(pageviewSchema).max(MAX_PAGEVIEWS_PER_CHUNK).default([]),
+  /**
+   * Which page this chunk's events belong to.
+   *
+   * Chunks flush at every page boundary, so a chunk never straddles two pages — which is what lets
+   * the viewer load one page of a long session without fetching the rest. Optional because a chunk
+   * from an older SDK has no pageviews at all, and refusing it would be a worse outcome than
+   * filing it under no page.
+   */
+  pageviewOrdinal: z.number().int().nonnegative().optional(),
 });
 
 export const clockResponseSchema = z.object({
@@ -80,6 +106,7 @@ export type ClockCalibration = z.infer<typeof clockCalibrationSchema>;
 export type Viewport = z.infer<typeof viewportSchema>;
 export type SessionMeta = z.infer<typeof sessionMetaSchema>;
 export type RequestLink = z.infer<typeof requestLinkSchema>;
+export type Pageview = z.infer<typeof pageviewSchema>;
 export type SessionChunk = z.infer<typeof sessionChunkSchema>;
 export type ClockResponse = z.infer<typeof clockResponseSchema>;
 

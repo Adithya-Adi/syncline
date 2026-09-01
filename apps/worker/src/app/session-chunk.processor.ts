@@ -2,12 +2,35 @@ import { Logger } from '@nestjs/common';
 import { UnrecoverableError, type Job } from 'bullmq';
 import {
   isSynclineEvent,
+  REQUEST_END,
+  REQUEST_START,
   sessionChunkSchema,
+  TRIVIAL_SESSION_MS,
   type SessionChunk,
   type SessionChunkJob,
 } from '@syncline/protocol';
 import type { PrismaClient } from '@syncline/models';
 import type { ObjectStore } from '@syncline/storage';
+
+/**
+ * The slice of the client the pageview helpers need.
+ *
+ * Typed structurally rather than as the transaction client so the helpers can be called with either,
+ * and so a test can hand them a fake without constructing a Prisma transaction.
+ */
+type PageviewTx = {
+  pageview: {
+    findMany(args: unknown): Promise<
+      {
+        id: string;
+        startedAt: Date;
+        endedAt: Date | null;
+        durationMs: number | null;
+      }[]
+    >;
+    update(args: unknown): Promise<unknown>;
+  };
+};
 
 /**
  * Turns a stored rrweb chunk into rows.
@@ -82,13 +105,44 @@ export class SessionChunkProcessor {
           endedAt: new Date(endedMs),
           eventCount: parsed.events.length,
           sizeBytes: raw.byteLength,
+          ...(parsed.pageviewOrdinal !== undefined
+            ? { pageviewOrdinal: parsed.pageviewOrdinal }
+            : {}),
           storageKey,
         },
         update: {
           eventCount: parsed.events.length,
           sizeBytes: raw.byteLength,
+          ...(parsed.pageviewOrdinal !== undefined
+            ? { pageviewOrdinal: parsed.pageviewOrdinal }
+            : {}),
         },
       });
+
+      // The flow. Upsert by (session, ordinal) because a redelivered chunk carries the same pages,
+      // and because the SDK's ordinal is the authority on their order — not arrival time.
+      for (const pageview of parsed.pageviews) {
+        const startedAt = new Date(pageview.startMs);
+        await tx.pageview.upsert({
+          where: {
+            sessionId_ordinal: { sessionId, ordinal: pageview.ordinal },
+          },
+          create: {
+            sessionId,
+            ordinal: pageview.ordinal,
+            url: pageview.url,
+            path: pathOf(pageview.url),
+            trigger: pageview.trigger,
+            startedAt,
+          },
+          update: {
+            url: pageview.url,
+            path: pathOf(pageview.url),
+            trigger: pageview.trigger,
+            startedAt,
+          },
+        });
+      }
 
       if (parsed.links.length > 0) {
         await tx.requestLink.deleteMany({
@@ -120,15 +174,27 @@ export class SessionChunkProcessor {
       });
 
       if (bounds._min.startedAt && bounds._max.endedAt) {
+        const durationMs =
+          bounds._max.endedAt.getTime() - bounds._min.startedAt.getTime();
+
+        // Counted rather than tracked incrementally: a chunk can arrive twice, and a counter that
+        // drifts is worse than one query per chunk on a table indexed by session.
+        const [linkCount, failedCount] = await Promise.all([
+          tx.requestLink.count({ where: { sessionId } }),
+          tx.requestLink.count({ where: { sessionId, status: { gte: 400 } } }),
+        ]);
+
         await tx.session.update({
           where: { id: sessionId },
           data: {
             startedAt: bounds._min.startedAt,
             endedAt: bounds._max.endedAt,
-            durationMs:
-              bounds._max.endedAt.getTime() - bounds._min.startedAt.getTime(),
+            durationMs,
+            trivial: isTrivial({ durationMs, linkCount, failedCount }),
           },
         });
+
+        await closePageviews(tx, sessionId, bounds._max.endedAt);
       }
     });
 
@@ -172,8 +238,97 @@ export class SessionChunkProcessor {
 export class UnrecoverableChunkError extends UnrecoverableError {}
 
 /**
- * rrweb stamps every event with a client timestamp. Syncline's own custom events are excluded:
- * they mark request boundaries and can sit outside the window of recorded DOM activity.
+ * The path a pageview URL points at, stored alongside the URL so filtering never parses per row.
+ *
+ * A hash route lives in the fragment, and for a hash router that fragment *is* the path — so it is
+ * kept. Anything unparseable becomes `/`, because a null path would make every "which sessions
+ * reached X" query decide what to do about it.
+ */
+export function pathOf(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const hash = parsed.hash.startsWith('#/') ? parsed.hash.slice(1) : '';
+    return hash || parsed.pathname || '/';
+  } catch {
+    return '/';
+  }
+}
+
+/**
+ * Gives every page an end: the next page's start, or the session's last event for the final one.
+ *
+ * Derived here rather than sent by the SDK because the SDK cannot know. It emits a page's start and
+ * then, whenever the user leaves, a different page's start — the previous page's end is only knowable
+ * once you have both, and the last page's end only once the recording stops arriving.
+ *
+ * Recomputed from scratch on every chunk, so a late-arriving page slots into the middle of the flow
+ * and the pages either side of it correct themselves.
+ */
+async function closePageviews(
+  tx: PageviewTx,
+  sessionId: string,
+  sessionEndedAt: Date,
+): Promise<void> {
+  const pageviews = await tx.pageview.findMany({
+    where: { sessionId },
+    orderBy: { ordinal: 'asc' },
+    select: { id: true, startedAt: true, endedAt: true, durationMs: true },
+  });
+
+  for (const [index, pageview] of pageviews.entries()) {
+    const next = pageviews[index + 1];
+    const endedAt = next ? next.startedAt : sessionEndedAt;
+
+    // A page cannot end before it began. Client clocks jump, and a negative duration on screen is
+    // worse than none: it reads as a bug in the viewer rather than a bad clock on the device.
+    if (endedAt.getTime() < pageview.startedAt.getTime()) continue;
+    if (pageview.endedAt?.getTime() === endedAt.getTime()) continue;
+
+    await tx.pageview.update({
+      where: { id: pageview.id },
+      data: {
+        endedAt,
+        durationMs: endedAt.getTime() - pageview.startedAt.getTime(),
+      },
+    });
+  }
+}
+
+/**
+ * Whether a recording is worth showing by default.
+ *
+ * Short *and* empty. A two-second visit that produced a failed request is exactly the recording
+ * someone will come looking for, so a failure disqualifies it however brief it was. This is a label
+ * and never a deletion: the recordings list hides these, and a filter brings them back.
+ */
+/** One of our request markers, as opposed to a pageview marker or a real rrweb event. */
+function isRequestMarker(event: unknown): boolean {
+  if (!isSynclineEvent(event)) return false;
+  const tag = event.data.tag;
+  return tag === REQUEST_START || tag === REQUEST_END;
+}
+
+export function isTrivial(session: {
+  durationMs: number;
+  linkCount: number;
+  failedCount: number;
+}): boolean {
+  if (session.failedCount > 0) return false;
+  if (session.linkCount > 0) return false;
+  return session.durationMs < TRIVIAL_SESSION_MS;
+}
+
+/**
+ * rrweb stamps every event with a client timestamp, and these are the bounds of the recording.
+ *
+ * Request markers are excluded: a response can arrive after the last DOM mutation, and letting it
+ * extend the recording would claim frames that were never captured.
+ *
+ * Pageview markers are *not* excluded, and the difference matters. A navigation is by definition a
+ * moment the user was on the page, and a chunk that carries only the marker — which is what a
+ * route change immediately before leaving produces — would otherwise contribute nothing. The
+ * session would then end before its own last page began, and that page would be left with no
+ * duration at all.
  */
 export function eventTimestamps(events: unknown[]): {
   first?: number;
@@ -183,7 +338,7 @@ export function eventTimestamps(events: unknown[]): {
   let last: number | undefined;
 
   for (const event of events) {
-    if (isSynclineEvent(event)) continue;
+    if (isRequestMarker(event)) continue;
     const ts = (event as { timestamp?: unknown })?.timestamp;
     if (typeof ts !== 'number' || !Number.isFinite(ts)) continue;
     if (first === undefined || ts < first) first = ts;

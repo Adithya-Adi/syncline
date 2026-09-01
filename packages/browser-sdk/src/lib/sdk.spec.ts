@@ -160,7 +160,10 @@ describe('session identity', () => {
     );
 
     const session = resolveSession(storage, now);
-    expect(session).toEqual({ id: '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD', isNew: false });
+    expect(session).toMatchObject({
+      id: '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD',
+      isNew: false,
+    });
   });
 
   it('starts fresh after the idle timeout, rather than recording an overnight gap', () => {

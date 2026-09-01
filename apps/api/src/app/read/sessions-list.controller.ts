@@ -45,7 +45,15 @@ export class SessionsListController {
         url: true,
         userId: true,
         release: true,
-        _count: { select: { chunks: true, links: true } },
+        trivial: true,
+        _count: { select: { chunks: true, links: true, pageviews: true } },
+        // The first page of the flow: where the session came in. One row per session, not a join
+        // per row, because a list of fifty must not become fifty-one queries.
+        pageviews: {
+          orderBy: { ordinal: 'asc' },
+          take: 1,
+          select: { path: true },
+        },
       },
     });
 
@@ -73,6 +81,9 @@ export class SessionsListController {
         chunkCount: s._count.chunks,
         linkCount: s._count.links,
         errorCount: errorBySession.get(s.id) ?? 0,
+        pageCount: s._count.pageviews,
+        ...(s.pageviews[0]?.path ? { entryPath: s.pageviews[0].path } : {}),
+        trivial: s.trivial,
       })),
       ...(rows.length > limit ? { nextCursor: page[page.length - 1]?.id } : {}),
     };

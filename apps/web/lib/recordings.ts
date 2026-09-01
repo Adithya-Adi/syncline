@@ -58,6 +58,7 @@ export async function recordingForViewer(
     include: {
       chunks: { orderBy: { seq: 'asc' } },
       links: { orderBy: { clientStartMs: 'asc' } },
+      pageviews: { orderBy: { ordinal: 'asc' } },
     },
   });
 
@@ -84,6 +85,9 @@ export async function recordingForViewer(
       endedMs: chunk.endedAt.getTime(),
       eventCount: chunk.eventCount,
       sizeBytes: chunk.sizeBytes,
+      ...(chunk.pageviewOrdinal !== null
+        ? { pageviewOrdinal: chunk.pageviewOrdinal }
+        : {}),
       // Points back through this app, not at the ingest API.
       url: `/api/recordings/${session.id}/chunks/${chunk.seq}`,
     })),
@@ -95,6 +99,17 @@ export async function recordingForViewer(
       ...(link.status !== null ? { status: link.status } : {}),
       startMs: Number(link.clientStartMs),
       endMs: Number(link.clientEndMs),
+    })),
+    pageviews: session.pageviews.map((pageview) => ({
+      ordinal: pageview.ordinal,
+      url: pageview.url,
+      path: pageview.path,
+      trigger: pageview.trigger,
+      startedMs: pageview.startedAt.getTime(),
+      ...(pageview.endedAt ? { endedMs: pageview.endedAt.getTime() } : {}),
+      ...(pageview.durationMs !== null
+        ? { durationMs: pageview.durationMs }
+        : {}),
     })),
   };
 }

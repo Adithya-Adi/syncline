@@ -58,6 +58,7 @@ export class ReadController {
       include: {
         chunks: { orderBy: { seq: 'asc' } },
         links: { orderBy: { clientStartMs: 'asc' } },
+        pageviews: { orderBy: { ordinal: 'asc' } },
       },
     });
 
@@ -86,6 +87,9 @@ export class ReadController {
         endedMs: chunk.endedAt.getTime(),
         eventCount: chunk.eventCount,
         sizeBytes: chunk.sizeBytes,
+        ...(chunk.pageviewOrdinal !== null
+          ? { pageviewOrdinal: chunk.pageviewOrdinal }
+          : {}),
         url: `/v1/sessions/${session.id}/chunks/${chunk.seq}`,
       })),
       links: session.links.map((link) => ({
@@ -96,6 +100,17 @@ export class ReadController {
         ...(link.status !== null ? { status: link.status } : {}),
         startMs: Number(link.clientStartMs),
         endMs: Number(link.clientEndMs),
+      })),
+      pageviews: session.pageviews.map((pageview) => ({
+        ordinal: pageview.ordinal,
+        url: pageview.url,
+        path: pageview.path,
+        trigger: pageview.trigger,
+        startedMs: pageview.startedAt.getTime(),
+        ...(pageview.endedAt ? { endedMs: pageview.endedAt.getTime() } : {}),
+        ...(pageview.durationMs !== null
+          ? { durationMs: pageview.durationMs }
+          : {}),
       })),
     };
   }
