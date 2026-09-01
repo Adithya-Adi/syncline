@@ -1,0 +1,2137 @@
+{
+  "generator": "tools/build-demo-recording.mjs",
+  "sdk": {
+    "name": "syncline-browser",
+    "version": "0.1.0"
+  },
+  "clock": {
+    "offsetMs": 9,
+    "rttMs": 9
+  },
+  "meta": {
+    "url": "http://localhost:4321/cart",
+    "userAgent": "Mozilla/5.0 (win32) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/30.0.1",
+    "viewport": {
+      "w": 1024,
+      "h": 768
+    },
+    "release": "northwind-web@4.2.0",
+    "user": {
+      "id": "u_8823"
+    }
+  },
+  "durationMs": 83251,
+  "chunks": [
+    {
+      "seq": 0,
+      "pageviewOrdinal": 0,
+      "events": [
+        {
+          "type": 4,
+          "data": {
+            "href": "http://localhost:4321/",
+            "width": 1024,
+            "height": 768
+          },
+          "timestamp": 0
+        },
+        {
+          "type": 2,
+          "data": {
+            "node": {
+              "type": 0,
+              "childNodes": [
+                {
+                  "type": 1,
+                  "name": "html",
+                  "publicId": "",
+                  "systemId": "",
+                  "id": 2
+                },
+                {
+                  "type": 2,
+                  "tagName": "html",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "tagName": "head",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 2,
+                          "tagName": "title",
+                          "attributes": {},
+                          "childNodes": [
+                            {
+                              "type": 3,
+                              "textContent": "Northwind Supply",
+                              "id": 6
+                            }
+                          ],
+                          "id": 5
+                        }
+                      ],
+                      "id": 4
+                    },
+                    {
+                      "type": 2,
+                      "tagName": "body",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 8
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "header",
+                          "attributes": {
+                            "class": "topbar"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 10
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "span",
+                              "attributes": {
+                                "class": "brand"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Northwind Supply",
+                                  "id": 12
+                                }
+                              ],
+                              "id": 11
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 13
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "nav",
+                              "attributes": {},
+                              "childNodes": [
+                                {
+                                  "type": 2,
+                                  "tagName": "a",
+                                  "attributes": {
+                                    "href": "http://localhost:4321/"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Shop",
+                                      "id": 16
+                                    }
+                                  ],
+                                  "id": 15
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": " ",
+                                  "id": 17
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "a",
+                                  "attributes": {
+                                    "href": "http://localhost:4321/cart"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Cart",
+                                      "id": 19
+                                    }
+                                  ],
+                                  "id": 18
+                                }
+                              ],
+                              "id": 14
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 20
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "span",
+                              "attributes": {
+                                "id": "cart-count",
+                                "class": "cart-count"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "0",
+                                  "id": 22
+                                }
+                              ],
+                              "id": 21
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n    ",
+                              "id": 23
+                            }
+                          ],
+                          "id": 9
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 24
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "main",
+                          "attributes": {
+                            "id": "view"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 26
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "h1",
+                              "attributes": {
+                                "id": "heading"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Workshop tools",
+                                  "id": 28
+                                }
+                              ],
+                              "id": 27
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 29
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "ul",
+                              "attributes": {
+                                "id": "catalogue"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "\n        ",
+                                  "id": 31
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "li",
+                                  "attributes": {
+                                    "data-sku": "NW-1042"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "name"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "Bench vice, 4in",
+                                          "id": 34
+                                        }
+                                      ],
+                                      "id": 33
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "price"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "$89.00",
+                                          "id": 36
+                                        }
+                                      ],
+                                      "id": 35
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "button",
+                                      "attributes": {
+                                        "class": "add"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "Add to cart",
+                                          "id": 38
+                                        }
+                                      ],
+                                      "id": 37
+                                    }
+                                  ],
+                                  "id": 32
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": "\n        ",
+                                  "id": 39
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "li",
+                                  "attributes": {
+                                    "data-sku": "NW-2277"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "name"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "Torque wrench set",
+                                          "id": 42
+                                        }
+                                      ],
+                                      "id": 41
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "price"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "$142.50",
+                                          "id": 44
+                                        }
+                                      ],
+                                      "id": 43
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "button",
+                                      "attributes": {
+                                        "class": "add"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "Add to cart",
+                                          "id": 46
+                                        }
+                                      ],
+                                      "id": 45
+                                    }
+                                  ],
+                                  "id": 40
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": "\n        ",
+                                  "id": 47
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "li",
+                                  "attributes": {
+                                    "data-sku": "NW-3310"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "name"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "Digital calipers",
+                                          "id": 50
+                                        }
+                                      ],
+                                      "id": 49
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "price"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "$36.00",
+                                          "id": 52
+                                        }
+                                      ],
+                                      "id": 51
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "button",
+                                      "attributes": {
+                                        "class": "add"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "Add to cart",
+                                          "id": 54
+                                        }
+                                      ],
+                                      "id": 53
+                                    }
+                                  ],
+                                  "id": 48
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": "\n      ",
+                                  "id": 55
+                                }
+                              ],
+                              "id": 30
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n    ",
+                              "id": 56
+                            }
+                          ],
+                          "id": 25
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 57
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "div",
+                          "attributes": {
+                            "id": "flash",
+                            "hidden": ""
+                          },
+                          "childNodes": [],
+                          "id": 58
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n  ",
+                          "id": 59
+                        }
+                      ],
+                      "id": 7
+                    }
+                  ],
+                  "id": 3
+                }
+              ],
+              "id": 1
+            },
+            "initialOffset": {
+              "left": 0,
+              "top": 0
+            }
+          },
+          "timestamp": 0
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.pageview",
+            "payload": {
+              "ordinal": 0,
+              "url": "http://localhost:4321/",
+              "startMs": 0,
+              "trigger": "load"
+            }
+          },
+          "timestamp": 0
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [
+              {
+                "id": 45,
+                "attributes": {
+                  "class": "add pressed"
+                }
+              }
+            ],
+            "removes": [],
+            "adds": []
+          },
+          "timestamp": 18009
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.request",
+            "payload": {
+              "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
+              "spanId": "7dca26946541ec19",
+              "method": "POST",
+              "url": "http://localhost:4321/api/cart",
+              "startMs": 18207
+            }
+          },
+          "timestamp": 18207
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.response",
+            "payload": {
+              "spanId": "7dca26946541ec19",
+              "endMs": 18248,
+              "status": 200
+            }
+          },
+          "timestamp": 18248
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [],
+            "removes": [
+              {
+                "parentId": 21,
+                "id": 22
+              },
+              {
+                "parentId": 45,
+                "id": 46
+              }
+            ],
+            "adds": [
+              {
+                "parentId": 21,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "1",
+                  "id": 60
+                }
+              },
+              {
+                "parentId": 45,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "Added",
+                  "id": 61
+                }
+              }
+            ]
+          },
+          "timestamp": 18248
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [],
+            "removes": [
+              {
+                "parentId": 25,
+                "id": 26
+              },
+              {
+                "parentId": 25,
+                "id": 27
+              },
+              {
+                "parentId": 25,
+                "id": 29
+              },
+              {
+                "parentId": 25,
+                "id": 30
+              },
+              {
+                "parentId": 25,
+                "id": 56
+              }
+            ],
+            "adds": [
+              {
+                "parentId": 25,
+                "nextId": null,
+                "node": {
+                  "type": 2,
+                  "tagName": "button",
+                  "attributes": {
+                    "id": "checkout"
+                  },
+                  "childNodes": [],
+                  "id": 62
+                }
+              },
+              {
+                "parentId": 62,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "Checkout",
+                  "id": 63
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 62,
+                "node": {
+                  "type": 3,
+                  "textContent": "\n   ",
+                  "id": 64
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 64,
+                "node": {
+                  "type": 2,
+                  "tagName": "p",
+                  "attributes": {
+                    "class": "total"
+                  },
+                  "childNodes": [],
+                  "id": 65
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 65,
+                "node": {
+                  "type": 3,
+                  "textContent": "\n   ",
+                  "id": 66
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 66,
+                "node": {
+                  "type": 2,
+                  "tagName": "ul",
+                  "attributes": {
+                    "id": "lines"
+                  },
+                  "childNodes": [],
+                  "id": 67
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 67,
+                "node": {
+                  "type": 2,
+                  "tagName": "h1",
+                  "attributes": {
+                    "id": "heading"
+                  },
+                  "childNodes": [],
+                  "id": 68
+                }
+              },
+              {
+                "parentId": 68,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "Your cart",
+                  "id": 69
+                }
+              },
+              {
+                "parentId": 67,
+                "nextId": null,
+                "node": {
+                  "type": 2,
+                  "tagName": "li",
+                  "attributes": {},
+                  "childNodes": [],
+                  "id": 70
+                }
+              },
+              {
+                "parentId": 70,
+                "nextId": null,
+                "node": {
+                  "type": 2,
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "price"
+                  },
+                  "childNodes": [],
+                  "id": 71
+                }
+              },
+              {
+                "parentId": 70,
+                "nextId": 71,
+                "node": {
+                  "type": 2,
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "qty"
+                  },
+                  "childNodes": [],
+                  "id": 72
+                }
+              },
+              {
+                "parentId": 70,
+                "nextId": 72,
+                "node": {
+                  "type": 2,
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "name"
+                  },
+                  "childNodes": [],
+                  "id": 73
+                }
+              },
+              {
+                "parentId": 73,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "Torque wrench set",
+                  "id": 74
+                }
+              },
+              {
+                "parentId": 72,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "1",
+                  "id": 75
+                }
+              },
+              {
+                "parentId": 71,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "$142.50",
+                  "id": 76
+                }
+              },
+              {
+                "parentId": 65,
+                "nextId": null,
+                "node": {
+                  "type": 2,
+                  "tagName": "strong",
+                  "attributes": {},
+                  "childNodes": [],
+                  "id": 77
+                }
+              },
+              {
+                "parentId": 65,
+                "nextId": 77,
+                "node": {
+                  "type": 3,
+                  "textContent": "Total ",
+                  "id": 78
+                }
+              },
+              {
+                "parentId": 77,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "$142.50",
+                  "id": 79
+                }
+              }
+            ]
+          },
+          "timestamp": 32248
+        }
+      ],
+      "links": [
+        {
+          "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
+          "spanId": "7dca26946541ec19",
+          "method": "POST",
+          "url": "http://localhost:4321/api/cart",
+          "startMs": 18207,
+          "endMs": 18248,
+          "status": 200
+        }
+      ],
+      "pageviews": [
+        {
+          "ordinal": 0,
+          "url": "http://localhost:4321/",
+          "startMs": 0,
+          "trigger": "load"
+        }
+      ]
+    },
+    {
+      "seq": 1,
+      "pageviewOrdinal": 1,
+      "events": [
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.pageview",
+            "payload": {
+              "ordinal": 1,
+              "url": "http://localhost:4321/cart",
+              "startMs": 32248,
+              "trigger": "pushState"
+            }
+          },
+          "timestamp": 32248
+        },
+        {
+          "type": 4,
+          "data": {
+            "href": "http://localhost:4321/cart",
+            "width": 1024,
+            "height": 768
+          },
+          "timestamp": 32248
+        },
+        {
+          "type": 2,
+          "data": {
+            "node": {
+              "type": 0,
+              "childNodes": [
+                {
+                  "type": 1,
+                  "name": "html",
+                  "publicId": "",
+                  "systemId": "",
+                  "id": 2
+                },
+                {
+                  "type": 2,
+                  "tagName": "html",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "tagName": "head",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 2,
+                          "tagName": "title",
+                          "attributes": {},
+                          "childNodes": [
+                            {
+                              "type": 3,
+                              "textContent": "Northwind Supply",
+                              "id": 6
+                            }
+                          ],
+                          "id": 5
+                        }
+                      ],
+                      "id": 4
+                    },
+                    {
+                      "type": 2,
+                      "tagName": "body",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 8
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "header",
+                          "attributes": {
+                            "class": "topbar"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 10
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "span",
+                              "attributes": {
+                                "class": "brand"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Northwind Supply",
+                                  "id": 12
+                                }
+                              ],
+                              "id": 11
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 13
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "nav",
+                              "attributes": {},
+                              "childNodes": [
+                                {
+                                  "type": 2,
+                                  "tagName": "a",
+                                  "attributes": {
+                                    "href": "http://localhost:4321/"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Shop",
+                                      "id": 16
+                                    }
+                                  ],
+                                  "id": 15
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": " ",
+                                  "id": 17
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "a",
+                                  "attributes": {
+                                    "href": "http://localhost:4321/cart"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Cart",
+                                      "id": 19
+                                    }
+                                  ],
+                                  "id": 18
+                                }
+                              ],
+                              "id": 14
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 20
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "span",
+                              "attributes": {
+                                "id": "cart-count",
+                                "class": "cart-count"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "1",
+                                  "id": 60
+                                }
+                              ],
+                              "id": 21
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n    ",
+                              "id": 23
+                            }
+                          ],
+                          "id": 9
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 24
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "main",
+                          "attributes": {
+                            "id": "view"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 2,
+                              "tagName": "h1",
+                              "attributes": {
+                                "id": "heading"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Your cart",
+                                  "id": 69
+                                }
+                              ],
+                              "id": 68
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "ul",
+                              "attributes": {
+                                "id": "lines"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 2,
+                                  "tagName": "li",
+                                  "attributes": {},
+                                  "childNodes": [
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "name"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "Torque wrench set",
+                                          "id": 74
+                                        }
+                                      ],
+                                      "id": 73
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "qty"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "1",
+                                          "id": 75
+                                        }
+                                      ],
+                                      "id": 72
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "span",
+                                      "attributes": {
+                                        "class": "price"
+                                      },
+                                      "childNodes": [
+                                        {
+                                          "type": 3,
+                                          "textContent": "$142.50",
+                                          "id": 76
+                                        }
+                                      ],
+                                      "id": 71
+                                    }
+                                  ],
+                                  "id": 70
+                                }
+                              ],
+                              "id": 67
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n   ",
+                              "id": 66
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "p",
+                              "attributes": {
+                                "class": "total"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Total ",
+                                  "id": 78
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "strong",
+                                  "attributes": {},
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "$142.50",
+                                      "id": 79
+                                    }
+                                  ],
+                                  "id": 77
+                                }
+                              ],
+                              "id": 65
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n   ",
+                              "id": 64
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "button",
+                              "attributes": {
+                                "id": "checkout"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Checkout",
+                                  "id": 63
+                                }
+                              ],
+                              "id": 62
+                            }
+                          ],
+                          "id": 25
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 57
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "div",
+                          "attributes": {
+                            "id": "flash",
+                            "hidden": ""
+                          },
+                          "childNodes": [],
+                          "id": 58
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n  ",
+                          "id": 59
+                        }
+                      ],
+                      "id": 7
+                    }
+                  ],
+                  "id": 3
+                }
+              ],
+              "id": 1
+            },
+            "initialOffset": {
+              "left": 0,
+              "top": 0
+            }
+          },
+          "timestamp": 32248
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.request",
+            "payload": {
+              "traceId": "7155ef013f583e4984b7803bb6caf667",
+              "spanId": "3b5c2b99c0742f8b",
+              "method": "GET",
+              "url": "http://localhost:4321/api/inventory?sku",
+              "startMs": 38248
+            }
+          },
+          "timestamp": 38248
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.response",
+            "payload": {
+              "spanId": "3b5c2b99c0742f8b",
+              "endMs": 38311,
+              "status": 200
+            }
+          },
+          "timestamp": 38311
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [],
+            "removes": [
+              {
+                "parentId": 65,
+                "id": 78
+              },
+              {
+                "parentId": 65,
+                "id": 77
+              }
+            ],
+            "adds": [
+              {
+                "parentId": 65,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": " · in stock",
+                  "id": 80
+                }
+              },
+              {
+                "parentId": 65,
+                "nextId": 80,
+                "node": {
+                  "type": 2,
+                  "tagName": "strong",
+                  "attributes": {},
+                  "childNodes": [],
+                  "id": 81
+                }
+              },
+              {
+                "parentId": 65,
+                "nextId": 81,
+                "node": {
+                  "type": 3,
+                  "textContent": "Total ",
+                  "id": 82
+                }
+              },
+              {
+                "parentId": 81,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "$142.50",
+                  "id": 83
+                }
+              }
+            ]
+          },
+          "timestamp": 38311
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [],
+            "removes": [
+              {
+                "parentId": 25,
+                "id": 68
+              },
+              {
+                "parentId": 25,
+                "id": 67
+              },
+              {
+                "parentId": 25,
+                "id": 66
+              },
+              {
+                "parentId": 25,
+                "id": 65
+              },
+              {
+                "parentId": 25,
+                "id": 64
+              },
+              {
+                "parentId": 25,
+                "id": 62
+              }
+            ],
+            "adds": [
+              {
+                "parentId": 25,
+                "nextId": null,
+                "node": {
+                  "type": 2,
+                  "tagName": "p",
+                  "attributes": {
+                    "class": "summary"
+                  },
+                  "childNodes": [],
+                  "id": 84
+                }
+              },
+              {
+                "parentId": 84,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "1 item · $142.50",
+                  "id": 85
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 84,
+                "node": {
+                  "type": 3,
+                  "textContent": "\n   ",
+                  "id": 86
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 86,
+                "node": {
+                  "type": 2,
+                  "tagName": "form",
+                  "attributes": {
+                    "id": "pay"
+                  },
+                  "childNodes": [],
+                  "id": 87
+                }
+              },
+              {
+                "parentId": 25,
+                "nextId": 87,
+                "node": {
+                  "type": 2,
+                  "tagName": "h1",
+                  "attributes": {
+                    "id": "heading"
+                  },
+                  "childNodes": [],
+                  "id": 88
+                }
+              },
+              {
+                "parentId": 88,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "Checkout",
+                  "id": 89
+                }
+              },
+              {
+                "parentId": 87,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "\n   ",
+                  "id": 90
+                }
+              },
+              {
+                "parentId": 87,
+                "nextId": 90,
+                "node": {
+                  "type": 2,
+                  "tagName": "button",
+                  "attributes": {
+                    "id": "place"
+                  },
+                  "childNodes": [],
+                  "id": 91
+                }
+              },
+              {
+                "parentId": 87,
+                "nextId": 91,
+                "node": {
+                  "type": 3,
+                  "textContent": "\n     ",
+                  "id": 92
+                }
+              },
+              {
+                "parentId": 87,
+                "nextId": 92,
+                "node": {
+                  "type": 2,
+                  "tagName": "label",
+                  "attributes": {},
+                  "childNodes": [],
+                  "id": 93
+                }
+              },
+              {
+                "parentId": 87,
+                "nextId": 93,
+                "node": {
+                  "type": 3,
+                  "textContent": "\n     ",
+                  "id": 94
+                }
+              },
+              {
+                "parentId": 87,
+                "nextId": 94,
+                "node": {
+                  "type": 2,
+                  "tagName": "label",
+                  "attributes": {},
+                  "childNodes": [],
+                  "id": 95
+                }
+              },
+              {
+                "parentId": 87,
+                "nextId": 95,
+                "node": {
+                  "type": 3,
+                  "textContent": "\n     ",
+                  "id": 96
+                }
+              },
+              {
+                "parentId": 95,
+                "nextId": null,
+                "node": {
+                  "type": 2,
+                  "tagName": "input",
+                  "attributes": {
+                    "id": "card",
+                    "value": "*******************"
+                  },
+                  "childNodes": [],
+                  "id": 97
+                }
+              },
+              {
+                "parentId": 95,
+                "nextId": 97,
+                "node": {
+                  "type": 3,
+                  "textContent": "Card ",
+                  "id": 98
+                }
+              },
+              {
+                "parentId": 93,
+                "nextId": null,
+                "node": {
+                  "type": 2,
+                  "tagName": "input",
+                  "attributes": {
+                    "id": "exp",
+                    "value": "*****"
+                  },
+                  "childNodes": [],
+                  "id": 99
+                }
+              },
+              {
+                "parentId": 93,
+                "nextId": 99,
+                "node": {
+                  "type": 3,
+                  "textContent": "Expiry ",
+                  "id": 100
+                }
+              },
+              {
+                "parentId": 91,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "Place order",
+                  "id": 101
+                }
+              }
+            ]
+          },
+          "timestamp": 64811
+        }
+      ],
+      "links": [
+        {
+          "traceId": "7155ef013f583e4984b7803bb6caf667",
+          "spanId": "3b5c2b99c0742f8b",
+          "method": "GET",
+          "url": "http://localhost:4321/api/inventory?sku",
+          "startMs": 38248,
+          "endMs": 38311,
+          "status": 200
+        }
+      ],
+      "pageviews": [
+        {
+          "ordinal": 1,
+          "url": "http://localhost:4321/cart",
+          "startMs": 32248,
+          "trigger": "pushState"
+        }
+      ]
+    },
+    {
+      "seq": 2,
+      "pageviewOrdinal": 2,
+      "events": [
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.pageview",
+            "payload": {
+              "ordinal": 2,
+              "url": "http://localhost:4321/checkout",
+              "startMs": 64811,
+              "trigger": "pushState"
+            }
+          },
+          "timestamp": 64811
+        },
+        {
+          "type": 4,
+          "data": {
+            "href": "http://localhost:4321/checkout",
+            "width": 1024,
+            "height": 768
+          },
+          "timestamp": 64811
+        },
+        {
+          "type": 2,
+          "data": {
+            "node": {
+              "type": 0,
+              "childNodes": [
+                {
+                  "type": 1,
+                  "name": "html",
+                  "publicId": "",
+                  "systemId": "",
+                  "id": 2
+                },
+                {
+                  "type": 2,
+                  "tagName": "html",
+                  "attributes": {},
+                  "childNodes": [
+                    {
+                      "type": 2,
+                      "tagName": "head",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 2,
+                          "tagName": "title",
+                          "attributes": {},
+                          "childNodes": [
+                            {
+                              "type": 3,
+                              "textContent": "Northwind Supply",
+                              "id": 6
+                            }
+                          ],
+                          "id": 5
+                        }
+                      ],
+                      "id": 4
+                    },
+                    {
+                      "type": 2,
+                      "tagName": "body",
+                      "attributes": {},
+                      "childNodes": [
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 8
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "header",
+                          "attributes": {
+                            "class": "topbar"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 10
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "span",
+                              "attributes": {
+                                "class": "brand"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Northwind Supply",
+                                  "id": 12
+                                }
+                              ],
+                              "id": 11
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 13
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "nav",
+                              "attributes": {},
+                              "childNodes": [
+                                {
+                                  "type": 2,
+                                  "tagName": "a",
+                                  "attributes": {
+                                    "href": "http://localhost:4321/"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Shop",
+                                      "id": 16
+                                    }
+                                  ],
+                                  "id": 15
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": " ",
+                                  "id": 17
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "a",
+                                  "attributes": {
+                                    "href": "http://localhost:4321/cart"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Cart",
+                                      "id": 19
+                                    }
+                                  ],
+                                  "id": 18
+                                }
+                              ],
+                              "id": 14
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n      ",
+                              "id": 20
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "span",
+                              "attributes": {
+                                "id": "cart-count",
+                                "class": "cart-count"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "1",
+                                  "id": 60
+                                }
+                              ],
+                              "id": 21
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n    ",
+                              "id": 23
+                            }
+                          ],
+                          "id": 9
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 24
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "main",
+                          "attributes": {
+                            "id": "view"
+                          },
+                          "childNodes": [
+                            {
+                              "type": 2,
+                              "tagName": "h1",
+                              "attributes": {
+                                "id": "heading"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "Checkout",
+                                  "id": 89
+                                }
+                              ],
+                              "id": 88
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "form",
+                              "attributes": {
+                                "id": "pay"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "\n     ",
+                                  "id": 96
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "label",
+                                  "attributes": {},
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Card ",
+                                      "id": 98
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "input",
+                                      "attributes": {
+                                        "id": "card",
+                                        "value": "*******************"
+                                      },
+                                      "childNodes": [],
+                                      "id": 97
+                                    }
+                                  ],
+                                  "id": 95
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": "\n     ",
+                                  "id": 94
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "label",
+                                  "attributes": {},
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Expiry ",
+                                      "id": 100
+                                    },
+                                    {
+                                      "type": 2,
+                                      "tagName": "input",
+                                      "attributes": {
+                                        "id": "exp",
+                                        "value": "*****"
+                                      },
+                                      "childNodes": [],
+                                      "id": 99
+                                    }
+                                  ],
+                                  "id": 93
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": "\n     ",
+                                  "id": 92
+                                },
+                                {
+                                  "type": 2,
+                                  "tagName": "button",
+                                  "attributes": {
+                                    "id": "place"
+                                  },
+                                  "childNodes": [
+                                    {
+                                      "type": 3,
+                                      "textContent": "Place order",
+                                      "id": 101
+                                    }
+                                  ],
+                                  "id": 91
+                                },
+                                {
+                                  "type": 3,
+                                  "textContent": "\n   ",
+                                  "id": 90
+                                }
+                              ],
+                              "id": 87
+                            },
+                            {
+                              "type": 3,
+                              "textContent": "\n   ",
+                              "id": 86
+                            },
+                            {
+                              "type": 2,
+                              "tagName": "p",
+                              "attributes": {
+                                "class": "summary"
+                              },
+                              "childNodes": [
+                                {
+                                  "type": 3,
+                                  "textContent": "1 item · $142.50",
+                                  "id": 85
+                                }
+                              ],
+                              "id": 84
+                            }
+                          ],
+                          "id": 25
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n    ",
+                          "id": 57
+                        },
+                        {
+                          "type": 2,
+                          "tagName": "div",
+                          "attributes": {
+                            "id": "flash",
+                            "hidden": ""
+                          },
+                          "childNodes": [],
+                          "id": 58
+                        },
+                        {
+                          "type": 3,
+                          "textContent": "\n  ",
+                          "id": 59
+                        }
+                      ],
+                      "id": 7
+                    }
+                  ],
+                  "id": 3
+                }
+              ],
+              "id": 1
+            },
+            "initialOffset": {
+              "left": 0,
+              "top": 0
+            }
+          },
+          "timestamp": 64811
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [
+              {
+                "id": 91,
+                "attributes": {
+                  "class": "pressed"
+                }
+              }
+            ],
+            "removes": [],
+            "adds": []
+          },
+          "timestamp": 75811
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.request",
+            "payload": {
+              "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+              "spanId": "22833c5b6a8336de",
+              "method": "POST",
+              "url": "http://localhost:4321/api/checkout",
+              "startMs": 75951
+            }
+          },
+          "timestamp": 75951
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.response",
+            "payload": {
+              "spanId": "22833c5b6a8336de",
+              "endMs": 77131,
+              "status": 502
+            }
+          },
+          "timestamp": 77131
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [
+              {
+                "id": 58,
+                "attributes": {
+                  "hidden": null,
+                  "class": "flash error"
+                }
+              },
+              {
+                "id": 91,
+                "attributes": {
+                  "class": "add"
+                }
+              }
+            ],
+            "removes": [],
+            "adds": [
+              {
+                "parentId": 58,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "We could not take payment. Please try again.",
+                  "id": 102
+                }
+              }
+            ]
+          },
+          "timestamp": 77131
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [
+              {
+                "id": 91,
+                "attributes": {
+                  "class": "pressed"
+                }
+              }
+            ],
+            "removes": [],
+            "adds": []
+          },
+          "timestamp": 83131
+        },
+        {
+          "type": 3,
+          "data": {
+            "source": 0,
+            "texts": [],
+            "attributes": [],
+            "removes": [
+              {
+                "parentId": 58,
+                "id": 102
+              }
+            ],
+            "adds": [
+              {
+                "parentId": 58,
+                "nextId": null,
+                "node": {
+                  "type": 3,
+                  "textContent": "We could not take payment. Please try again. (2)",
+                  "id": 103
+                }
+              }
+            ]
+          },
+          "timestamp": 83251
+        }
+      ],
+      "links": [
+        {
+          "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+          "spanId": "22833c5b6a8336de",
+          "method": "POST",
+          "url": "http://localhost:4321/api/checkout",
+          "startMs": 75951,
+          "endMs": 77131,
+          "status": 502
+        }
+      ],
+      "pageviews": [
+        {
+          "ordinal": 2,
+          "url": "http://localhost:4321/checkout",
+          "startMs": 64811,
+          "trigger": "pushState"
+        }
+      ]
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
+      "spanId": "0000000000000001",
+      "name": "POST /api/cart",
+      "kind": "SERVER",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 18213,
+      "durationMs": 29,
+      "statusCode": "OK",
+      "attributes": {
+        "http.request.method": "POST",
+        "url.path": "/api/cart",
+        "http.response.status_code": 200,
+        "cart.sku": "NW-2277"
+      }
+    },
+    {
+      "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
+      "spanId": "0000000000000002",
+      "parentSpanId": "0000000000000001",
+      "name": "prisma:query INSERT",
+      "kind": "CLIENT",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 18217,
+      "durationMs": 9,
+      "statusCode": "OK",
+      "attributes": {
+        "db.system": "postgresql",
+        "db.statement": "INSERT INTO \"CartLine\" (\"sku\",\"qty\") VALUES ($1,$2)"
+      }
+    },
+    {
+      "traceId": "7155ef013f583e4984b7803bb6caf667",
+      "spanId": "0000000000000003",
+      "name": "GET /api/inventory",
+      "kind": "SERVER",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 38254,
+      "durationMs": 51,
+      "statusCode": "OK",
+      "attributes": {
+        "http.request.method": "GET",
+        "url.path": "/api/inventory",
+        "http.response.status_code": 200,
+        "inventory.sku": "NW-2277"
+      }
+    },
+    {
+      "traceId": "7155ef013f583e4984b7803bb6caf667",
+      "spanId": "0000000000000004",
+      "parentSpanId": "0000000000000003",
+      "name": "prisma:query SELECT",
+      "kind": "CLIENT",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 38258,
+      "durationMs": 31,
+      "statusCode": "OK",
+      "attributes": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT \"available\" FROM \"Inventory\" WHERE \"sku\" = $1"
+      }
+    },
+    {
+      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "spanId": "0000000000000005",
+      "name": "POST /api/checkout",
+      "kind": "SERVER",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 75957,
+      "durationMs": 1168,
+      "statusCode": "ERROR",
+      "statusMsg": "payment provider unreachable",
+      "attributes": {
+        "http.request.method": "POST",
+        "url.path": "/api/checkout",
+        "http.response.status_code": 502,
+        "checkout.item_count": 1,
+        "checkout.total_cents": 14250
+      }
+    },
+    {
+      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "spanId": "0000000000000006",
+      "parentSpanId": "0000000000000005",
+      "name": "validate cart",
+      "kind": "INTERNAL",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 75961,
+      "durationMs": 7,
+      "statusCode": "OK",
+      "attributes": {
+        "checkout.item_count": 1
+      }
+    },
+    {
+      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "spanId": "0000000000000007",
+      "parentSpanId": "0000000000000005",
+      "name": "prisma:query SELECT",
+      "kind": "CLIENT",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 75969,
+      "durationMs": 24,
+      "statusCode": "OK",
+      "attributes": {
+        "db.system": "postgresql",
+        "db.statement": "SELECT * FROM \"Cart\" WHERE \"id\" = $1"
+      }
+    },
+    {
+      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "spanId": "0000000000000008",
+      "parentSpanId": "0000000000000005",
+      "name": "POST payments.northwind.internal/charges",
+      "kind": "CLIENT",
+      "serviceName": "northwind-api",
+      "startOffsetMs": 75994,
+      "durationMs": 1004,
+      "statusCode": "ERROR",
+      "statusMsg": "upstream connect timeout",
+      "attributes": {
+        "http.request.method": "POST",
+        "server.address": "payments.northwind.internal",
+        "http.response.status_code": 504,
+        "error.type": "ConnectTimeout"
+      }
+    }
+  ]
+}

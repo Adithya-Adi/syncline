@@ -101,7 +101,7 @@ Nx monorepo, pnpm, TypeScript.
 pnpm install
 pnpm infra:up      # postgres, redis, minio
 pnpm db:migrate
-pnpm db:seed       # prints the project's pk_ / sk_ keys
+pnpm db:seed       # prints the project's pk_ / sk_ keys, and installs a demo recording
 ```
 
 Then run the three processes:
@@ -112,7 +112,17 @@ node apps/worker/dist/main.js
 pnpm nx dev web                  # :3000
 ```
 
-The landing page is at `/`; a recording is at `/s/<sessionId>`.
+The landing page is at `/`; a recording is at `/s/<sessionId>`. The seed installs one — a
+three-page checkout that ends in a failed payment, with the trace underneath it — so the viewer has
+something in it before the SDK is wired into anything. `SEED_DEMO=false` skips it.
+
+That recording is a fixture, and it was made by the real SDK driving real rrweb under jsdom rather
+than written by hand. Regenerate it with:
+
+```sh
+pnpm nx build browser-sdk
+node tools/build-demo-recording.mjs
+```
 
 Ports 5442 and 6399 are deliberate — if you already run Postgres or Redis
 natively, the standard ports are taken, and a host connection can reach your own

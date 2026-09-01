@@ -8,6 +8,7 @@
 import 'dotenv/config';
 import { createPrismaClientFromEnv } from '../src/lib/client.js';
 import { hashSecretKey, newPublicKey, newSecretKey } from '../src/lib/keys.js';
+import { seedDemoRecording } from './demo.js';
 
 const DEFAULT_ORGANIZATION_ID = 'org_default';
 
@@ -86,6 +87,33 @@ async function main() {
   console.log('');
   console.log('  The secret key is not recoverable — only its hash is stored.');
   console.log('');
+
+  /**
+   * A recording to look at before there is one of your own.
+   *
+   * Installed after the keys are printed, and never allowed to throw. The secret key is shown
+   * exactly once and cannot be recovered, so losing it to a MinIO container nobody started — or to
+   * anything else that goes wrong down here — would be a bad trade for a convenience feature.
+   * `SEED_DEMO=false` turns it off for anyone who wants an empty project.
+   */
+  const demo =
+    process.env['SEED_DEMO'] === 'false'
+      ? 'SEED_DEMO=false'
+      : await seedDemoRecording(prisma, project.id).catch(
+          (error: unknown) => `${(error as Error).message}`,
+        );
+
+  if (typeof demo === 'string') {
+    console.log(`  demo       skipped (${demo})`);
+    console.log('');
+  } else {
+    console.log(
+      `  demo       ${Math.round(demo.durationMs / 1000)}s across ${demo.pageCount} pages, ` +
+        `${demo.requestCount} requests, ${demo.spanCount} spans`,
+    );
+    console.log(`             http://localhost:3000/s/${demo.sessionId}`);
+    console.log('');
+  }
 
   await prisma.$disconnect();
 }
