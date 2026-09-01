@@ -271,6 +271,7 @@ describe('transport', () => {
     clock: { offsetMs: 0, rttMs: 0 },
     events: [{ type: 3, timestamp: 1 }],
     links: [],
+    pageviews: [],
   };
 
   it('builds the ingest URL the API actually serves', () => {
