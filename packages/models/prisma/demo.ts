@@ -25,6 +25,11 @@ import { ulid } from 'ulid';
 import { sessionChunkKey, sessionChunkSchema } from '@syncline/protocol';
 import { ObjectStore } from '@syncline/storage';
 import type { PrismaClient } from '../src/generated/prisma/client.js';
+import {
+  missingChunkSeqs,
+  sessionAttributes,
+  slowestRequestMs,
+} from '../src/lib/session-index.js';
 import { PostgresSpanStore } from '../src/lib/span-store.js';
 
 const FIXTURE = join(
@@ -365,6 +370,38 @@ export async function seedDemoRecording(
         (total, chunk) => total + chunk.consoleWarnCount,
         0,
       ),
+      // The search summary, computed the way the worker computes it. This is the third thing this
+      // file duplicates from the worker and the reason tests/demo.spec.ts exists: a seeded
+      // recording that is missing from a search someone runs on their first day reads as a broken
+      // product, not as a seed that skipped a column.
+      requestCount: links.length,
+      failedRequestCount: links.filter((link) => (link.status ?? 0) >= 400)
+        .length,
+      slowestRequestMs: slowestRequestMs(links),
+      hasBackendSpans: fixture.spans.length > 0,
+      serviceNames: [
+        ...new Set(fixture.spans.map((span) => span.serviceName)),
+      ].sort(),
+      chunkCount: chunks.length,
+      // The fixture is complete by construction, so this is always empty — written anyway rather
+      // than left to the default, because the next person to add a chunk to it should see where
+      // the answer comes from.
+      missingChunkSeqs: missingChunkSeqs(chunks.map((chunk) => chunk.seq)),
+      attributes: {
+        create: sessionAttributes({
+          userId: meta.user?.id ?? null,
+          release: meta.release ?? null,
+          url: pageviews[0]?.url ?? null,
+          userAgent: meta.userAgent ?? null,
+          viewport: meta.viewport ?? null,
+          paths: pageviews.map((pageview) => pathOf(pageview.url)),
+          serviceNames: fixture.spans.map((span) => span.serviceName),
+        }).map((fact) => ({
+          projectId,
+          key: fact.key,
+          value: fact.value,
+        })),
+      },
       errors: {
         create: chunks.flatMap((chunk) =>
           chunk.errors.map((error) => ({

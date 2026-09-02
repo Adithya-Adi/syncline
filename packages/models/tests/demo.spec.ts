@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { sessionChunkSchema } from '@syncline/protocol';
+import { sessionAttributes } from '../src/lib/session-index.js';
 import {
   freshIds,
   pathOf,
@@ -74,6 +75,37 @@ describe('the demo fixture', () => {
     for (const error of fixture.chunks.flatMap((chunk) => chunk.errors ?? [])) {
       expect(error.stack ?? '').not.toMatch(/build-demo-recording|[A-Z]:\\/);
     }
+  });
+
+  it('is findable by the things someone would search for', () => {
+    // The demo is the first thing a new install searches, and a fixture regenerated without a
+    // user id or a release would leave those filters matching nothing on the only recording there
+    // is — which reads as search being broken rather than as a seed missing a field.
+    const meta = fixture.meta as {
+      release?: string;
+      userAgent?: string;
+      user?: { id?: string };
+      viewport?: { w: number; h: number };
+    };
+    const pageviews = fixture.chunks.flatMap((chunk) => chunk.pageviews);
+
+    const facts = sessionAttributes({
+      userId: meta.user?.id ?? null,
+      release: meta.release ?? null,
+      url: pageviews[0]?.url ?? null,
+      userAgent: meta.userAgent ?? null,
+      viewport: meta.viewport ?? null,
+      paths: pageviews.map((pageview) => pathOf(pageview.url)),
+      serviceNames: fixture.spans.map((span) => span.serviceName),
+    });
+
+    const keys = new Set(facts.map((fact) => fact.key));
+    for (const key of ['user', 'release', 'host', 'path', 'service']) {
+      expect(keys).toContain(key);
+    }
+
+    // The page the demo is built around, so a `path:/checkout` search finds it.
+    expect(facts).toContainEqual({ key: 'path', value: '/checkout' });
   });
 
   it('has a span for every trace a request points at', () => {
