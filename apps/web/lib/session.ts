@@ -26,11 +26,11 @@ export async function currentUser() {
 }
 
 /**
- * The viewer and their organization, or a redirect to sign-in.
+ * The viewer and their organization, or a redirect out of the dashboard.
  *
- * Better Auth tracks an active organization on the session, but it is unset until something sets
- * it — including for the very first sign-in. Falling back to the earliest membership means a
- * single-organization install, which is nearly all of them, never has to choose one.
+ * The session's active organization is authoritative while a session lasts — switching writes it
+ * there. What this adds is the two cases the session cannot answer: an id that has gone stale, and
+ * a brand-new session belonging to someone who was last working somewhere in particular.
  */
 export async function requireViewer(): Promise<Viewer> {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -38,32 +38,54 @@ export async function requireViewer(): Promise<Viewer> {
 
   const activeId = session.session.activeOrganizationId ?? undefined;
 
-  const memberships = await db.member.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: 'asc' },
-    include: { organization: { select: { id: true, name: true } } },
-  });
+  const [memberships, preference] = await Promise.all([
+    db.member.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'asc' },
+      include: { organization: { select: { id: true, name: true } } },
+    }),
+    db.userPreference.findUnique({
+      where: { userId: session.user.id },
+      select: { lastOrganizationId: true },
+    }),
+  ]);
 
-  // The active id can outlive the membership it names — someone removed from an organization, or
-  // one that was deleted, keeps it on their session. Falling back to the earliest membership rather
-  // than trusting the id means that strands nobody who still belongs somewhere.
+  const belongsTo = (id?: string) =>
+    id ? memberships.find((row) => row.organizationId === id) : undefined;
+
+  // In order: what the session says, then where they left off, then their earliest membership.
+  //
+  // Each fallback covers a way the one before it goes stale. An active id outlives the membership
+  // it names — someone removed from an organization, or one that was deleted, keeps it on their
+  // session — and the remembered one can be just as stale for the same reason. Checking both
+  // against membership rather than trusting either means nothing strands someone who still belongs
+  // somewhere.
   const membership =
-    memberships.find((row) => row.organizationId === activeId) ??
+    belongsTo(activeId) ??
+    belongsTo(preference?.lastOrganizationId ?? undefined) ??
     memberships[0];
 
-  // Belonging nowhere is the only case left, and rendering an empty dashboard for it would hide a
-  // broken invitation flow rather than surface it.
-  if (!membership) redirect('/no-organization');
+  // Belonging nowhere is now the ordinary state of a new account: nothing is provisioned at
+  // sign-up, because an organization named after whoever registered is a guess nobody can correct.
+  // Naming one is the first thing the dashboard asks for.
+  if (!membership) redirect('/organizations/new');
 
   // Write the resolved organization back when the session disagrees with it. Better Auth's own
   // organization endpoints read `activeOrganizationId` and nothing else — a null one is reported as
   // "Organization not found" — so a fallback that only this file knows about leaves invite, cancel,
   // re-role, and remove broken for every session issued before one was stamped on.
-  if (session.session.activeOrganizationId !== membership.organizationId) {
+  if (activeId !== membership.organizationId) {
     await db.authSession.update({
       where: { id: session.session.id },
       data: { activeOrganizationId: membership.organizationId },
     });
+  }
+
+  // And remember it beyond this session, so the next sign-in opens here rather than back at the
+  // earliest membership. This is where a switch is recorded: `setActive` writes the session, and
+  // the first page load afterwards is what notices.
+  if (preference?.lastOrganizationId !== membership.organizationId) {
+    await rememberOrganization(session.user.id, membership.organizationId);
   }
 
   return {
@@ -74,6 +96,27 @@ export async function requireViewer(): Promise<Viewer> {
     organizationName: membership.organization.name,
     role: membership.role,
   };
+}
+
+/**
+ * Records where someone is working, to be reopened at their next sign-in.
+ *
+ * Best-effort: a failure here costs the next sign-in its starting organization, which is a worse
+ * guess rather than a broken page, and is not worth failing a dashboard render over.
+ */
+async function rememberOrganization(
+  userId: string,
+  organizationId: string,
+): Promise<void> {
+  try {
+    await db.userPreference.upsert({
+      where: { userId },
+      create: { userId, lastOrganizationId: organizationId },
+      update: { lastOrganizationId: organizationId },
+    });
+  } catch {
+    // See above.
+  }
 }
 
 /** Roles that may invite, remove, and re-role other members. */

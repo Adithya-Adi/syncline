@@ -8,9 +8,9 @@ export const metadata = { title: 'Create your account' };
 /**
  * Registration is open.
  *
- * Each account is provisioned its own organization, so a new sign-up starts on an empty dashboard
- * and can never see recordings belonging to anyone else. Joining an existing organization is by
- * invitation only, which keeps that an explicit act by an existing member.
+ * A new account belongs to nothing, and the dashboard sends it straight on to name an organization
+ * — so a sign-up can never see recordings belonging to anyone else. Joining an existing
+ * organization is by invitation only, which keeps that an explicit act by an existing member.
  */
 export default async function SignUpPage({
   searchParams,

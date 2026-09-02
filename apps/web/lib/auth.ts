@@ -20,85 +20,79 @@ import { db } from './db';
 const DEFAULT_ORGANIZATION_ID = 'org_default';
 
 /**
- * Registration is open, and every account lands in an organization of its own.
+ * Registration is open, and a new account belongs to nothing until it says otherwise.
  *
- * The isolation is the reason it can be open at all: a new account sees an empty dashboard, never
- * anybody else's recordings. Sharing happens by invitation into an existing organization, which is
- * an explicit act by someone who is already a member.
+ * It used to be given an organization named after whoever registered. That was the wrong default
+ * twice over: the name is a guess at what someone wants their workspace called, and there is no
+ * screen anywhere that lets them correct it — so the guess was permanent. Naming it is now the
+ * first thing the dashboard asks for, which takes one screen and produces a name somebody chose.
+ *
+ * The isolation that lets registration stay open is unchanged: a new account sees nothing until it
+ * creates an organization or accepts an invitation into one.
  */
-
-/** URL-safe, stable, and short enough to read in an address bar. */
-function slugify(raw: string): string {
-  const slug = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40);
-  return slug.length > 0 ? slug : 'workspace';
-}
 
 /**
- * Finds a free slug near the one asked for.
+ * Adopts the seeded organization, if one is sitting there with nobody in it.
  *
- * The column is unique, so a second "Acme" has to become something else, and a suffix is less
- * surprising than a rejected sign-up. Bounded rather than looping forever: after a few collisions
- * the random suffix is doing the work, not the base.
- */
-async function freeSlug(base: string): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const candidate =
-      attempt === 0 ? base : `${base}-${randomUUID().slice(0, 6)}`;
-    const taken = await db.organization.findUnique({
-      where: { slug: candidate },
-      select: { slug: true },
-    });
-    if (!taken) return candidate;
-  }
-  return `${base}-${randomUUID()}`;
-}
-
-/**
- * Gives a new account somewhere to be.
+ * The one case where an account is given an organization rather than asked for one, and it is not
+ * a guess — it is a handover. `pnpm db:seed` creates a project before anyone has registered, and
+ * the multi-tenancy migration did the same for projects that predated organizations. Both park it
+ * under `org_default` with no members, which makes it invisible to everyone: whoever registers
+ * first takes it, along with the demo recording that is the entire point of having seeded.
  *
- * One special case, and it is a migration artifact rather than a rule: the multi-tenancy migration
- * parked pre-existing projects in an organization with no members, because inventing a user row
- * nobody can log in as would have been worse. Whoever registers first adopts it, along with those
- * projects. Everybody else — and everybody on a fresh install, where that organization was never
- * created — gets a new one.
+ * Narrow on purpose. It fires only for that id, only while it has no members, and on a fresh
+ * install where nobody ran the seed it never fires at all.
  */
-async function provisionOrganization(user: {
-  id: string;
-  name?: string | null;
-  email: string;
-}): Promise<void> {
+async function adoptSeededOrganization(userId: string): Promise<void> {
   const orphaned = await db.organization.findFirst({
     where: { id: DEFAULT_ORGANIZATION_ID, members: { none: {} } },
     select: { id: true },
   });
 
-  const organizationId = orphaned?.id ?? randomUUID();
-
-  if (!orphaned) {
-    const name = user.name?.trim() || user.email.split('@')[0] || 'Workspace';
-    await db.organization.create({
-      data: {
-        id: organizationId,
-        name,
-        slug: await freeSlug(slugify(name)),
-        createdAt: new Date(),
-      },
-    });
-  }
+  if (!orphaned) return;
 
   await db.member.create({
     data: {
       id: randomUUID(),
-      organizationId,
-      userId: user.id,
+      organizationId: orphaned.id,
+      userId,
       role: 'owner',
       createdAt: new Date(),
     },
   });
+}
+
+/**
+ * The organization a new session should open in.
+ *
+ * Where someone left off, when they still belong there — otherwise their earliest membership, and
+ * nothing at all when they belong nowhere. The membership check is not a formality: being removed
+ * from the organization you were last in is exactly when a remembered id goes stale, and honouring
+ * it then would strand you outside the ones you still belong to.
+ */
+async function openingOrganizationId(
+  userId: string,
+): Promise<string | undefined> {
+  const [preference, memberships] = await Promise.all([
+    db.userPreference.findUnique({
+      where: { userId },
+      select: { lastOrganizationId: true },
+    }),
+    db.member.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      select: { organizationId: true },
+    }),
+  ]);
+
+  const remembered = preference?.lastOrganizationId;
+  const stillAMember = memberships.some(
+    (membership) => membership.organizationId === remembered,
+  );
+
+  return stillAMember && remembered
+    ? remembered
+    : memberships[0]?.organizationId;
 }
 
 export const auth = betterAuth({
@@ -125,7 +119,7 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          await provisionOrganization(user);
+          await adoptSeededOrganization(user.id);
         },
       },
     },
@@ -138,28 +132,23 @@ export const auth = betterAuth({
      * the caller does not name an organization. A null one comes back as "Organization not found",
      * which reads as a missing tenant rather than an unset pointer on the session.
      *
-     * The dashboard already resolves the viewer's organization from their earliest membership, so
-     * the session may as well agree from the first request. Anyone who belongs to more than one
-     * overwrites this by switching, which calls `setActive`.
+     * So it is chosen here, once, at sign-in: where they left off if they still belong there, and
+     * their earliest membership otherwise. Switching afterwards calls `setActive`, which overwrites
+     * this and is remembered for next time — see `rememberOrganization` in session.ts.
+     *
+     * Someone who belongs nowhere is left null on purpose. There is nothing to point at, and the
+     * dashboard sends them to create an organization rather than rendering an empty one.
      */
     session: {
       create: {
         before: async (session) => {
           if (session.activeOrganizationId) return;
 
-          const membership = await db.member.findFirst({
-            where: { userId: session.userId },
-            orderBy: { createdAt: 'asc' },
-            select: { organizationId: true },
-          });
-
-          if (!membership) return;
+          const organizationId = await openingOrganizationId(session.userId);
+          if (!organizationId) return;
 
           return {
-            data: {
-              ...session,
-              activeOrganizationId: membership.organizationId,
-            },
+            data: { ...session, activeOrganizationId: organizationId },
           };
         },
       },
