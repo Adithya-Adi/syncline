@@ -9,6 +9,7 @@
  * server. The viewer does no arithmetic — it has one clock and draws against it.
  */
 
+import type { ErrorSource } from './events.js';
 import type { ClockCalibration, SessionMeta } from './ingest.js';
 
 export interface ChunkIndexEntry {
@@ -48,6 +49,30 @@ export interface SessionPageview {
   durationMs?: number;
 }
 
+/**
+ * An uncaught error the page reported, lifted out of the replay stream.
+ *
+ * An instant rather than a span: nothing here has a duration, and drawing one would invent a
+ * measurement the SDK never took.
+ *
+ * Console output is deliberately not here. There is far more of it, each line is worth far less,
+ * and it stays in the replay stream where it is already on the timeline for anyone watching — only
+ * its counts are lifted out, onto `SessionSummary`, so a list can be filtered without reading every
+ * chunk in the project.
+ */
+export interface SessionError {
+  source: ErrorSource;
+  /** The constructor name, when something that had one was thrown. */
+  name?: string;
+  message: string;
+  fileUrl?: string;
+  line?: number;
+  column?: number;
+  stack?: string;
+  /** Client time, the same frame of reference as the replay and every bar beside it. */
+  atMs: number;
+}
+
 export interface SessionLink {
   traceId: string;
   spanId: string;
@@ -73,6 +98,8 @@ export interface SessionResponse {
   links: SessionLink[];
   /** The flow, in order. Empty for a recording made before pageviews existed. */
   pageviews: SessionPageview[];
+  /** Uncaught errors, oldest first. Empty when the page never threw. */
+  errors: SessionError[];
 }
 
 export type SpanStatus = 'UNSET' | 'OK' | 'ERROR';
@@ -127,8 +154,25 @@ export interface SessionSummary {
   release?: string;
   chunkCount: number;
   linkCount: number;
-  /** Requests the browser saw fail. The reason to open one recording rather than another. */
+  /** Requests the browser saw fail. */
+  failedRequestCount: number;
+  /**
+   * Uncaught errors the page threw.
+   *
+   * Kept apart from `failedRequestCount` because they are different failures with different
+   * culprits: a 500 belongs to the backend, a `TypeError` belongs to the frontend, and a session
+   * with one of each is not a session with two of anything. Both are reasons to open a recording;
+   * which one it is decides who should read it.
+   */
   errorCount: number;
+  /**
+   * Console output, at the two levels that describe something going wrong.
+   *
+   * Zero on every recording made with console capture off, which is the default — so a zero here
+   * means "not captured" at least as often as it means "nothing was logged".
+   */
+  consoleErrorCount: number;
+  consoleWarnCount: number;
   /** How many pages the session visited, and where it came in. The flow at a glance. */
   pageCount: number;
   entryPath?: string;

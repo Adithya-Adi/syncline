@@ -285,6 +285,32 @@
   opacity: 1;
 }
 
+/*
+ * An error mark. A rotated square rather than a bar, because an error has no duration and a
+ * one-pixel bar would read as a very short one. The shape says "instant" before the label does.
+ */
+.mark {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  transform: translateY(-50%) rotate(45deg);
+  background: var(--fault);
+  border: 0;
+  padding: 0;
+  border-radius: 1px;
+  opacity: 0.85;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.mark:hover,
+.mark--selected {
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--fault) 28%, transparent);
+}
+
 .bar__caption {
   position: absolute;
   left: 6px;
@@ -365,6 +391,33 @@
 .detail__name {
   color: var(--bone-100);
   font-size: 13px;
+}
+
+/* The thrown message. Wraps, unlike an attribute value — it is a sentence, not an identifier. */
+.detail__message {
+  margin: 0 0 8px;
+  color: var(--bone-100);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/*
+ * The stack, verbatim. Capped and scrolled rather than wrapped: the frames are already truncated
+ * at the SDK's bound, and reflowing them would cost the alignment that makes a stack skimmable.
+ */
+.detail__stack {
+  margin: 8px 0 0;
+  max-height: 132px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: var(--rock-900);
+  border: 1px solid rgba(39, 51, 67, 0.7);
+  border-radius: 2px;
+  color: var(--bone-300);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre;
 }
 
 .detail__attrs {

@@ -15,8 +15,8 @@ import { Button } from '@/components/ui/button';
 import { db } from '@/lib/db';
 import type { Viewer } from '@/lib/session';
 
-const COLUMNS = '190px minmax(280px,1.7fr) 150px 104px 104px 86px';
-const LIST_MIN_WIDTH = '900px';
+const COLUMNS = '178px minmax(240px,1.6fr) 140px 96px 96px 86px 86px';
+const LIST_MIN_WIDTH = '980px';
 
 const countFormat = new Intl.NumberFormat('en-US');
 const timeFormat = new Intl.DateTimeFormat('en-US', {
@@ -64,6 +64,10 @@ export async function RecordingsSurface({
       url: true,
       userId: true,
       trivial: true,
+      // Counted by the worker as chunks land, so the list does not pay a query per row for the
+      // one number that decides whether a recording is worth opening.
+      errorCount: true,
+      consoleErrorCount: true,
       _count: { select: { links: true, pageviews: true } },
       // The flow, trimmed to what a row can show: where they came in, and the first few steps.
       pageviews: {
@@ -74,7 +78,10 @@ export async function RecordingsSurface({
     },
   });
 
-  const errors =
+  // Failed requests are a predicate over a second table rather than a number the ingest path
+  // already knew, so unlike the error counts they still cost a query — one grouped query for the
+  // whole page, not one per row.
+  const failures =
     sessions.length > 0
       ? await db.requestLink.groupBy({
           by: ['sessionId'],
@@ -85,12 +92,12 @@ export async function RecordingsSurface({
           _count: { _all: true },
         })
       : [];
-  const errorBySession = new Map(
-    errors.map((error) => [error.sessionId, error._count._all]),
+  const failedBySession = new Map(
+    failures.map((failure) => [failure.sessionId, failure._count._all]),
   );
   const rows = sessions.map((session) => ({
     session,
-    errorCount: errorBySession.get(session.id) ?? 0,
+    failedRequestCount: failedBySession.get(session.id) ?? 0,
   }));
 
   const totalRequests = sessions.reduce(
@@ -107,8 +114,19 @@ export async function RecordingsSurface({
             completedDurations.length,
         )
       : null;
-  const totalErrors = rows.reduce((total, row) => total + row.errorCount, 0);
-  const failedRecordings = rows.filter((row) => row.errorCount > 0).length;
+  const totalFailedRequests = rows.reduce(
+    (total, row) => total + row.failedRequestCount,
+    0,
+  );
+  const totalErrors = sessions.reduce(
+    (total, session) => total + session.errorCount,
+    0,
+  );
+  // Either kind counts as broken. Which kind it was decides who reads the recording, so the tile
+  // shows both numbers rather than one sum of two unlike things.
+  const brokenRecordings = rows.filter(
+    (row) => row.failedRequestCount > 0 || row.session.errorCount > 0,
+  ).length;
   const latest = sessions[0]?.startedAt;
 
   return (
@@ -195,12 +213,15 @@ export async function RecordingsSurface({
             <Metric
               icon={<AlertTriangle className="size-3.5" />}
               label="Failures"
-              value={formatCount(totalErrors)}
-              detail={`${formatCount(failedRecordings)} ${plural(
-                failedRecordings,
-                'recording',
-              )} affected`}
-              tone={totalErrors > 0 ? 'fault' : 'default'}
+              value={formatCount(brokenRecordings)}
+              detail={`${formatCount(totalErrors)} ${plural(
+                totalErrors,
+                'error',
+              )} · ${formatCount(totalFailedRequests)} failed ${plural(
+                totalFailedRequests,
+                'request',
+              )}`}
+              tone={brokenRecordings > 0 ? 'fault' : 'default'}
             />
           </section>
 
@@ -232,10 +253,11 @@ export async function RecordingsSurface({
                 <span>User</span>
                 <span className="text-right">Duration</span>
                 <span className="text-right">Requests</span>
+                <span className="text-right">Failed</span>
                 <span className="text-right">Errors</span>
               </DataListHeader>
 
-              {rows.map(({ session, errorCount }) => {
+              {rows.map(({ session, failedRequestCount }) => {
                 const page = pageParts(session.url ?? undefined);
 
                 return (
@@ -292,19 +314,28 @@ export async function RecordingsSurface({
                     <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
                       {formatCount(session._count.links)}
                     </span>
+                    {/*
+                     * Two columns rather than one sum. A 500 is the backend's failure and a
+                     * TypeError is the frontend's; a row showing "2" for one of each would send
+                     * whoever opens it looking in the wrong place first.
+                     */}
                     <span className="text-right">
-                      {errorCount > 0 ? (
-                        <Badge
-                          variant="destructive"
-                          className="font-mono tabular-nums"
-                        >
-                          {formatCount(errorCount)}
-                        </Badge>
-                      ) : (
-                        <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                          0
-                        </span>
-                      )}
+                      <FaultCount value={failedRequestCount} />
+                    </span>
+                    <span className="text-right">
+                      <FaultCount
+                        value={session.errorCount}
+                        title={
+                          session.consoleErrorCount > 0
+                            ? `${formatCount(
+                                session.consoleErrorCount,
+                              )} console ${plural(
+                                session.consoleErrorCount,
+                                'error',
+                              )} as well`
+                            : undefined
+                        }
+                      />
                     </span>
                   </DataListRow>
                 );
@@ -314,6 +345,32 @@ export async function RecordingsSurface({
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * A count that only shouts when it is not zero.
+ *
+ * A destructive badge on every row would make the column unreadable at a glance, which is the only
+ * thing the column is for.
+ */
+function FaultCount({ value, title }: { value: number; title?: string }) {
+  if (value === 0) {
+    return (
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+        0
+      </span>
+    );
+  }
+
+  return (
+    <Badge
+      variant="destructive"
+      className="font-mono tabular-nums"
+      {...(title ? { title } : {})}
+    >
+      {formatCount(value)}
+    </Badge>
   );
 }
 

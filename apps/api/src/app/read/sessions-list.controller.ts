@@ -46,6 +46,12 @@ export class SessionsListController {
         userId: true,
         release: true,
         trivial: true,
+        // Counted by the worker onto the session, so a list of fifty rows costs no extra query.
+        // The failed-request count below cannot work the same way — it is a predicate over a
+        // second table rather than a number the ingest path already knew.
+        errorCount: true,
+        consoleErrorCount: true,
+        consoleWarnCount: true,
         _count: { select: { chunks: true, links: true, pageviews: true } },
         // The first page of the flow: where the session came in. One row per session, not a join
         // per row, because a list of fifty must not become fifty-one queries.
@@ -61,13 +67,13 @@ export class SessionsListController {
 
     // Counting failures per session in one grouped query rather than one query per row: a list of
     // fifty recordings should cost two round trips, not fifty-one.
-    const errors = await this.prisma.client.requestLink.groupBy({
+    const failures = await this.prisma.client.requestLink.groupBy({
       by: ['sessionId'],
       where: { sessionId: { in: page.map((s) => s.id) }, status: { gte: 400 } },
       _count: { _all: true },
     });
-    const errorBySession = new Map(
-      errors.map((e) => [e.sessionId, e._count._all]),
+    const failedBySession = new Map(
+      failures.map((f) => [f.sessionId, f._count._all]),
     );
 
     return {
@@ -80,7 +86,10 @@ export class SessionsListController {
         ...(s.release ? { release: s.release } : {}),
         chunkCount: s._count.chunks,
         linkCount: s._count.links,
-        errorCount: errorBySession.get(s.id) ?? 0,
+        failedRequestCount: failedBySession.get(s.id) ?? 0,
+        errorCount: s.errorCount,
+        consoleErrorCount: s.consoleErrorCount,
+        consoleWarnCount: s.consoleWarnCount,
         pageCount: s._count.pageviews,
         ...(s.pageviews[0]?.path ? { entryPath: s.pageviews[0].path } : {}),
         trivial: s.trivial,

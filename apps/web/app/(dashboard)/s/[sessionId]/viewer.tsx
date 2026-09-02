@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'rrweb-player/dist/style.css';
 import type {
+  SessionError,
   SessionPageview,
   SessionResponse,
   TraceResponse,
@@ -46,6 +47,19 @@ const LANES: { key: LaneKey; label: string; color: string }[] = [
   { key: 'database', label: 'Database', color: 'var(--stratum-database)' },
 ];
 
+/**
+ * What the detail panel is describing.
+ *
+ * A bar and an error are not the same kind of thing and are not squeezed into one shape: a bar was
+ * measured over an interval, an error happened at an instant. Giving an error a fake `endMs` so it
+ * could reuse `Bar` would put a duration on screen that nothing ever timed.
+ */
+type Selection =
+  { kind: 'bar'; bar: Bar } | { kind: 'error'; error: SessionError };
+
+/** How much of the recording to show either side of an error, once one is picked. */
+const ERROR_FOCUS_PAD_MS = 1_000;
+
 export function Viewer({ sessionId }: { sessionId: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<{
@@ -59,7 +73,7 @@ export function Viewer({ sessionId }: { sessionId: string }) {
   const [traces, setTraces] = useState<Record<string, TraceResponse>>({});
   const [error, setError] = useState<string | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
-  const [selected, setSelected] = useState<Bar | null>(null);
+  const [selected, setSelected] = useState<Selection | null>(null);
 
   // ------------------------------------------------------------------ data
 
@@ -264,8 +278,17 @@ export function Viewer({ sessionId }: { sessionId: string }) {
 
     // The recording's own window can be narrower than the spans it references — a request that
     // outlived the last chunk, for instance. Widen rather than clip, so nothing is drawn offscreen.
-    const min = out.reduce((m, b) => Math.min(m, b.startMs), start);
-    const max = out.reduce((m, b) => Math.max(m, b.endMs), end);
+    // Errors count toward the bounds for the same reason: one thrown during teardown lands after
+    // the last rrweb event, and clipping it would hide the very thing worth seeing.
+    const instants = session.errors.map((e) => e.atMs);
+    const min = out.reduce(
+      (m, b) => Math.min(m, b.startMs),
+      Math.min(start, ...instants),
+    );
+    const max = out.reduce(
+      (m, b) => Math.max(m, b.endMs),
+      Math.max(end, ...instants),
+    );
 
     return { bars: out, startMs: min, durationMs: Math.max(1, max - min) };
   }, [session, traces]);
@@ -279,17 +302,23 @@ export function Viewer({ sessionId }: { sessionId: string }) {
    * legible.
    */
   /**
-   * When requests failed, in client time.
+   * When something went wrong, in client time.
+   *
+   * Failed requests and thrown errors together, because the flow answers one question — "where do
+   * I look" — and both kinds answer it the same way. The distinction between them is worth drawing
+   * one level down, in the lanes, where there is room to say which was which.
    *
    * Passed to the flow so a page that contained a failure is marked there rather than only in the
    * lanes below. The flow is what someone reads first, and "the checkout page went red" is the
-   * fastest possible answer to "where do I look".
+   * fastest possible answer.
    */
-  const failedRequestMs = useMemo(
-    () =>
-      (session?.links ?? [])
+  const faultMs = useMemo(
+    () => [
+      ...(session?.links ?? [])
         .filter((link) => (link.status ?? 0) >= 400)
         .map((link) => link.startMs),
+      ...(session?.errors ?? []).map((error) => error.atMs),
+    ],
     [session],
   );
 
@@ -365,6 +394,10 @@ export function Viewer({ sessionId }: { sessionId: string }) {
           <Field label="user" value={session.meta.user.id} />
         )}
         <Field label="duration" value={`${session.durationMs ?? 0}ms`} />
+        {/* Only when there are any: "errors 0" on every recording is a row of noise. */}
+        {session.errors.length > 0 && (
+          <Field label="errors" value={String(session.errors.length)} />
+        )}
         <Field
           label="skew"
           value={`${session.clock.offsetMs}ms ±${Math.round(session.clock.rttMs / 2)}`}
@@ -394,7 +427,7 @@ export function Viewer({ sessionId }: { sessionId: string }) {
           startMs={startMs}
           durationMs={durationMs}
           playheadMs={playheadMs}
-          failedAt={failedRequestMs}
+          faultAt={faultMs}
           onSelect={(page) => {
             // Seeking and zooming together: a page is the unit someone means when they say "what
             // happened on checkout", and answering it with only half the timeline moved would leave
@@ -409,6 +442,52 @@ export function Viewer({ sessionId }: { sessionId: string }) {
         <Ruler fromMs={view.from - startMs} spanMs={view.span} />
 
         <div className="strata__lanes">
+          {/*
+            Errors sit above the request lanes, and only when there are any. An empty lane on every
+            recording would train the eye to skip the row that matters most on the few where it is
+            not empty.
+          */}
+          {session.errors.length > 0 && (
+            <div className="lane lane--errors">
+              <div className="lane__label">
+                <span
+                  className="lane__swatch"
+                  style={{ background: 'var(--fault)' }}
+                />
+                Errors
+              </div>
+              <div className="lane__track">
+                {session.errors.map((error, index) => (
+                  <button
+                    key={`${error.atMs}:${index}`}
+                    type="button"
+                    className={
+                      selected?.kind === 'error' && selected.error === error
+                        ? 'mark mark--selected'
+                        : 'mark'
+                    }
+                    style={{ left: `${pct(error.atMs)}%` }}
+                    title={`${error.name ?? error.source}: ${error.message}`}
+                    onClick={() => {
+                      setSelected({ kind: 'error', error });
+                      // An instant has no width to zoom to, so a window is put around it — and
+                      // the replay is seeked to just before, because what happened in the second
+                      // leading up to a throw is the part worth watching.
+                      setFocus({
+                        from: error.atMs - ERROR_FOCUS_PAD_MS,
+                        to: error.atMs + ERROR_FOCUS_PAD_MS,
+                      });
+                      playerRef.current?.goto?.(
+                        Math.max(0, error.atMs - startMs - ERROR_FOCUS_PAD_MS),
+                        false,
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {LANES.map((lane) => (
             <div className="lane" key={lane.key}>
               <div className="lane__label">
@@ -431,7 +510,7 @@ export function Viewer({ sessionId }: { sessionId: string }) {
                         key={bar.key}
                         type="button"
                         onClick={() => {
-                          setSelected(bar);
+                          setSelected({ kind: 'bar', bar });
                           // Selecting is also how you zoom. On a real recording a request is a
                           // fraction of a percent of the width, so inspecting one and narrowing to
                           // it are the same intent — asking for a separate gesture would just mean
@@ -488,7 +567,7 @@ export function Viewer({ sessionId }: { sessionId: string }) {
         </div>
       </div>
 
-      <Detail bar={selected} />
+      <Detail selection={selected} />
     </div>
   );
 }
@@ -523,14 +602,14 @@ function Flow({
   startMs,
   durationMs,
   playheadMs,
-  failedAt,
+  faultAt,
   onSelect,
 }: {
   pageviews: SessionPageview[];
   startMs: number;
   durationMs: number;
   playheadMs: number;
-  failedAt: number[];
+  faultAt: number[];
   onSelect: (page: SessionPageview) => void;
 }) {
   // A recording from an SDK that predates pageviews has no flow, and an empty rail with a heading
@@ -548,7 +627,7 @@ function Flow({
           const to = page.endedMs ?? startMs + durationMs;
           const width = Math.max(1.5, ((to - from) / total) * 100);
           const here = playheadMs >= from && playheadMs < to;
-          const failed = failedAt.some((at) => at >= from && at < to);
+          const failed = faultAt.some((at) => at >= from && at < to);
 
           return (
             <button
@@ -603,8 +682,8 @@ function Ruler({ fromMs, spanMs }: { fromMs: number; spanMs: number }) {
   );
 }
 
-function Detail({ bar }: { bar: Bar | null }) {
-  if (!bar) {
+function Detail({ selection }: { selection: Selection | null }) {
+  if (!selection) {
     return (
       <div className="detail">
         <span className="eyebrow">Selection</span>
@@ -615,6 +694,10 @@ function Detail({ bar }: { bar: Bar | null }) {
     );
   }
 
+  if (selection.kind === 'error')
+    return <ErrorDetail error={selection.error} />;
+
+  const { bar } = selection;
   const attributes = bar.span ? Object.entries(bar.span.attributes) : [];
 
   return (
@@ -644,6 +727,43 @@ function Detail({ bar }: { bar: Bar | null }) {
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+/**
+ * What was thrown.
+ *
+ * No duration line, because there is nothing to put in it — an error is a point, and reporting
+ * "0ms" would read as a measurement rather than as the absence of one. The stack is rendered
+ * verbatim in a scrolling block: it arrived truncated at the SDK's bound, and reflowing what is
+ * left would cost the one property that makes a stack readable.
+ */
+function ErrorDetail({ error }: { error: SessionError }) {
+  const where = [error.fileUrl, error.line, error.column]
+    .filter((part) => part !== undefined)
+    .join(':');
+
+  return (
+    <div className="detail">
+      <div className="detail__head">
+        <span className="detail__name">{error.name ?? 'Error'}</span>
+        <span className="eyebrow">{error.source}</span>
+        <span style={{ color: 'var(--fault)' }}>uncaught</span>
+      </div>
+
+      <p className="detail__message">{error.message}</p>
+
+      <dl className="detail__attrs">
+        {where && (
+          <div className="detail__attr">
+            <dt>at</dt>
+            <dd>{where}</dd>
+          </div>
+        )}
+      </dl>
+
+      {error.stack && <pre className="detail__stack">{error.stack}</pre>}
     </div>
   );
 }

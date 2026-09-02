@@ -11,6 +11,7 @@ import type { ServerResponse } from 'node:http';
 import {
   CLOCK_UNCERTAINTY_THRESHOLD_MS,
   sessionIdSchema,
+  type ErrorSource,
   type SessionResponse,
   type TraceResponse,
 } from '@syncline/protocol';
@@ -59,6 +60,7 @@ export class ReadController {
         chunks: { orderBy: { seq: 'asc' } },
         links: { orderBy: { clientStartMs: 'asc' } },
         pageviews: { orderBy: { ordinal: 'asc' } },
+        errors: { orderBy: { clientMs: 'asc' } },
       },
     });
 
@@ -111,6 +113,18 @@ export class ReadController {
         ...(pageview.durationMs !== null
           ? { durationMs: pageview.durationMs }
           : {}),
+      })),
+      // The source column is a plain string in Postgres — the enum lives in the protocol, and the
+      // ingest schema is what enforces it. Nothing else can have written this row.
+      errors: session.errors.map((error) => ({
+        source: error.source as ErrorSource,
+        ...(error.name ? { name: error.name } : {}),
+        message: error.message,
+        ...(error.fileUrl ? { fileUrl: error.fileUrl } : {}),
+        ...(error.line !== null ? { line: error.line } : {}),
+        ...(error.column !== null ? { column: error.column } : {}),
+        ...(error.stack ? { stack: error.stack } : {}),
+        atMs: Number(error.clientMs),
       })),
     };
   }
