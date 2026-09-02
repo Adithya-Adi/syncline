@@ -308,6 +308,7 @@ describe('transport', () => {
     pageviews: [],
     errors: [],
     logs: [],
+    context: [],
   };
 
   it('builds the ingest URL the API actually serves', () => {

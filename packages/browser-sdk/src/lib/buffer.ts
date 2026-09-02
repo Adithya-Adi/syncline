@@ -11,8 +11,10 @@ import {
   FLUSH_BYTES,
   FLUSH_INTERVAL_MS,
   MAX_CONSOLE_ENTRIES_PER_CHUNK,
+  MAX_CONTEXT_ENTRIES_PER_CHUNK,
   MAX_ERRORS_PER_CHUNK,
   MAX_EVENTS_PER_CHUNK,
+  type ChunkContext,
   type ChunkError,
   type ChunkLog,
   type Pageview,
@@ -25,6 +27,7 @@ export interface PendingChunk {
   pageviews: Pageview[];
   errors: ChunkError[];
   logs: ChunkLog[];
+  context: ChunkContext[];
 }
 
 export class EventBuffer {
@@ -33,6 +36,7 @@ export class EventBuffer {
   private pageviews: Pageview[] = [];
   private errors: ChunkError[] = [];
   private logs: ChunkLog[] = [];
+  private context: ChunkContext[] = [];
   /** Rough running total. Exact byte accounting would mean serializing on every event. */
   private approximateBytes = 0;
 
@@ -81,6 +85,20 @@ export class EventBuffer {
     return true;
   }
 
+  /**
+   * Records a context change, up to the per-chunk ceiling.
+   *
+   * The ceiling is generous relative to how many keys a session can hold, because these are
+   * *changes*: an application that moves a value through fifty states legitimately reports fifty
+   * entries, and only the last of them will end up mattering.
+   */
+  addContext(entry: ChunkContext): boolean {
+    if (this.context.length >= MAX_CONTEXT_ENTRIES_PER_CHUNK) return false;
+    this.context.push(entry);
+    this.approximateBytes += entry.key.length + 32;
+    return true;
+  }
+
   get size(): number {
     return this.events.length;
   }
@@ -91,7 +109,8 @@ export class EventBuffer {
       this.links.length === 0 &&
       this.pageviews.length === 0 &&
       this.errors.length === 0 &&
-      this.logs.length === 0
+      this.logs.length === 0 &&
+      this.context.length === 0
     );
   }
 
@@ -110,12 +129,14 @@ export class EventBuffer {
       pageviews: this.pageviews,
       errors: this.errors,
       logs: this.logs,
+      context: this.context,
     };
     this.events = [];
     this.links = [];
     this.pageviews = [];
     this.errors = [];
     this.logs = [];
+    this.context = [];
     this.approximateBytes = 0;
     return chunk;
   }

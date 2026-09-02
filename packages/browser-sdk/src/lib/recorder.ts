@@ -8,7 +8,9 @@
 import { record } from 'rrweb';
 import {
   CONSOLE,
+  CONTEXT,
   ERROR,
+  IDENTITY_KEY,
   MAX_CHUNKS_PER_SESSION,
   PAGEVIEW,
   REQUEST_END,
@@ -19,6 +21,11 @@ import {
   type SessionChunk,
 } from '@syncline/protocol';
 import { resolveOptions, type SynclineOptions } from './config.js';
+import {
+  SessionContext,
+  type ContextChange,
+  type ContextInput,
+} from './context.js';
 import { EventBuffer, FLUSH_EVERY_MS, PendingRequests } from './buffer.js';
 import { measureClock } from './clock.js';
 import { installConsoleCapture, installErrorCapture } from './diagnostics.js';
@@ -39,6 +46,24 @@ const SDK_VERSION = '0.1.0';
 
 export interface Recording {
   sessionId: string;
+  /**
+   * Says who this recording belongs to.
+   *
+   * Callable at any point, and normally called late — a recording starts at page load and identity
+   * arrives after sign-in. The whole session becomes findable by it, not just the part after the
+   * call: the server applies the latest identity to the recording, so the ten anonymous seconds
+   * before someone logged in are still theirs.
+   */
+  identify(userId: string): void;
+  /**
+   * Attaches anything else the session should be findable by — an account, a tenant, a plan.
+   *
+   * `null` unsets a key. `undefined` is ignored rather than treated as an unset, so a missing
+   * field in an object spread does not silently delete what is already there.
+   */
+  setContext(context: ContextInput): void;
+  /** Forgets the identity and every context key. What logging out has to do to a recording. */
+  clearIdentity(): void;
   /** Sends whatever is buffered. Exposed mainly so tests and hosts can force a flush. */
   flush(): Promise<void>;
   stop(): Promise<void>;
@@ -66,6 +91,7 @@ export function startRecording(options: SynclineOptions): Recording {
   const buffer = new EventBuffer();
   const pending = new PendingRequests();
   const pageviews = new PageviewTracker();
+  const context = new SessionContext();
 
   let clock = { offsetMs: 0, rttMs: 0 };
   let seq = 0;
@@ -164,6 +190,31 @@ export function startRecording(options: SynclineOptions): Recording {
           },
         )
       : () => undefined;
+
+  /**
+   * Applies a context change: a marker in the replay, and a copy on the chunk.
+   *
+   * The marker is what puts "they signed in here" at a frame you can scrub to; the copy is what
+   * the worker reads without decompressing the stream. Nothing is emitted when the change is
+   * empty, which is the common case for an application that calls `setContext` on every render
+   * with values that have not moved.
+   */
+  function applyContext(change: ContextChange): void {
+    for (const refusal of change.refused) {
+      log(`context key "${refusal.key}" refused: ${refusal.reason}`);
+    }
+
+    if (change.entries.length === 0) return;
+
+    const timeMs = Date.now();
+    const entries = change.entries.filter((entry) =>
+      buffer.addContext({ ...entry, timeMs }),
+    );
+
+    if (entries.length === 0) return;
+    addCustomEvent(CONTEXT, { entries, timeMs });
+    log(`context: ${entries.map((entry) => entry.key).join(', ')}`);
+  }
 
   /**
    * A route change closes one page and opens the next.
@@ -332,6 +383,7 @@ export function startRecording(options: SynclineOptions): Recording {
         pageviews: drained.pageviews,
         errors: drained.errors,
         logs: drained.logs,
+        context: drained.context,
         // The page these events belong to. Every flush happens either at a boundary or inside one
         // page, so this is unambiguous for the whole chunk.
         pageviewOrdinal: pageviews.current,
@@ -381,6 +433,13 @@ export function startRecording(options: SynclineOptions): Recording {
     get sessionId() {
       return session.id;
     },
+    // Identity goes through the same path as any other context, under a reserved key. One ordering
+    // rule, one way to clear it, one route into the index — rather than a second mechanism that
+    // has to be kept in step with the first.
+    identify: (userId: string) =>
+      applyContext(context.apply({ [IDENTITY_KEY]: userId })),
+    setContext: (values: ContextInput) => applyContext(context.apply(values)),
+    clearIdentity: () => applyContext(context.clear()),
     flush: () => flush({ rotate: false }),
     stop,
   };

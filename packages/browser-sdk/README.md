@@ -104,6 +104,42 @@ package. Publish prereleases with:
 | `captureConsole` | `false`     | `true` for error+warn, or a level list |
 | `debug`          | `false`     | SDK diagnostics to the console         |
 
+## Who the session belongs to
+
+`startRecording` returns a handle. Three of its methods say what the recording is about, so it can
+be found later:
+
+```ts
+const recording = startRecording({ key: 'pk_…', endpoint: 'https://…' });
+
+// After sign-in — which is normally several chunks in, not at page load.
+recording.identify('u_8823');
+
+// Anything else worth filtering by. Strings, numbers and booleans.
+recording.setContext({ accountId: 'acct_412', plan: 'pro', cartValue: 142.5 });
+
+// On sign-out.
+recording.clearIdentity();
+```
+
+**These apply to the whole recording, not the part after the call.** A session that was anonymous
+for its first ten seconds is still findable by the person it turned out to be — the server keeps
+every change with the instant it was made and applies the latest one to the session. That is the
+reason identity is a call rather than the `user` option: at page load you usually do not know yet.
+
+`null` unsets a key; `undefined` is ignored, so a missing field in an object spread does not
+silently delete what is already there. Calling `setContext` with values that have not changed emits
+nothing, so it is safe to call from a render.
+
+Three things are refused, and `debug: true` reports each one rather than failing:
+
+- **Anything that looks like a credential** — `password`, `apiKey`, `authToken`, `sessionId` and
+  friends, matched as a substring. Refused in the browser, so it never reaches the network.
+- **Keys Syncline derives itself** — `user`, `path`, `release`, `host`, `browser`, `os`, `device`,
+  `viewport`, `service`. Use `identify()` for the first; the rest are already indexed for you.
+- **Values that are not a string, number or boolean.** Objects and arrays are not serialized, which
+  is also what stops a whole user object being flattened into the index by a careless spread.
+
 ## The one thing an integrator has to do
 
 The API being called must allow the header:
