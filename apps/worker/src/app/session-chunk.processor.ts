@@ -9,7 +9,12 @@ import {
   type SessionChunk,
   type SessionChunkJob,
 } from '@syncline/protocol';
-import type { PrismaClient } from '@syncline/models';
+import {
+  missingChunkSeqs,
+  sessionAttributes,
+  slowestRequestMs,
+  type PrismaClient,
+} from '@syncline/models';
 import type { ObjectStore } from '@syncline/storage';
 
 /**
@@ -30,6 +35,32 @@ type PageviewTx = {
     >;
     update(args: unknown): Promise<unknown>;
   };
+};
+
+/** The same, for the attribute index: whatever can answer these four calls. */
+type IndexTx = {
+  session: {
+    findUnique(args: unknown): Promise<SessionIndexRow | null>;
+  };
+  pageview: {
+    findMany(args: unknown): Promise<{ path: string }[]>;
+  };
+  sessionAttribute: {
+    findMany(
+      args: unknown,
+    ): Promise<{ id: string; key: string; value: string }[]>;
+    deleteMany(args: unknown): Promise<unknown>;
+    createMany(args: unknown): Promise<unknown>;
+  };
+};
+
+type SessionIndexRow = {
+  userId: string | null;
+  release: string | null;
+  url: string | null;
+  userAgent: string | null;
+  viewport: unknown;
+  serviceNames: string[];
 };
 
 /**
@@ -212,18 +243,37 @@ export class SessionChunkProcessor {
         // drifts is worse than one query per chunk on a table indexed by session. Console output
         // has no table, so it is summed from the chunks — whose rows are upserts, which gets the
         // same guarantee by a different route.
-        const [linkCount, failedCount, errorCount, consoleTotals] =
-          await Promise.all([
-            tx.requestLink.count({ where: { sessionId } }),
-            tx.requestLink.count({
-              where: { sessionId, status: { gte: 400 } },
-            }),
-            tx.sessionError.count({ where: { sessionId } }),
-            tx.sessionChunk.aggregate({
-              where: { sessionId },
-              _sum: { consoleErrorCount: true, consoleWarnCount: true },
-            }),
-          ]);
+        const [
+          linkCount,
+          failedCount,
+          errorCount,
+          consoleTotals,
+          chunkSeqs,
+          links,
+        ] = await Promise.all([
+          tx.requestLink.count({ where: { sessionId } }),
+          tx.requestLink.count({
+            where: { sessionId, status: { gte: 400 } },
+          }),
+          tx.sessionError.count({ where: { sessionId } }),
+          tx.sessionChunk.aggregate({
+            where: { sessionId },
+            _sum: { consoleErrorCount: true, consoleWarnCount: true },
+          }),
+          tx.sessionChunk.findMany({
+            where: { sessionId },
+            select: { seq: true },
+          }),
+          // Durations are computed here rather than by the database, because they are the
+          // difference of two BigInt columns and Postgres would need a raw expression to aggregate
+          // them. A session's links are bounded by MAX_LINKS_PER_CHUNK per chunk.
+          tx.requestLink.findMany({
+            where: { sessionId },
+            select: { clientStartMs: true, clientEndMs: true },
+          }),
+        ]);
+
+        const seqs = chunkSeqs.map((chunk) => chunk.seq);
 
         await tx.session.update({
           where: { id: sessionId },
@@ -234,6 +284,17 @@ export class SessionChunkProcessor {
             errorCount,
             consoleErrorCount: consoleTotals._sum.consoleErrorCount ?? 0,
             consoleWarnCount: consoleTotals._sum.consoleWarnCount ?? 0,
+            requestCount: linkCount,
+            failedRequestCount: failedCount,
+            slowestRequestMs: slowestRequestMs(
+              // Epoch milliseconds, so well inside what a Number holds exactly.
+              links.map((link) => ({
+                startMs: Number(link.clientStartMs),
+                endMs: Number(link.clientEndMs),
+              })),
+            ),
+            chunkCount: seqs.length,
+            missingChunkSeqs: missingChunkSeqs(seqs),
             trivial: isTrivial({
               durationMs,
               linkCount,
@@ -245,6 +306,10 @@ export class SessionChunkProcessor {
 
         await closePageviews(tx, sessionId, bounds._max.endedAt);
       }
+
+      // The search index, last: it reads the flow this transaction just wrote, and the meta the
+      // session upsert just settled.
+      await indexSession(tx, projectId, sessionId);
     });
 
     this.logger.log(
@@ -389,6 +454,94 @@ export function countConsole(logs: { level: string }[]): {
   }
 
   return { error, warn };
+}
+
+/**
+ * Reconciles a session's attribute rows with what it should be findable by.
+ *
+ * Written as a diff rather than a delete-and-recreate. The rows are what a search reads, and
+ * emptying them for the width of a transaction would make a session briefly unfindable every time
+ * a chunk arrived — on a long recording, most of the time.
+ *
+ * Reconciled rather than appended for the reason everything else here is: a redelivered chunk must
+ * produce the same rows, and a session whose landing URL or release changed between chunks must not
+ * keep both. What the session no longer says about itself stops being true of it.
+ */
+export async function indexSession(
+  tx: IndexTx,
+  projectId: string,
+  sessionId: string,
+): Promise<void> {
+  const session = await tx.session.findUnique({
+    where: { id: sessionId },
+    select: {
+      userId: true,
+      release: true,
+      url: true,
+      userAgent: true,
+      viewport: true,
+      serviceNames: true,
+    },
+  });
+  if (!session) return;
+
+  const pageviews = await tx.pageview.findMany({
+    where: { sessionId },
+    select: { path: true },
+    orderBy: { ordinal: 'asc' },
+  });
+
+  const desired = sessionAttributes({
+    userId: session.userId,
+    release: session.release,
+    url: session.url,
+    userAgent: session.userAgent,
+    viewport: viewportOf(session.viewport),
+    paths: pageviews.map((pageview) => pageview.path),
+    serviceNames: session.serviceNames,
+  });
+
+  const existing = await tx.sessionAttribute.findMany({
+    where: { sessionId },
+    select: { id: true, key: true, value: true },
+  });
+
+  const wanted = new Set(desired.map(identity));
+  const held = new Set(existing.map(identity));
+
+  const stale = existing
+    .filter((row) => !wanted.has(identity(row)))
+    .map((row) => row.id);
+  if (stale.length > 0) {
+    await tx.sessionAttribute.deleteMany({ where: { id: { in: stale } } });
+  }
+
+  const added = desired.filter((fact) => !held.has(identity(fact)));
+  if (added.length > 0) {
+    await tx.sessionAttribute.createMany({
+      data: added.map((fact) => ({
+        sessionId,
+        projectId,
+        key: fact.key,
+        value: fact.value,
+      })),
+      // Two chunks of one session can be processed concurrently, and both would compute the same
+      // attributes. The unique constraint is the arbiter; this keeps the loser from failing.
+      skipDuplicates: true,
+    });
+  }
+}
+
+/** A key/value pair as one comparable string. NUL, because no attribute value contains one. */
+function identity(fact: { key: string; value: string }): string {
+  return `${fact.key}\u0000${fact.value}`;
+}
+
+/** The viewport column is Json, so its shape has to be checked rather than trusted. */
+function viewportOf(value: unknown): { w: number; h: number } | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { w, h } = value as { w?: unknown; h?: unknown };
+  return typeof w === 'number' && typeof h === 'number' ? { w, h } : undefined;
 }
 
 /**

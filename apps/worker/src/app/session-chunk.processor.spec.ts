@@ -44,20 +44,33 @@ function storageReturning(body: Buffer): ObjectStore {
 /** Enough of Prisma to see what the processor tried to write. */
 function fakePrisma() {
   const tx = {
-    session: { upsert: jest.fn(), update: jest.fn() },
+    session: {
+      upsert: jest.fn(),
+      update: jest.fn(),
+      // The attribute index reads the session back. Null by default: a test that cares about
+      // attributes says what the session says about itself.
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     sessionChunk: {
       upsert: jest.fn(),
       aggregate: jest.fn().mockResolvedValue({ _min: {}, _max: {}, _sum: {} }),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     requestLink: {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     sessionError: {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
+    },
+    sessionAttribute: {
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
     },
     pageview: {
       upsert: jest.fn(),
@@ -314,6 +327,206 @@ describe('errors and console output', () => {
       // Thirty seconds with three errors in it is not a recording to hide.
       trivial: false,
     });
+  });
+});
+
+describe('the search summary', () => {
+  const START = 1_724_832_000_000;
+
+  function withChunks(seqs: number[]) {
+    const { prisma, tx } = fakePrisma();
+    tx.sessionChunk.aggregate.mockResolvedValue({
+      _min: { startedAt: new Date(START) },
+      _max: { endedAt: new Date(START + 30_000) },
+      _sum: {},
+    });
+    tx.sessionChunk.findMany.mockResolvedValue(
+      seqs.map((seq: number) => ({ seq })),
+    );
+    return { prisma, tx };
+  }
+
+  it('writes the counts a list row shows and a filter selects on', async () => {
+    const { prisma, tx } = withChunks([0, 1, 2]);
+    tx.requestLink.count
+      .mockResolvedValueOnce(12) // requests
+      .mockResolvedValueOnce(2); // failures
+    tx.requestLink.findMany.mockResolvedValue([
+      { clientStartMs: BigInt(START), clientEndMs: BigInt(START + 41) },
+      { clientStartMs: BigInt(START), clientEndMs: BigInt(START + 1_180) },
+    ]);
+
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+
+    expect(tx.session.update.mock.calls[0][0].data).toMatchObject({
+      requestCount: 12,
+      failedRequestCount: 2,
+      slowestRequestMs: 1_180,
+      chunkCount: 3,
+      missingChunkSeqs: [],
+    });
+  });
+
+  it('records the sequence numbers that never arrived', async () => {
+    // A gap means the recording is not the whole session. Storing it is what lets the viewer mark
+    // the discontinuity instead of playing across it.
+    const { prisma, tx } = withChunks([0, 1, 4]);
+
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+
+    expect(tx.session.update.mock.calls[0][0].data).toMatchObject({
+      chunkCount: 3,
+      missingChunkSeqs: [2, 3],
+    });
+  });
+
+  it('leaves the slowest request null for a session that made none', async () => {
+    const { prisma, tx } = withChunks([0]);
+
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+
+    expect(tx.session.update.mock.calls[0][0].data.slowestRequestMs).toBeNull();
+  });
+});
+
+describe('the attribute index', () => {
+  const SESSION = {
+    userId: 'u_8823',
+    release: 'web@2.4.1',
+    url: 'https://app.acme.com/checkout',
+    userAgent: null,
+    viewport: { w: 1440, h: 900 },
+    serviceNames: ['checkout-api'],
+  };
+
+  function indexing(over: Partial<typeof SESSION> = {}) {
+    const { prisma, tx } = fakePrisma();
+    tx.session.findUnique.mockResolvedValue({ ...SESSION, ...over });
+    return { prisma, tx };
+  }
+
+  async function run(prisma: ReturnType<typeof fakePrisma>['prisma']) {
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+  }
+
+  it('writes a row per fact the session can be found by', async () => {
+    const { prisma, tx } = indexing();
+    tx.pageview.findMany.mockResolvedValue([
+      { path: '/' },
+      { path: '/checkout' },
+    ]);
+
+    await run(prisma);
+
+    expect(tx.sessionAttribute.createMany.mock.calls[0][0].data).toEqual([
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'user',
+        value: 'u_8823',
+      },
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'release',
+        value: 'web@2.4.1',
+      },
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'host',
+        value: 'app.acme.com',
+      },
+      { sessionId: SESSION_ID, projectId: 'proj_1', key: 'path', value: '/' },
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'path',
+        value: '/checkout',
+      },
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'device',
+        value: 'desktop',
+      },
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'viewport',
+        value: '1440x900',
+      },
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'service',
+        value: 'checkout-api',
+      },
+    ]);
+  });
+
+  it('writes nothing twice when the rows are already there', async () => {
+    // The whole session is reindexed on every chunk, so this is the ordinary case on any recording
+    // longer than one flush — not an edge one.
+    const { prisma, tx } = indexing({
+      release: null,
+      url: null,
+      viewport: null,
+    });
+    tx.sessionAttribute.findMany.mockResolvedValue([
+      { id: 'a1', key: 'user', value: 'u_8823' },
+      { id: 'a2', key: 'device', value: 'desktop' },
+      { id: 'a3', key: 'service', value: 'checkout-api' },
+    ]);
+
+    await run(prisma);
+
+    expect(tx.sessionAttribute.createMany).not.toHaveBeenCalled();
+    expect(tx.sessionAttribute.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('removes a fact that stopped being true', async () => {
+    // The release the first chunk reported can be corrected by a later one. Keeping both would
+    // make the session findable under a release it was never on.
+    const { prisma, tx } = indexing({ release: 'web@2.4.2' });
+    tx.sessionAttribute.findMany.mockResolvedValue([
+      { id: 'stale', key: 'release', value: 'web@2.4.1' },
+    ]);
+
+    await run(prisma);
+
+    expect(tx.sessionAttribute.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['stale'] } },
+    });
+    expect(tx.sessionAttribute.createMany.mock.calls[0][0].data).toContainEqual(
+      expect.objectContaining({ key: 'release', value: 'web@2.4.2' }),
+    );
+  });
+
+  it('does nothing for a session it cannot read back', async () => {
+    // The upsert and the index are in one transaction, so this should not happen — and if it does,
+    // indexing a session that is not there is not the way to find out.
+    const { prisma, tx } = fakePrisma();
+    await run(prisma);
+
+    expect(tx.sessionAttribute.findMany).not.toHaveBeenCalled();
+    expect(tx.sessionAttribute.createMany).not.toHaveBeenCalled();
   });
 });
 

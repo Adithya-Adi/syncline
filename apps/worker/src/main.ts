@@ -47,6 +47,7 @@ async function bootstrap() {
   const traces = new OtlpTracesProcessor(
     new PostgresSpanStore(prisma),
     storage,
+    prisma,
   );
 
   const workers = [
