@@ -100,6 +100,7 @@ model Session {
   pageviews  Pageview[]
   errors     SessionError[]
   attributes SessionAttribute[]
+  context    SessionContext[]
 
   /// The session list: newest first, per project.
   @@index([projectId, startedAt(sort: Desc)])
@@ -125,16 +126,60 @@ model SessionAttribute {
   session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   projectId String
 
-  /// A closed vocabulary. See ATTRIBUTE_KEYS in packages/models/src/lib/session-index.ts.
+  /// Built-in (ATTRIBUTE_KEYS) or whatever the application passed to setContext.
   key   String
   /// Truncated at MAX_ATTRIBUTE_VALUE_CHARS. Written by a browser, so treated as untrusted text.
   value String
 
+  /// The same value as a number, when it is one.
+  ///
+  /// Set so a threshold filter has something to compare. Over `value` it could not: `'90' > '100'`
+  /// is true as text, so `cartValue:>100` would quietly return the wrong sessions rather than
+  /// failing. Null for every value that is not a number, which is most of them.
+  numValue Float?
+
   @@unique([sessionId, key, value])
   /// The lookup this table exists for, scoped to a project so the index is never scanned globally.
   @@index([projectId, key, value])
+  /// The same lookup for thresholds — `cartValue:>100`, `duration:<2000`.
+  @@index([projectId, key, numValue])
   /// Read one session's attributes, and cascade its deletion.
   @@index([sessionId])
+}
+
+/// What the application said about a session, as it said it.
+///
+/// The raw record, kept apart from `SessionAttribute` because the two answer different questions.
+/// This is every change reported, with the instant the application made it; the attribute table is
+/// only what is currently true, which is what a search reads.
+///
+/// Rows rather than a merged column on Session, for the reason everything else in the ingest path
+/// is derived rather than accumulated: chunks arrive out of order and arrive twice. Merging into a
+/// column would let a redelivered early chunk overwrite a later value, and two chunks processed
+/// concurrently would lose one of the writes outright. Latest-wins over rows has neither problem,
+/// and it can be recomputed from the chunks if this is ever got wrong.
+///
+/// Identity lives here too, under the reserved `user` key — one mechanism for ordering, clearing
+/// and indexing rather than a second one for `identify()` that has to be kept in step.
+model SessionContext {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  key      String
+  /// Null means the application unset the key — what `clearIdentity()` writes on logout. Kept as a
+  /// row rather than a deletion so that clearing still wins over an earlier value that arrives
+  /// after it.
+  value    String?
+  numValue Float?
+
+  /// Client time, the same frame of reference as the replay. What makes later beat earlier.
+  clientMs BigInt
+
+  /// One row per key per instant, which makes a redelivered chunk a no-op.
+  @@unique([sessionId, key, clientMs])
+  /// Read a session's context in order, and cascade its deletion.
+  @@index([sessionId, clientMs])
 }
 
 model SessionChunk {

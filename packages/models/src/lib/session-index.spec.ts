@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  contextAttributes,
   describeUserAgent,
+  effectiveContext,
   hostOf,
   MAX_ATTRIBUTES_PER_SESSION,
   MAX_ATTRIBUTE_VALUE_CHARS,
   missingChunkSeqs,
+  rejectKey,
   sessionAttributes,
   slowestRequestMs,
 } from './session-index.js';
@@ -201,5 +204,152 @@ describe('missingChunkSeqs', () => {
 
   it('is unmoved by the order they arrived in', () => {
     expect(missingChunkSeqs([6, 0, 3, 1])).toEqual([2, 4, 5]);
+  });
+});
+
+describe('effectiveContext', () => {
+  it('takes the latest value a key was given', () => {
+    expect(
+      effectiveContext([
+        { key: 'plan', value: 'free', atMs: 1_000 },
+        { key: 'plan', value: 'pro', atMs: 2_000 },
+      ]).get('plan'),
+    ).toBe('pro');
+  });
+
+  it('is unmoved by the order the changes arrive in', () => {
+    // Chunks arrive out of order routinely. A session whose plan changed must not read `free`
+    // because the earlier chunk happened to be redelivered last.
+    expect(
+      effectiveContext([
+        { key: 'plan', value: 'pro', atMs: 2_000 },
+        { key: 'plan', value: 'free', atMs: 1_000 },
+      ]).get('plan'),
+    ).toBe('pro');
+  });
+
+  it('keeps a clear as a value, so logging out wins over what came before', () => {
+    const context = effectiveContext([
+      { key: 'user', value: 'u_1', atMs: 1_000 },
+      { key: 'user', value: null, atMs: 2_000 },
+    ]);
+    expect(context.get('user')).toBeNull();
+  });
+
+  it('lets a sign-in after a sign-out win again', () => {
+    const context = effectiveContext([
+      { key: 'user', value: 'u_1', atMs: 1_000 },
+      { key: 'user', value: null, atMs: 2_000 },
+      { key: 'user', value: 'u_2', atMs: 3_000 },
+    ]);
+    expect(context.get('user')).toBe('u_2');
+  });
+});
+
+describe('rejectKey', () => {
+  it('refuses anything that looks like a credential', () => {
+    for (const key of [
+      'password',
+      'accessToken',
+      'API_KEY',
+      'stripe_secret',
+      'authorization',
+      'sessionId',
+      'card_number',
+    ]) {
+      expect(rejectKey(key)).toBe('sensitive');
+    }
+  });
+
+  it('refuses a key Syncline derives itself', () => {
+    // Letting an application write `path` would make `path:/checkout` mean two different things.
+    for (const key of ['path', 'user', 'Release', 'service']) {
+      expect(rejectKey(key)).toBe('reserved');
+    }
+  });
+
+  it('allows the keys people actually filter by', () => {
+    for (const key of ['accountId', 'tenantId', 'plan', 'cartValue', 'orgSlug'])
+      expect(rejectKey(key)).toBeNull();
+  });
+
+  it('refuses an empty or oversized key', () => {
+    expect(rejectKey('   ')).toBe('empty');
+    expect(rejectKey('k'.repeat(500))).toBe('too-long');
+  });
+});
+
+describe('contextAttributes', () => {
+  const facts = (entries: [string, unknown][]) =>
+    contextAttributes(new Map(entries as [string, never][]));
+
+  it('indexes a number twice, as text and as a number', () => {
+    // The text answers `cartValue:14250`; the number answers `cartValue:>100`, which a text index
+    // cannot — '90' > '100' is true as strings.
+    expect(facts([['cartValue', 14_250]])).toEqual([
+      { key: 'cartValue', value: '14250', numValue: 14_250 },
+    ]);
+  });
+
+  it('does not render a large integer in exponent form', () => {
+    // String(1e21) is '1e+21', which nobody types into a filter.
+    expect(facts([['ledgerId', 1e15]])[0]?.value).toBe('1000000000000000');
+  });
+
+  it('drops an unset key rather than indexing it empty', () => {
+    // clearIdentity() has to make the session stop matching; an empty string would keep it
+    // matching `has:accountId`.
+    expect(facts([['accountId', null]])).toEqual([]);
+  });
+
+  it('drops keys it is not allowed to index', () => {
+    expect(
+      facts([
+        ['password', 'hunter2'],
+        ['path', '/x'],
+      ]),
+    ).toEqual([]);
+  });
+
+  it('indexes booleans as text, because nobody writes flagged:>0.5', () => {
+    expect(facts([['beta', true]])).toEqual([{ key: 'beta', value: 'true' }]);
+  });
+
+  it('orders by key, so a second run over the same session writes nothing new', () => {
+    expect(
+      facts([
+        ['zeta', '1'],
+        ['alpha', '2'],
+      ]).map((fact) => fact.key),
+    ).toEqual(['alpha', 'zeta']);
+  });
+});
+
+describe('sessionAttributes with application context', () => {
+  it('carries custom keys alongside the built-in ones', () => {
+    const facts = sessionAttributes({
+      userId: 'u_1',
+      context: new Map<string, string | number | boolean | null>([
+        ['accountId', 'acct_9'],
+        ['plan', 'pro'],
+      ]),
+    });
+
+    expect(facts).toContainEqual({ key: 'accountId', value: 'acct_9' });
+    expect(facts).toContainEqual({ key: 'plan', value: 'pro' });
+    expect(facts).toContainEqual({ key: 'user', value: 'u_1' });
+  });
+
+  it('drops the tail of a runaway setContext before the flow or the identity', () => {
+    // What gets cut at the ceiling matters: the built-in facts are the ones every filter depends
+    // on, and losing them to an application that indexed a loop counter would be the wrong trade.
+    const context = new Map<string, string | number | boolean | null>();
+    for (let i = 0; i < 400; i += 1) context.set(`k${i}`, `v${i}`);
+
+    const facts = sessionAttributes({ userId: 'u_1', paths: ['/a'], context });
+
+    expect(facts).toHaveLength(MAX_ATTRIBUTES_PER_SESSION);
+    expect(facts).toContainEqual({ key: 'user', value: 'u_1' });
+    expect(facts).toContainEqual({ key: 'path', value: '/a' });
   });
 });
