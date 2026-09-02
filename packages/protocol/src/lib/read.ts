@@ -173,6 +173,22 @@ export interface SessionSummary {
    */
   consoleErrorCount: number;
   consoleWarnCount: number;
+  /** The worst request the browser timed, in ms. Absent when the session made none. */
+  slowestRequestMs?: number;
+  /**
+   * The services that produced spans for this session's traces, sorted.
+   *
+   * Empty means no export arrived — which is not the same as no backend, and is exactly what a
+   * new install needs to be able to see.
+   */
+  serviceNames: string[];
+  /**
+   * Chunk sequence numbers that never arrived.
+   *
+   * A recording with gaps is still worth watching, but it is not the whole session, and a list
+   * that presented it as one would be lying by omission.
+   */
+  missingChunkSeqs: number[];
   /** How many pages the session visited, and where it came in. The flow at a glance. */
   pageCount: number;
   entryPath?: string;

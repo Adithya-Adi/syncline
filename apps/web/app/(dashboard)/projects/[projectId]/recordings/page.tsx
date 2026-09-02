@@ -10,10 +10,10 @@ export default async function ProjectRecordingsPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ all?: string }>;
+  searchParams: Promise<{ all?: string; before?: string }>;
 }) {
   const { projectId } = await params;
-  const { all } = await searchParams;
+  const { all, before } = await searchParams;
   const viewer = await requireViewer();
   const project = await projectForViewer(viewer, projectId);
   if (!project) notFound();
@@ -23,6 +23,7 @@ export default async function ProjectRecordingsPage({
       viewer={viewer}
       project={{ id: project.id, name: project.name }}
       showAll={all === '1'}
+      {...(before ? { before } : {})}
     />
   );
 }

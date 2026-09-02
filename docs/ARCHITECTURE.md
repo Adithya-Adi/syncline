@@ -379,6 +379,9 @@ model Span {
 }
 ```
 
+The block above is abridged — `packages/models/prisma/schema.prisma` is the authority, and carries
+the models the flow, the error lane and the search index added since.
+
 Notes on the shape:
 
 - **rrweb blobs never enter Postgres.** A five-minute session is tens of megabytes of DOM
@@ -402,6 +405,45 @@ Postgres is correct until it isn't. Spans are the one table with unbounded write
 ClickHouse is where it ends up. Confining that to one class now means the migration is a new
 implementation plus a config flag rather than a rewrite.
 
+### The search index
+
+Finding a recording is two different questions, and they are stored two different ways.
+
+**"Is this one worth opening"** is a set of counts, and they live as columns on `Session`:
+`requestCount`, `failedRequestCount`, `slowestRequestMs`, `errorCount`, the console counts,
+`hasBackendSpans`, `serviceNames`, `chunkCount`, `missingChunkSeqs`. A list of fifty recordings has
+to cost one query, and "sessions with a request slower than two seconds" must not mean aggregating
+every request in the project.
+
+**"Find me the session where X"** is a lookup, and lives in `SessionAttribute` — one narrow
+key/value row per fact, indexed on `(projectId, key, value)`:
+
+```
+user     u_8823          release  web@2.4.1        host    app.acme.com
+path     /checkout       browser  Chrome 131       os      Windows
+device   mobile          viewport 1440x900         service checkout-api
+```
+
+A column per filter would need a migration every time someone wanted a new one; searching the
+session's JSON would read every recording in the project to answer one lookup. One table answers
+all of them at the same cost. `projectId` is denormalized onto the row on purpose — it is the
+index's first column, and reaching it through a join would put every project's rows in one scan.
+
+Two properties this depends on:
+
+- **Everything is derived.** `packages/models/src/lib/session-index.ts` is pure functions over rows
+  that are still there, so the whole index can be rebuilt from the raw events, links and spans. A
+  bug in it is a reindex, not a data loss.
+- **Everything is reconciled, not appended.** The worker recomputes a session's summary and
+  attributes on every chunk and diffs the result, so a redelivered job writes the same rows and a
+  fact the session stopped reporting stops being true of it.
+
+The backend half is written on a different schedule than the rest. `hasBackendSpans` and
+`serviceNames` are set when spans arrive, not when the chunk does, because the browser posts its
+recording as it goes and the backend exports on its own clock — usually seconds later, sometimes
+never. A session asked at chunk time whether its backend was instrumented would answer "no" and
+stay wrong.
+
 ### Object store layout
 
 ```
@@ -414,11 +456,17 @@ otlp/{projectId}/{yyyy-mm-dd}/{ulid}.json.gz       raw OTLP bodies, kept for rep
 ## 7. Read API
 
 ```
-GET /v1/sessions                      one row per recording: counts, flow, and why to open it
+GET /v1/sessions?limit&before         one row per recording: counts, flow, why to open it
 GET /v1/sessions/:id                  meta, clock, chunk index, links, pageviews, errors
 GET /v1/sessions/:id/chunks/:seq      gzipped rrweb events (or a presigned redirect)
 GET /v1/traces/:traceId               span tree, timestamps normalized to client ms
 ```
+
+`GET /v1/sessions` pages by keyset, not offset: `before` is the last id of the previous page, and
+session ids are ULIDs so they already sort by creation. An offset would let a recording arriving
+mid-scroll shift a page boundary and make a session appear twice or not at all. Every row it
+returns is columns on one `Session` row — see the search index above — so the page costs one query
+whatever its size.
 
 `GET /v1/traces/:traceId` returns spans already skew-corrected and tree-ordered, so the viewer does
 no arithmetic:

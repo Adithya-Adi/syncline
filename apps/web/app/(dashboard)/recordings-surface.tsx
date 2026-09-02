@@ -35,17 +35,23 @@ const timeWithYearFormat = new Intl.DateTimeFormat('en-US', {
   hour12: false,
 });
 
+/** Recordings per page. One request, one screenful, and a cursor for the next. */
+const PAGE_SIZE = 50;
+
 export async function RecordingsSurface({
   viewer,
   project,
   showAll = false,
+  before,
 }: {
   viewer: Viewer;
   project: { id: string; name: string };
   /** Include recordings marked trivial — short, and with nothing in them. */
   showAll?: boolean;
+  /** Keyset cursor: the id of the last row on the previous page. */
+  before?: string;
 }) {
-  const sessions = await db.session.findMany({
+  const rows = await db.session.findMany({
     where: {
       project: {
         organizationId: viewer.organizationId,
@@ -54,9 +60,14 @@ export async function RecordingsSurface({
       // Recordings with nothing in them are hidden rather than deleted, so a direct link to one
       // still works and the "show empty" toggle brings them back.
       ...(showAll ? {} : { trivial: false }),
+      ...(before ? { id: { lt: before } } : {}),
     },
-    orderBy: { startedAt: 'desc' },
-    take: 50,
+    // Keyset pagination on the id, not an offset on the start time. Session ids are ULIDs, so
+    // they already sort by creation — and unlike an offset, a recording arriving while someone is
+    // paging cannot shift a page boundary and make a session appear twice or not at all.
+    orderBy: { id: 'desc' },
+    // One more than a page, purely to learn whether there is a next one.
+    take: PAGE_SIZE + 1,
     select: {
       id: true,
       startedAt: true,
@@ -64,11 +75,16 @@ export async function RecordingsSurface({
       url: true,
       userId: true,
       trivial: true,
-      // Counted by the worker as chunks land, so the list does not pay a query per row for the
-      // one number that decides whether a recording is worth opening.
+      // The search summary, every number of it counted by the worker as the rows landed. This is
+      // what makes the list one query: nothing here is an aggregate over links or chunks.
       errorCount: true,
       consoleErrorCount: true,
-      _count: { select: { links: true, pageviews: true } },
+      requestCount: true,
+      failedRequestCount: true,
+      slowestRequestMs: true,
+      serviceNames: true,
+      missingChunkSeqs: true,
+      _count: { select: { pageviews: true } },
       // The flow, trimmed to what a row can show: where they came in, and the first few steps.
       pageviews: {
         orderBy: { ordinal: 'asc' },
@@ -78,30 +94,12 @@ export async function RecordingsSurface({
     },
   });
 
-  // Failed requests are a predicate over a second table rather than a number the ingest path
-  // already knew, so unlike the error counts they still cost a query — one grouped query for the
-  // whole page, not one per row.
-  const failures =
-    sessions.length > 0
-      ? await db.requestLink.groupBy({
-          by: ['sessionId'],
-          where: {
-            sessionId: { in: sessions.map((session) => session.id) },
-            status: { gte: 400 },
-          },
-          _count: { _all: true },
-        })
-      : [];
-  const failedBySession = new Map(
-    failures.map((failure) => [failure.sessionId, failure._count._all]),
-  );
-  const rows = sessions.map((session) => ({
-    session,
-    failedRequestCount: failedBySession.get(session.id) ?? 0,
-  }));
+  const sessions = rows.slice(0, PAGE_SIZE);
+  const nextCursor =
+    rows.length > PAGE_SIZE ? sessions[sessions.length - 1]?.id : undefined;
 
   const totalRequests = sessions.reduce(
-    (total, session) => total + session._count.links,
+    (total, session) => total + session.requestCount,
     0,
   );
   const completedDurations = sessions
@@ -114,8 +112,8 @@ export async function RecordingsSurface({
             completedDurations.length,
         )
       : null;
-  const totalFailedRequests = rows.reduce(
-    (total, row) => total + row.failedRequestCount,
+  const totalFailedRequests = sessions.reduce(
+    (total, session) => total + session.failedRequestCount,
     0,
   );
   const totalErrors = sessions.reduce(
@@ -124,8 +122,11 @@ export async function RecordingsSurface({
   );
   // Either kind counts as broken. Which kind it was decides who reads the recording, so the tile
   // shows both numbers rather than one sum of two unlike things.
-  const brokenRecordings = rows.filter(
-    (row) => row.failedRequestCount > 0 || row.session.errorCount > 0,
+  const brokenRecordings = sessions.filter(
+    (session) => session.failedRequestCount > 0 || session.errorCount > 0,
+  ).length;
+  const gappedRecordings = sessions.filter(
+    (session) => session.missingChunkSeqs.length > 0,
   ).length;
   const latest = sessions[0]?.startedAt;
 
@@ -148,13 +149,8 @@ export async function RecordingsSurface({
              * hidden recordings are the ones with nothing in them — never one that failed.
              */}
             <Button asChild variant="ghost" size="sm">
-              <Link
-                href={
-                  showAll
-                    ? `/projects/${project.id}/recordings`
-                    : `/projects/${project.id}/recordings?all=1`
-                }
-              >
+              {/* Toggling drops the cursor: page four of one filter is not page four of another. */}
+              <Link href={recordingsHref(project.id, { all: !showAll })}>
                 {showAll ? 'Hide empty' : 'Show empty'}
               </Link>
             </Button>
@@ -190,7 +186,15 @@ export async function RecordingsSurface({
               icon={<Clapperboard className="size-3.5" />}
               label="Recordings"
               value={formatCount(sessions.length)}
-              detail="In this project"
+              // A gap means a chunk never arrived, so those rows are not whole sessions. Said here
+              // rather than only per row, because a project that has started dropping chunks is an
+              // ingest problem and one row does not look like a pattern.
+              detail={
+                gappedRecordings > 0
+                  ? `${formatCount(gappedRecordings)} with missing chunks`
+                  : 'On this page'
+              }
+              tone={gappedRecordings > 0 ? 'fault' : 'default'}
             />
             <Metric
               icon={<Network className="size-3.5" />}
@@ -257,7 +261,7 @@ export async function RecordingsSurface({
                 <span className="text-right">Errors</span>
               </DataListHeader>
 
-              {rows.map(({ session, failedRequestCount }) => {
+              {sessions.map((session) => {
                 const page = pageParts(session.url ?? undefined);
 
                 return (
@@ -296,6 +300,13 @@ export async function RecordingsSurface({
                           </span>
                         )}
                       </span>
+                      {/*
+                       * The second line carries whatever else is worth knowing before opening the
+                       * row, in order of how much it changes the answer: a gap means this is not
+                       * the whole session, and the services are what says the backend answered at
+                       * all. Only one of them is ever shown — a subtitle that lists everything is
+                       * read as decoration.
+                       */}
                       <span className="mt-1 block truncate text-xs text-muted-foreground">
                         {session._count.pageviews > 0
                           ? `${formatCount(session._count.pageviews)} ${plural(
@@ -303,6 +314,22 @@ export async function RecordingsSurface({
                               'page',
                             )} · ${page.host}`
                           : page.host}
+                        {session.missingChunkSeqs.length > 0 ? (
+                          <span className="text-destructive">
+                            {' · '}
+                            {formatCount(session.missingChunkSeqs.length)}{' '}
+                            {plural(session.missingChunkSeqs.length, 'gap')}
+                          </span>
+                        ) : (
+                          session.serviceNames.length > 0 && (
+                            <span>
+                              {' · '}
+                              {session.serviceNames[0]}
+                              {session.serviceNames.length > 1 &&
+                                ` +${session.serviceNames.length - 1}`}
+                            </span>
+                          )
+                        )}
                       </span>
                     </span>
                     <span className="truncate text-muted-foreground">
@@ -311,8 +338,19 @@ export async function RecordingsSurface({
                     <span className="text-right font-mono text-xs tabular-nums">
                       {formatDuration(session.durationMs)}
                     </span>
-                    <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
-                      {formatCount(session._count.links)}
+                    {/*
+                     * The count, and under it the worst one. "Twelve requests" says how busy the
+                     * page was; "and one took 4.2s" is the reason to open it.
+                     */}
+                    <span className="text-right">
+                      <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                        {formatCount(session.requestCount)}
+                      </span>
+                      {session.slowestRequestMs !== null && (
+                        <span className="mt-1 block font-mono text-xs tabular-nums text-muted-foreground">
+                          {formatDuration(session.slowestRequestMs)}
+                        </span>
+                      )}
                     </span>
                     {/*
                      * Two columns rather than one sum. A 500 is the backend's failure and a
@@ -320,7 +358,7 @@ export async function RecordingsSurface({
                      * whoever opens it looking in the wrong place first.
                      */}
                     <span className="text-right">
-                      <FaultCount value={failedRequestCount} />
+                      <FaultCount value={session.failedRequestCount} />
                     </span>
                     <span className="text-right">
                       <FaultCount
@@ -341,11 +379,42 @@ export async function RecordingsSurface({
                 );
               })}
             </DataList>
+
+            {/*
+             * A link, not a button, so the cursor lives in the URL: a page of recordings someone
+             * scrolled to stays linkable, survives a refresh, and needs no client state to do it.
+             */}
+            {nextCursor && (
+              <div className="mt-4 flex justify-center">
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={recordingsHref(project.id, {
+                      all: showAll,
+                      before: nextCursor,
+                    })}
+                  >
+                    Older recordings
+                  </Link>
+                </Button>
+              </div>
+            )}
           </section>
         </>
       )}
     </main>
   );
+}
+
+/** The recordings URL for a given filter and page. Absent options are left off, not sent empty. */
+function recordingsHref(
+  projectId: string,
+  { all, before }: { all?: boolean; before?: string },
+): string {
+  const params = new URLSearchParams();
+  if (all) params.set('all', '1');
+  if (before) params.set('before', before);
+  const query = params.toString();
+  return `/projects/${projectId}/recordings${query ? `?${query}` : ''}`;
 }
 
 /**
