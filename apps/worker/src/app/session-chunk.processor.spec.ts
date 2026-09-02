@@ -67,6 +67,11 @@ function fakePrisma() {
       createMany: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
+    sessionContext: {
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+    },
     sessionAttribute: {
       findMany: jest.fn().mockResolvedValue([]),
       deleteMany: jest.fn(),
@@ -792,5 +797,270 @@ describe('eventTimestamps', () => {
   it('returns nothing for a chunk with no usable timestamps', () => {
     expect(eventTimestamps([])).toEqual({});
     expect(eventTimestamps([{ type: 3 }, null, 'junk'])).toEqual({});
+  });
+});
+
+describe('application context', () => {
+  const AT = 1_724_832_000_500;
+
+  function contextChunk(entries: unknown[]) {
+    return Buffer.from(JSON.stringify({ ...CHUNK, context: entries }));
+  }
+
+  it('stores what the application said, with the instant it said it', async () => {
+    const { prisma, tx } = fakePrisma();
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(
+        contextChunk([
+          { key: 'accountId', value: 'acct_9', timeMs: AT },
+          { key: 'cartValue', value: 142.5, timeMs: AT },
+        ]),
+      ),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionContext.createMany.mock.calls[0][0].data).toEqual([
+      {
+        sessionId: SESSION_ID,
+        key: 'accountId',
+        value: 'acct_9',
+        numValue: null,
+        clientMs: BigInt(AT),
+      },
+      {
+        sessionId: SESSION_ID,
+        key: 'cartValue',
+        // Both forms: the text answers an exact match, the number answers a threshold.
+        value: '142.5',
+        numValue: 142.5,
+        clientMs: BigInt(AT),
+      },
+    ]);
+  });
+
+  it('keeps a clear as a row rather than deleting what it clears', async () => {
+    // Deleting would let an earlier value that arrives after the clear win, which is the ordinary
+    // shape of out-of-order delivery — and would leave the session findable by whoever logged out.
+    const { prisma, tx } = fakePrisma();
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(
+        contextChunk([{ key: 'user', value: null, timeMs: AT }]),
+      ),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionContext.createMany.mock.calls[0][0].data[0]).toMatchObject(
+      {
+        key: 'user',
+        value: null,
+        numValue: null,
+      },
+    );
+  });
+
+  it('replaces entries at the same instant rather than duplicating them on redelivery', async () => {
+    const { prisma, tx } = fakePrisma();
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(
+        contextChunk([{ key: 'plan', value: 'pro', timeMs: AT }]),
+      ),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionContext.deleteMany).toHaveBeenCalledWith({
+      where: { sessionId: SESSION_ID, clientMs: { in: [BigInt(AT)] } },
+    });
+  });
+
+  it('never stores a key it is not allowed to index, not even raw', async () => {
+    // The index skipping a credential is not enough: an unfiltered row would still be sitting in
+    // Postgres, and in every backup taken since. This is the assertion that keeps that true.
+    const { prisma, tx } = fakePrisma();
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(
+        contextChunk([
+          { key: 'apiKey', value: 'sk_live_1', timeMs: AT },
+          { key: 'path', value: '/hijacked', timeMs: AT },
+          { key: 'accountId', value: 'acct_9', timeMs: AT },
+        ]),
+      ),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionContext.createMany.mock.calls[0][0].data).toEqual([
+      {
+        sessionId: SESSION_ID,
+        key: 'accountId',
+        value: 'acct_9',
+        numValue: null,
+        clientMs: BigInt(AT),
+      },
+    ]);
+  });
+
+  it('touches the table not at all when a chunk carries no context', async () => {
+    const { prisma, tx } = fakePrisma();
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+
+    await processor.process(job());
+    expect(tx.sessionContext.createMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('late identity', () => {
+  const SESSION_ROW = {
+    userId: null,
+    release: null,
+    url: null,
+    userAgent: null,
+    viewport: null,
+    serviceNames: [] as string[],
+  };
+
+  function identified(
+    rows: { key: string; value: string | null; at: number }[],
+  ) {
+    const { prisma, tx } = fakePrisma();
+    tx.session.findUnique.mockResolvedValue({ ...SESSION_ROW });
+    tx.sessionContext.findMany.mockResolvedValue(
+      rows.map((row) => ({
+        key: row.key,
+        value: row.value,
+        numValue: null,
+        clientMs: BigInt(row.at),
+      })),
+    );
+    return { prisma, tx };
+  }
+
+  async function run(prisma: ReturnType<typeof fakePrisma>['prisma']) {
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+  }
+
+  it('applies an identity that arrived mid-session to the whole recording', async () => {
+    // The point of the feature: a recording is anonymous until someone signs in, and it still has
+    // to be findable by who they turned out to be.
+    const { prisma, tx } = identified([
+      { key: 'user', value: 'u_8823', at: 1_724_832_010_000 },
+    ]);
+
+    await run(prisma);
+
+    expect(tx.session.update).toHaveBeenLastCalledWith({
+      where: { id: SESSION_ID },
+      data: { userId: 'u_8823' },
+    });
+    expect(tx.sessionAttribute.createMany.mock.calls[0][0].data).toContainEqual(
+      expect.objectContaining({ key: 'user', value: 'u_8823' }),
+    );
+  });
+
+  it('lets a later sign-in replace an earlier one', async () => {
+    const { prisma, tx } = identified([
+      { key: 'user', value: 'u_1', at: 1_000 },
+      { key: 'user', value: 'u_2', at: 2_000 },
+    ]);
+
+    await run(prisma);
+
+    expect(tx.session.update).toHaveBeenLastCalledWith({
+      where: { id: SESSION_ID },
+      data: { userId: 'u_2' },
+    });
+  });
+
+  it('takes the identity away when the application cleared it', async () => {
+    const { prisma, tx } = identified([
+      { key: 'user', value: 'u_1', at: 1_000 },
+      { key: 'user', value: null, at: 2_000 },
+    ]);
+
+    await run(prisma);
+
+    expect(
+      tx.sessionAttribute.createMany.mock.calls[0]?.[0].data ?? [],
+    ).not.toContainEqual(expect.objectContaining({ key: 'user' }));
+  });
+
+  it('indexes context under its own key, never as the identity', async () => {
+    const { prisma, tx } = identified([
+      { key: 'accountId', value: 'acct_9', at: 1_000 },
+    ]);
+
+    await run(prisma);
+
+    const written = tx.sessionAttribute.createMany.mock.calls[0][0].data;
+
+    expect(written).toContainEqual({
+      sessionId: SESSION_ID,
+      projectId: 'proj_1',
+      key: 'accountId',
+      value: 'acct_9',
+    });
+    // Not folded into the identity, which is what `user` means and what a person searches by.
+    expect(written).not.toContainEqual(
+      expect.objectContaining({ key: 'user' }),
+    );
+  });
+
+  it('writes the numeric form of a number, so a threshold filter can compare it', async () => {
+    // Deriving `numValue` and then not writing it is a silent failure: exact match keeps working,
+    // and only `cartValue:>100` comes back empty.
+    const { prisma, tx } = fakePrisma();
+    tx.session.findUnique.mockResolvedValue({ ...SESSION_ROW });
+    tx.sessionContext.findMany.mockResolvedValue([
+      {
+        key: 'cartValue',
+        value: '142.5',
+        numValue: 142.5,
+        clientMs: BigInt(1_000),
+      },
+    ]);
+
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+
+    expect(tx.sessionAttribute.createMany.mock.calls[0][0].data).toContainEqual(
+      {
+        sessionId: SESSION_ID,
+        projectId: 'proj_1',
+        key: 'cartValue',
+        value: '142.5',
+        numValue: 142.5,
+      },
+    );
+  });
+
+  it('leaves numValue off a value that is not a number', async () => {
+    // Absent rather than explicitly null: Prisma treats an absent field as "not set", and a text
+    // value with a numeric column set would make a threshold filter match something it should not.
+    const { prisma, tx } = identified([
+      { key: 'accountId', value: 'acct_9', at: 1_000 },
+    ]);
+
+    await run(prisma);
+
+    const account = tx.sessionAttribute.createMany.mock.calls[0][0].data.find(
+      (fact: { key: string }) => fact.key === 'accountId',
+    );
+    expect(account).not.toHaveProperty('numValue');
   });
 });

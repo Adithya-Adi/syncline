@@ -98,17 +98,29 @@ The same channel carries everything else that has to sit at a frame rather than 
 
 ```ts
 export const PAGEVIEW = 'syncline.pageview' as const; // route changes, with what triggered them
+export const CONTEXT = 'syncline.context' as const; // identify(), setContext()
 export const ERROR = 'syncline.error' as const; // onerror, unhandledrejection
 export const CONSOLE = 'syncline.console' as const; // opt-in, per level
 ```
 
-Each of these is also **denormalized onto the chunk envelope** — `pageviews`, `errors`, `logs`
-beside `links` — for one reason: a worker deciding whether a session broke should not have to walk
-a five-thousand-event array to find out. The marker is the record; the copy is the index.
+Each of these is also **denormalized onto the chunk envelope** — `pageviews`, `errors`, `logs`,
+`context` beside `links` — for one reason: a worker deciding whether a session broke should not
+have to walk a five-thousand-event array to find out. The marker is the record; the copy is the
+index.
 
 Console output is the one that stops at a count. Its lines stay in the replay stream and only
 `consoleErrorCount`/`consoleWarnCount` are lifted onto the session, because there is far more of it
 than there are errors and each line is worth far less.
+
+Context is the one that arrives **late**. A recording starts at page load and who the user is
+becomes known after they sign in, several chunks later — so `identify()` and `setContext()` emit
+timestamped *changes* rather than writing into the session's opening metadata, and the server
+applies the latest value of each key to the whole recording. A session that was anonymous for its
+first ten seconds is still findable by the person it turned out to be.
+
+Identity is not a separate mechanism: `identify()` is a context change under the reserved `user`
+key. One ordering rule, one way to clear it, one route into the index — rather than a second one
+that has to be kept in step.
 
 ### 3.3 The backend does nothing Syncline-specific
 
@@ -422,7 +434,26 @@ key/value row per fact, indexed on `(projectId, key, value)`:
 user     u_8823          release  web@2.4.1        host    app.acme.com
 path     /checkout       browser  Chrome 131       os      Windows
 device   mobile          viewport 1440x900         service checkout-api
+accountId acct_412       plan     pro              cartValue 142.50
 ```
+
+The first nine keys Syncline derives. The rest are whatever the application passed to
+`setContext()` — an **open vocabulary**, indexed on arrival, because a key that has to be declared
+somewhere before it works means the first attempt always fails silently and the list then lives in
+two places that drift. A numeric value is indexed twice, as text and in `numValue`, so
+`cartValue:>100` has something to compare: over text it could not, since `'90' > '100'`.
+
+Three kinds of key are refused, and never stored:
+
+- anything matching a credential (`password`, `apiKey`, `authToken`, `sessionId`, …) — refused in
+  the browser so it never reaches the network, and again at the worker because an older SDK is
+  still a client;
+- the nine reserved names above, so an application cannot redefine what `path:` means;
+- values that are not a string, number or boolean.
+
+`SessionContext` holds the changes as reported, with the instant of each; `SessionAttribute` holds
+only what is currently true. The split is what makes ordering work — chunks arrive out of order and
+arrive twice, so latest-wins is computed at read time rather than merged at write time.
 
 A column per filter would need a migration every time someone wanted a new one; searching the
 session's JSON would read every recording in the project to answer one lookup. One table answers

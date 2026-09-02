@@ -4,13 +4,16 @@ import {
   isSynclineEvent,
   REQUEST_END,
   REQUEST_START,
+  IDENTITY_KEY,
   sessionChunkSchema,
   TRIVIAL_SESSION_MS,
   type SessionChunk,
   type SessionChunkJob,
 } from '@syncline/protocol';
 import {
+  effectiveContext,
   missingChunkSeqs,
+  rejectKey,
   sessionAttributes,
   slowestRequestMs,
   type PrismaClient,
@@ -41,9 +44,20 @@ type PageviewTx = {
 type IndexTx = {
   session: {
     findUnique(args: unknown): Promise<SessionIndexRow | null>;
+    update(args: unknown): Promise<unknown>;
   };
   pageview: {
     findMany(args: unknown): Promise<{ path: string }[]>;
+  };
+  sessionContext: {
+    findMany(args: unknown): Promise<
+      {
+        key: string;
+        value: string | null;
+        numValue: number | null;
+        clientMs: bigint;
+      }[]
+    >;
   };
   sessionAttribute: {
     findMany(
@@ -203,6 +217,49 @@ export class SessionChunkProcessor {
             stack: error.stack ?? null,
             clientMs: BigInt(error.timeMs),
           })),
+        });
+      }
+
+      // Refused here as well as in the SDK, and refused before anything is written rather than
+      // when the index is built. The SDK is the copy that matters for a credential — it stops it
+      // reaching the network at all — but an older SDK is still a client, and a key that only the
+      // index skips would still be sitting in Postgres and in every backup taken since.
+      const context = parsed.context.filter((entry) => {
+        // Identity is the one reserved key an application may write — that is what `identify()`
+        // is. It is still refused further down, where custom attributes are indexed, because by
+        // then it has been taken out and become the session's own column.
+        if (entry.key === IDENTITY_KEY) return true;
+
+        const rejection = rejectKey(entry.key);
+        if (rejection) {
+          this.logger.warn(
+            `session ${sessionId}: context key "${entry.key}" refused (${rejection})`,
+          );
+        }
+        return !rejection;
+      });
+
+      // Context is stored as reported rather than merged, and keyed by the instant it was
+      // reported at, so a redelivered chunk writes the same rows and a chunk that arrives late
+      // cannot overwrite a value set after it. Which value is current is worked out at read time.
+      if (context.length > 0) {
+        await tx.sessionContext.deleteMany({
+          where: {
+            sessionId,
+            clientMs: { in: context.map((e) => BigInt(e.timeMs)) },
+          },
+        });
+        await tx.sessionContext.createMany({
+          data: context.map((entry) => ({
+            sessionId,
+            key: entry.key,
+            value: entry.value === null ? null : String(entry.value),
+            numValue: typeof entry.value === 'number' ? entry.value : null,
+            clientMs: BigInt(entry.timeMs),
+          })),
+          // Two entries for the same key at the same instant is a duplicate, not a conflict: the
+          // delete above already removed what was there, so this only guards the chunk itself.
+          skipDuplicates: true,
         });
       }
 
@@ -485,20 +542,59 @@ export async function indexSession(
   });
   if (!session) return;
 
-  const pageviews = await tx.pageview.findMany({
-    where: { sessionId },
-    select: { path: true },
-    orderBy: { ordinal: 'asc' },
-  });
+  const [pageviews, contextRows] = await Promise.all([
+    tx.pageview.findMany({
+      where: { sessionId },
+      select: { path: true },
+      orderBy: { ordinal: 'asc' },
+    }),
+    tx.sessionContext.findMany({
+      where: { sessionId },
+      select: { key: true, value: true, numValue: true, clientMs: true },
+      orderBy: { clientMs: 'asc' },
+    }),
+  ]);
+
+  // What the application currently says, out of everything it has said. Latest wins by the instant
+  // it was said, which is the only ordering that survives chunks arriving out of order.
+  const context = effectiveContext(
+    contextRows.map((row) => ({
+      key: row.key,
+      // The number is the authority when there is one: `numValue` round-trips exactly, while the
+      // text form of a float can lose a digit.
+      value: row.numValue ?? row.value,
+      atMs: Number(row.clientMs),
+    })),
+  );
+
+  // Identity arrives through the same channel as everything else, under a reserved key — so it is
+  // taken out here rather than indexed as a custom attribute, and becomes the session's own column.
+  const identified = context.get(IDENTITY_KEY);
+  context.delete(IDENTITY_KEY);
+
+  // A late `identify()` beats the `user` option the SDK was started with: the option is a guess
+  // made at page load, the call is the application saying who this actually turned out to be. An
+  // explicit clear wins over both, which is what logging out has to do.
+  const userId =
+    identified === undefined
+      ? session.userId
+      : identified === null
+        ? null
+        : String(identified);
+
+  if (userId !== session.userId) {
+    await tx.session.update({ where: { id: sessionId }, data: { userId } });
+  }
 
   const desired = sessionAttributes({
-    userId: session.userId,
+    userId,
     release: session.release,
     url: session.url,
     userAgent: session.userAgent,
     viewport: viewportOf(session.viewport),
     paths: pageviews.map((pageview) => pageview.path),
     serviceNames: session.serviceNames,
+    context,
   });
 
   const existing = await tx.sessionAttribute.findMany({
@@ -524,6 +620,9 @@ export async function indexSession(
         projectId,
         key: fact.key,
         value: fact.value,
+        // Absent for anything that is not a number, which leaves the column null — and a null
+        // never satisfies a threshold comparison, which is the right answer for text.
+        ...(fact.numValue !== undefined ? { numValue: fact.numValue } : {}),
       })),
       // Two chunks of one session can be processed concurrently, and both would compute the same
       // attributes. The unique constraint is the arbiter; this keeps the loser from failing.
