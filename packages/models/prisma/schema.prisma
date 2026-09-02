@@ -69,13 +69,72 @@ model Session {
   consoleErrorCount Int @default(0)
   consoleWarnCount  Int @default(0)
 
-  chunks    SessionChunk[]
-  links     RequestLink[]
-  pageviews Pageview[]
-  errors    SessionError[]
+  /// The rest of the search summary: what a list row needs, and what a filter selects on.
+  ///
+  /// Every one of these is derived from rows that are still there — links, chunks, spans — so the
+  /// whole set can be rebuilt from the raw data if this ever computes them wrongly. They are stored
+  /// rather than joined because a list of fifty recordings must not cost fifty queries, and
+  /// "sessions slower than two seconds" must not mean aggregating every request in the project.
+  requestCount       Int  @default(0)
+  failedRequestCount Int  @default(0)
+  /// The worst request the browser timed, in ms. Null when the session made none.
+  slowestRequestMs   Int?
+
+  /// Whether any of this session's traces produced spans, and from which services.
+  ///
+  /// Written when spans arrive rather than when the chunk does, because the export lands after the
+  /// recording — often seconds after, sometimes never. False here is the honest answer to "is the
+  /// backend instrumented", which is a question a new install needs answered.
+  hasBackendSpans Boolean  @default(false)
+  serviceNames    String[]
+
+  /// Chunks received, and the sequence numbers that never arrived.
+  ///
+  /// A gap is a hole in the film. The viewer has to mark it rather than play across it, and a
+  /// project accumulating gaps has an ingest problem worth seeing before its users report it.
+  chunkCount       Int   @default(0)
+  missingChunkSeqs Int[]
+
+  chunks     SessionChunk[]
+  links      RequestLink[]
+  pageviews  Pageview[]
+  errors     SessionError[]
+  attributes SessionAttribute[]
 
   /// The session list: newest first, per project.
   @@index([projectId, startedAt(sort: Desc)])
+}
+
+/// One indexed fact about a session: `user = u_123`, `path = /checkout`, `service = checkout-api`.
+///
+/// A table rather than columns, and rather than searching the session's JSON, because the question
+/// it answers is "find me the session where X" for an X that varies. A column per filter needs a
+/// migration every time someone wants a new one, and a JSON scan reads every recording in the
+/// project to answer one lookup. One narrow key/value table with a composite index answers all of
+/// them at the same cost.
+///
+/// Multi-valued by design — a session visits many paths and touches many services — so uniqueness
+/// is on the value too, which is also what makes a redelivered chunk an upsert instead of a
+/// duplicate.
+///
+/// `projectId` is denormalized off Session on purpose: it is the first column of the lookup index,
+/// and reaching it through a join would put every project's rows in the same scan.
+model SessionAttribute {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  projectId String
+
+  /// A closed vocabulary. See ATTRIBUTE_KEYS in packages/models/src/lib/session-index.ts.
+  key   String
+  /// Truncated at MAX_ATTRIBUTE_VALUE_CHARS. Written by a browser, so treated as untrusted text.
+  value String
+
+  @@unique([sessionId, key, value])
+  /// The lookup this table exists for, scoped to a project so the index is never scanned globally.
+  @@index([projectId, key, value])
+  /// Read one session's attributes, and cascade its deletion.
+  @@index([sessionId])
 }
 
 model SessionChunk {
@@ -83,23 +142,23 @@ model SessionChunk {
   sessionId String
   session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  seq        Int
-  startedAt  DateTime
-  endedAt    DateTime
-  eventCount Int
-  sizeBytes  Int
+  seq               Int
+  startedAt         DateTime
+  endedAt           DateTime
+  eventCount        Int
+  sizeBytes         Int
   /// Console output is counted here and summed onto the session, rather than counted onto the
   /// session directly. A chunk row is an upsert, so a redelivered job overwrites these; a counter
   /// incremented on the session would double instead. The lines themselves stay in the replay
   /// stream — there are far more of them than errors and each is worth far less.
-  consoleErrorCount Int @default(0)
-  consoleWarnCount  Int @default(0)
+  consoleErrorCount Int      @default(0)
+  consoleWarnCount  Int      @default(0)
   /// Which page these events belong to. Chunks flush at page boundaries, so one chunk is one page —
   /// which is what lets the viewer load a single page of a long session. Null for chunks from an
   /// SDK that predates pageviews.
-  pageviewOrdinal Int?
+  pageviewOrdinal   Int?
   /// sessions/{projectId}/{sessionId}/{seq}.json.gz
-  storageKey String
+  storageKey        String
 
   /// Makes a redelivered job an upsert instead of a duplicate.
   @@unique([sessionId, seq])
@@ -124,7 +183,7 @@ model Pageview {
   /// What moved the user here: load, pushState, replaceState, popstate, hashchange.
   trigger String
 
-  startedAt DateTime
+  startedAt  DateTime
   /// Set when the next page begins, or from the session's last event for the final page. Null while
   /// the page is still the one being recorded.
   endedAt    DateTime?
