@@ -109,7 +109,8 @@ async function main() {
   } else {
     console.log(
       `  demo       ${Math.round(demo.durationMs / 1000)}s across ${demo.pageCount} pages, ` +
-        `${demo.requestCount} requests, ${demo.spanCount} spans`,
+        `${demo.requestCount} requests, ${demo.spanCount} spans, ` +
+        `${demo.errorCount} errors`,
     );
     console.log(`             http://localhost:3000/s/${demo.sessionId}`);
     console.log('');

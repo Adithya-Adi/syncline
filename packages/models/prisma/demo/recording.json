@@ -500,8 +500,8 @@
           "data": {
             "tag": "syncline.request",
             "payload": {
-              "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
-              "spanId": "7dca26946541ec19",
+              "traceId": "bc024266afc73688f09735dcf72a252e",
+              "spanId": "0c601614afaff615",
               "method": "POST",
               "url": "http://localhost:4321/api/cart",
               "startMs": 18207
@@ -514,7 +514,7 @@
           "data": {
             "tag": "syncline.response",
             "payload": {
-              "spanId": "7dca26946541ec19",
+              "spanId": "0c601614afaff615",
               "endMs": 18248,
               "status": 200
             }
@@ -790,8 +790,8 @@
       ],
       "links": [
         {
-          "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
-          "spanId": "7dca26946541ec19",
+          "traceId": "bc024266afc73688f09735dcf72a252e",
+          "spanId": "0c601614afaff615",
           "method": "POST",
           "url": "http://localhost:4321/api/cart",
           "startMs": 18207,
@@ -1174,8 +1174,8 @@
           "data": {
             "tag": "syncline.request",
             "payload": {
-              "traceId": "7155ef013f583e4984b7803bb6caf667",
-              "spanId": "3b5c2b99c0742f8b",
+              "traceId": "8a53b4907e82d293fa777bff5df57590",
+              "spanId": "031e83154c06baec",
               "method": "GET",
               "url": "http://localhost:4321/api/inventory?sku",
               "startMs": 38248
@@ -1188,7 +1188,7 @@
           "data": {
             "tag": "syncline.response",
             "payload": {
-              "spanId": "3b5c2b99c0742f8b",
+              "spanId": "031e83154c06baec",
               "endMs": 38311,
               "status": 200
             }
@@ -1486,8 +1486,8 @@
       ],
       "links": [
         {
-          "traceId": "7155ef013f583e4984b7803bb6caf667",
-          "spanId": "3b5c2b99c0742f8b",
+          "traceId": "8a53b4907e82d293fa777bff5df57590",
+          "spanId": "031e83154c06baec",
           "method": "GET",
           "url": "http://localhost:4321/api/inventory?sku",
           "startMs": 38248,
@@ -1883,8 +1883,8 @@
           "data": {
             "tag": "syncline.request",
             "payload": {
-              "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
-              "spanId": "22833c5b6a8336de",
+              "traceId": "a0944fe67f63726ab3aef6cc9ae35dae",
+              "spanId": "c2e8f452c6b473ca",
               "method": "POST",
               "url": "http://localhost:4321/api/checkout",
               "startMs": 75951
@@ -1897,7 +1897,7 @@
           "data": {
             "tag": "syncline.response",
             "payload": {
-              "spanId": "22833c5b6a8336de",
+              "spanId": "c2e8f452c6b473ca",
               "endMs": 77131,
               "status": 502
             }
@@ -1938,6 +1938,23 @@
             ]
           },
           "timestamp": 77131
+        },
+        {
+          "type": 5,
+          "data": {
+            "tag": "syncline.error",
+            "payload": {
+              "source": "onerror",
+              "name": "TypeError",
+              "message": "Cannot read properties of undefined (reading 'id')",
+              "stack": "TypeError: Cannot read properties of undefined (reading 'id')\n    at onCheckoutSettled (http://localhost:4321/static/checkout.9f2ab1.js:1284:27)\n    at HTMLButtonElement.<anonymous> (http://localhost:4321/static/checkout.9f2ab1.js:1301:9)",
+              "fileUrl": "http://localhost:4321/static/checkout.9f2ab1.js",
+              "line": 1284,
+              "column": 27,
+              "timeMs": 77351
+            }
+          },
+          "timestamp": 77351
         },
         {
           "type": 3,
@@ -1986,8 +2003,8 @@
       ],
       "links": [
         {
-          "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
-          "spanId": "22833c5b6a8336de",
+          "traceId": "a0944fe67f63726ab3aef6cc9ae35dae",
+          "spanId": "c2e8f452c6b473ca",
           "method": "POST",
           "url": "http://localhost:4321/api/checkout",
           "startMs": 75951,
@@ -2002,12 +2019,24 @@
           "startMs": 64811,
           "trigger": "pushState"
         }
+      ],
+      "errors": [
+        {
+          "source": "onerror",
+          "name": "TypeError",
+          "message": "Cannot read properties of undefined (reading 'id')",
+          "stack": "TypeError: Cannot read properties of undefined (reading 'id')\n    at onCheckoutSettled (http://localhost:4321/static/checkout.9f2ab1.js:1284:27)\n    at HTMLButtonElement.<anonymous> (http://localhost:4321/static/checkout.9f2ab1.js:1301:9)",
+          "fileUrl": "http://localhost:4321/static/checkout.9f2ab1.js",
+          "line": 1284,
+          "column": 27,
+          "timeMs": 77351
+        }
       ]
     }
   ],
   "spans": [
     {
-      "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
+      "traceId": "bc024266afc73688f09735dcf72a252e",
       "spanId": "0000000000000001",
       "name": "POST /api/cart",
       "kind": "SERVER",
@@ -2023,7 +2052,7 @@
       }
     },
     {
-      "traceId": "3fcf12fb2c9b13bc57224817df936fd9",
+      "traceId": "bc024266afc73688f09735dcf72a252e",
       "spanId": "0000000000000002",
       "parentSpanId": "0000000000000001",
       "name": "prisma:query INSERT",
@@ -2038,7 +2067,7 @@
       }
     },
     {
-      "traceId": "7155ef013f583e4984b7803bb6caf667",
+      "traceId": "8a53b4907e82d293fa777bff5df57590",
       "spanId": "0000000000000003",
       "name": "GET /api/inventory",
       "kind": "SERVER",
@@ -2054,7 +2083,7 @@
       }
     },
     {
-      "traceId": "7155ef013f583e4984b7803bb6caf667",
+      "traceId": "8a53b4907e82d293fa777bff5df57590",
       "spanId": "0000000000000004",
       "parentSpanId": "0000000000000003",
       "name": "prisma:query SELECT",
@@ -2069,7 +2098,7 @@
       }
     },
     {
-      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "traceId": "a0944fe67f63726ab3aef6cc9ae35dae",
       "spanId": "0000000000000005",
       "name": "POST /api/checkout",
       "kind": "SERVER",
@@ -2087,7 +2116,7 @@
       }
     },
     {
-      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "traceId": "a0944fe67f63726ab3aef6cc9ae35dae",
       "spanId": "0000000000000006",
       "parentSpanId": "0000000000000005",
       "name": "validate cart",
@@ -2101,7 +2130,7 @@
       }
     },
     {
-      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "traceId": "a0944fe67f63726ab3aef6cc9ae35dae",
       "spanId": "0000000000000007",
       "parentSpanId": "0000000000000005",
       "name": "prisma:query SELECT",
@@ -2116,7 +2145,7 @@
       }
     },
     {
-      "traceId": "a9aa533b5d3066c0cfc6c04651b9be76",
+      "traceId": "a0944fe67f63726ab3aef6cc9ae35dae",
       "spanId": "0000000000000008",
       "parentSpanId": "0000000000000005",
       "name": "POST payments.northwind.internal/charges",

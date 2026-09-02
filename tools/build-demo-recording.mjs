@@ -10,13 +10,18 @@
  * hand-writes an rrweb event. A fixture assembled by hand would drift from the recorder the first
  * time either changed, and the failure would be a blank player rather than a test going red.
  *
- * Two things are faked, both deliberately:
+ * Three things are faked, all deliberately:
  *
  *   - The network. There is no API to post to and no backend to trace, so `fetch` is answered from
  *     a script. The SDK still patches it, still mints the traceparent, still records the markers.
  *   - Time. `Date.now` is a virtual clock this file advances, so a session that reads as forty
  *     seconds long generates instantly and identically on every machine. Waiting out real time
  *     would make the fixture depend on how loaded the box was when someone regenerated it.
+ *   - The report of the uncaught error, and only its report. The `TypeError` is thrown by real code
+ *     reading a field that is really absent; what this file supplies is the window `error` event a
+ *     browser would have dispatched, because jsdom performs that step only for handlers it invoked
+ *     itself and the demo calls its handlers directly. The SDK's capture path is entered exactly as
+ *     it is in a browser. Its stack is scripted for one further reason, in `reportUncaught` below.
  *
  * Output is `packages/models/prisma/demo/recording.json`, committed, with every timestamp stored as
  * an offset from the session's first event. The seed rebases those onto the moment it runs, so the
@@ -208,6 +213,30 @@ function settle() {
   return new Promise((resolve) => setTimeout(resolve, 25));
 }
 
+/** Where the page's own bundle appears to live, for the error's file and frames. */
+const BUNDLE = `${PAGE_ORIGIN}/static/checkout.9f2ab1.js`;
+
+/**
+ * Reports a thrown error the way a browser reports an uncaught one.
+ *
+ * The stack is replaced rather than kept, and that is not cosmetic: a real stack here names this
+ * generator's absolute path on whoever's machine ran it, which would put `C:\\Users\\...` into a
+ * committed fixture and make it diff on every regeneration. The frames written in its place are
+ * what the page's own bundle would have produced.
+ */
+function reportUncaught(thrown, { line, column, stack }) {
+  thrown.stack = stack;
+  dom.window.dispatchEvent(
+    new dom.window.ErrorEvent('error', {
+      message: thrown.message,
+      filename: BUNDLE,
+      lineno: line,
+      colno: column,
+      error: thrown,
+    }),
+  );
+}
+
 /**
  * A route change.
  *
@@ -291,7 +320,32 @@ flash.className = 'flash error';
 flash.textContent = 'We could not take payment. Please try again.';
 $('#place').className = 'add';
 await settle();
-advance(6_000); // reading the error
+advance(220);
+
+// The 502's second act, and the reason the error lane exists.
+//
+// The page reports the failure and then breaks trying to describe it: the settled handler runs
+// whatever the response was and reads through a field the error body does not have. That ordering
+// is the ordinary shape of a frontend bug, and it is the case a recording answers and a server log
+// does not — the backend's trace says the payment provider timed out, and says nothing at all
+// about the checkout page then throwing on top of it.
+try {
+  const body = await checkout.json();
+  $('#pay').dataset['order'] = body.order.id;
+} catch (thrown) {
+  reportUncaught(thrown, {
+    line: 1284,
+    column: 27,
+    stack: [
+      `TypeError: ${thrown.message}`,
+      `    at onCheckoutSettled (${BUNDLE}:1284:27)`,
+      `    at HTMLButtonElement.<anonymous> (${BUNDLE}:1301:9)`,
+    ].join('\n'),
+  });
+}
+
+await settle();
+advance(5_780); // reading the error
 
 $('#place').className = 'pressed';
 await settle();
@@ -310,6 +364,12 @@ if (checkout.status !== 502) {
 }
 if (captured.length === 0) {
   throw new Error('the SDK sent no chunks; nothing to build a fixture from');
+}
+if (!captured.some((entry) => entry.body.errors?.length)) {
+  // The capture path is the thing being exercised, not the throw. If the SDK stopped listening,
+  // or stopped denormalizing onto the chunk, the fixture would still generate — and the demo
+  // would quietly lose its error lane rather than fail here.
+  throw new Error('the SDK recorded no errors; the capture path is not wired');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -472,12 +532,18 @@ const firstEventMs = Math.min(
   ),
 );
 
-/** rrweb's own stamp, plus the absolute times inside our custom-event payloads. */
+/**
+ * rrweb's own stamp, plus the absolute times inside our custom-event payloads.
+ *
+ * `timeMs` belongs to the error and console markers, and is here for the same reason `startMs` is:
+ * a marker left at its generated time while the replay says today would sit an eternity from the
+ * frames it describes.
+ */
 function rebaseEvent(event) {
   const out = { ...event, timestamp: event.timestamp - firstEventMs };
   if (out.data?.payload && typeof out.data.payload === 'object') {
     const payload = { ...out.data.payload };
-    for (const field of ['startMs', 'endMs']) {
+    for (const field of ['startMs', 'endMs', 'timeMs']) {
       if (typeof payload[field] === 'number') payload[field] -= firstEventMs;
     }
     out.data = { ...out.data, payload };
@@ -500,6 +566,24 @@ const rebasedChunks = chunks.map((chunk) => ({
     ...pageview,
     startMs: pageview.startMs - firstEventMs,
   })),
+  // The denormalized copies the SDK put on the chunk, rebased alongside their markers. Written
+  // only when there are any, so a chunk that captured nothing does not grow two empty arrays.
+  ...(chunk.errors?.length
+    ? {
+        errors: chunk.errors.map((error) => ({
+          ...error,
+          timeMs: error.timeMs - firstEventMs,
+        })),
+      }
+    : {}),
+  ...(chunk.logs?.length
+    ? {
+        logs: chunk.logs.map((log) => ({
+          ...log,
+          timeMs: log.timeMs - firstEventMs,
+        })),
+      }
+    : {}),
 }));
 
 const lastEventMs = Math.max(

@@ -63,6 +63,18 @@ export interface DemoFixture {
       startMs: number;
       trigger: string;
     }[];
+    /** Absent on a chunk that captured none, the same as the wire format. */
+    errors?: {
+      source: string;
+      name?: string;
+      message: string;
+      fileUrl?: string;
+      line?: number;
+      column?: number;
+      stack?: string;
+      timeMs: number;
+    }[];
+    logs?: { level: string; message: string; timeMs: number }[];
   }[];
   spans: {
     traceId: string;
@@ -84,6 +96,7 @@ export interface DemoRecording {
   chunkCount: number;
   pageCount: number;
   requestCount: number;
+  errorCount: number;
   spanCount: number;
   durationMs: number;
 }
@@ -183,7 +196,8 @@ export function rebaseChunk(
       if (!payload) return { ...event, timestamp: event.timestamp + baseMs };
 
       const moved = { ...payload };
-      for (const field of ['startMs', 'endMs']) {
+      // `timeMs` is the error and console markers' instant; `startMs`/`endMs` the request's window.
+      for (const field of ['startMs', 'endMs', 'timeMs']) {
         if (typeof moved[field] === 'number')
           moved[field] = (moved[field] as number) + baseMs;
       }
@@ -208,6 +222,24 @@ export function rebaseChunk(
       ...pageview,
       startMs: pageview.startMs + baseMs,
     })),
+    // The denormalized copies, moved with their markers. Omitted rather than sent empty, so a
+    // rebased chunk stays the shape the SDK would have posted.
+    ...(chunk.errors?.length
+      ? {
+          errors: chunk.errors.map((error) => ({
+            ...error,
+            timeMs: error.timeMs + baseMs,
+          })),
+        }
+      : {}),
+    ...(chunk.logs?.length
+      ? {
+          logs: chunk.logs.map((log) => ({
+            ...log,
+            timeMs: log.timeMs + baseMs,
+          })),
+        }
+      : {}),
     ...(chunk.pageviewOrdinal !== undefined
       ? { pageviewOrdinal: chunk.pageviewOrdinal }
       : {}),
@@ -273,6 +305,13 @@ export async function seedDemoRecording(
       eventCount: parsed.data.events.length,
       startedAt: new Date(Math.min(...timestamps)),
       endedAt: new Date(Math.max(...timestamps)),
+      // Taken from the validated chunk rather than the fixture, so these are the same numbers the
+      // worker would have derived from the same bytes.
+      errors: parsed.data.errors,
+      consoleErrorCount: parsed.data.logs.filter((log) => log.level === 'error')
+        .length,
+      consoleWarnCount: parsed.data.logs.filter((log) => log.level === 'warn')
+        .length,
       ...(chunk.pageviewOrdinal !== undefined
         ? { pageviewOrdinal: chunk.pageviewOrdinal }
         : {}),
@@ -311,9 +350,35 @@ export async function seedDemoRecording(
       release: meta.release ?? null,
       userId: meta.user?.id ?? null,
       viewport: meta.viewport ?? undefined,
-      // A failed request disqualifies a recording from being trivial however short it is, and this
-      // one has the failure the demo is built around.
+      // A failed request or a thrown error disqualifies a recording from being trivial however
+      // short it is, and this one has both — the failure the demo is built around.
       trivial: false,
+      errorCount: chunks.reduce(
+        (total, chunk) => total + chunk.errors.length,
+        0,
+      ),
+      consoleErrorCount: chunks.reduce(
+        (total, chunk) => total + chunk.consoleErrorCount,
+        0,
+      ),
+      consoleWarnCount: chunks.reduce(
+        (total, chunk) => total + chunk.consoleWarnCount,
+        0,
+      ),
+      errors: {
+        create: chunks.flatMap((chunk) =>
+          chunk.errors.map((error) => ({
+            source: error.source,
+            name: error.name ?? null,
+            message: error.message,
+            fileUrl: error.fileUrl ?? null,
+            line: error.line ?? null,
+            column: error.column ?? null,
+            stack: error.stack ?? null,
+            clientMs: BigInt(error.timeMs),
+          })),
+        ),
+      },
       chunks: {
         create: chunks.map((chunk) => ({
           seq: chunk.seq,
@@ -322,6 +387,8 @@ export async function seedDemoRecording(
           eventCount: chunk.eventCount,
           sizeBytes: chunk.bytes.byteLength,
           storageKey: chunk.key,
+          consoleErrorCount: chunk.consoleErrorCount,
+          consoleWarnCount: chunk.consoleWarnCount,
           ...(chunk.pageviewOrdinal !== undefined
             ? { pageviewOrdinal: chunk.pageviewOrdinal }
             : {}),
@@ -392,6 +459,7 @@ export async function seedDemoRecording(
     chunkCount: chunks.length,
     pageCount: pageviews.length,
     requestCount: links.length,
+    errorCount: chunks.reduce((total, chunk) => total + chunk.errors.length, 0),
     spanCount: fixture.spans.length,
     durationMs: fixture.durationMs,
   };

@@ -56,6 +56,26 @@ describe('the demo fixture', () => {
     expect(links.some((link) => (link.status ?? 200) >= 400)).toBe(true);
   });
 
+  it('contains the error the failure caused, inside the recorded window', () => {
+    // Both halves matter. Without the error the demo shows an empty lane where the frontend's own
+    // failure should be; outside the window it would be drawn somewhere the replay cannot reach.
+    const errors = fixture.chunks.flatMap((chunk) => chunk.errors ?? []);
+    expect(errors.length).toBeGreaterThan(0);
+
+    for (const error of errors) {
+      expect(error.timeMs).toBeGreaterThanOrEqual(0);
+      expect(error.timeMs).toBeLessThanOrEqual(fixture.durationMs);
+    }
+  });
+
+  it('keeps the generator’s own paths out of the committed stack', () => {
+    // A real stack here names an absolute path on whoever regenerated the fixture, which would
+    // make it diff on every machine and leak a home directory into the repo.
+    for (const error of fixture.chunks.flatMap((chunk) => chunk.errors ?? [])) {
+      expect(error.stack ?? '').not.toMatch(/build-demo-recording|[A-Z]:\\/);
+    }
+  });
+
   it('has a span for every trace a request points at', () => {
     // A request whose trace resolves to nothing is the one thing the viewer cannot explain, and it
     // reads as a broken install rather than a missing export.
@@ -108,6 +128,27 @@ describe('rebaseChunk', () => {
       );
 
     expect(spread(late)).toEqual(spread(early));
+  });
+
+  it('moves the errors on the chunk and their markers together', () => {
+    // Two copies of one error — the marker in the replay stream and the row the worker writes from
+    // the chunk — and a viewer joins them by nothing but their instant. Rebasing one and not the
+    // other would put the mark and the frame it describes in different eras.
+    for (const chunk of rebased()) {
+      for (const error of chunk.errors) {
+        expect(error.timeMs).toBeGreaterThanOrEqual(BASE_MS);
+      }
+
+      const markers = (
+        chunk.events as {
+          data?: { tag?: string; payload?: { timeMs?: number } };
+        }[]
+      ).filter((event) => event.data?.tag === 'syncline.error');
+
+      expect(markers.map((event) => event.data?.payload?.timeMs)).toEqual(
+        chunk.errors.map((error) => error.timeMs),
+      );
+    }
   });
 
   it('moves the timestamps inside request markers, not just rrweb’s own', () => {
