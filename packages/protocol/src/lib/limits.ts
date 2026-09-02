@@ -114,3 +114,30 @@ export const MAX_CONSOLE_MESSAGE_CHARS = 1_000;
  */
 export const MAX_ERRORS_PER_CHUNK = 100;
 export const MAX_CONSOLE_ENTRIES_PER_CHUNK = 500;
+
+/**
+ * Bounds on the context an application attaches to a session.
+ *
+ * These are the tightest bounds in this file, and deliberately so. Everything else here is written
+ * by the browser about the browser; context is written by the application about its customer, ends
+ * up in a search index, and is the one thing here that someone will eventually be asked to delete.
+ *
+ * The key cap is what stops an application that spreads a whole user object into `setContext` from
+ * turning one bad deploy into a permanent column of noise on every recording. The value cap is
+ * short because an indexed value is something you type into a filter — a two-hundred-character
+ * value is not one anybody is going to match exactly.
+ */
+export const MAX_CONTEXT_KEY_CHARS = 64;
+export const MAX_CONTEXT_VALUE_CHARS = 200;
+
+/**
+ * How many distinct keys one session may carry, and how many changes one chunk may report.
+ *
+ * The two differ because they bound different things: a session that names its customer, their
+ * account and their plan uses three keys forever, while a page that calls `setContext` in a render
+ * loop reports the same three thousands of times. Past the per-chunk ceiling entries are dropped
+ * rather than flushed early — the same rule errors and console output follow, and for the same
+ * reason.
+ */
+export const MAX_CONTEXT_KEYS_PER_SESSION = 50;
+export const MAX_CONTEXT_ENTRIES_PER_CHUNK = 200;

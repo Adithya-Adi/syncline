@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import {
   MAX_CONSOLE_ENTRIES_PER_CHUNK,
+  MAX_CONTEXT_ENTRIES_PER_CHUNK,
   MAX_ERRORS_PER_CHUNK,
   MAX_EVENTS_PER_CHUNK,
   MAX_LINKS_PER_CHUNK,
@@ -17,6 +18,7 @@ import {
 } from './limits.js';
 import {
   consolePayloadSchema,
+  contextEntrySchema,
   errorPayloadSchema,
   PAGEVIEW_TRIGGERS,
 } from './events.js';
@@ -107,6 +109,18 @@ export const sessionChunkSchema = z.object({
     .max(MAX_CONSOLE_ENTRIES_PER_CHUNK)
     .default([]),
   /**
+   * What the application said about this session — who it belongs to, and anything it asked to be
+   * findable by.
+   *
+   * Flat rather than nested by call, because the worker cares about entries and their instants and
+   * not about which `setContext` produced which. Each carries its own `timeMs` so a later value
+   * wins over an earlier one however the chunks arrive.
+   */
+  context: z
+    .array(contextEntrySchema)
+    .max(MAX_CONTEXT_ENTRIES_PER_CHUNK)
+    .default([]),
+  /**
    * Which page this chunk's events belong to.
    *
    * Chunks flush at every page boundary, so a chunk never straddles two pages — which is what lets
@@ -128,6 +142,7 @@ export type RequestLink = z.infer<typeof requestLinkSchema>;
 export type Pageview = z.infer<typeof pageviewSchema>;
 export type ChunkError = z.infer<typeof errorPayloadSchema>;
 export type ChunkLog = z.infer<typeof consolePayloadSchema>;
+export type ChunkContext = z.infer<typeof contextEntrySchema>;
 export type SessionChunk = z.infer<typeof sessionChunkSchema>;
 export type ClockResponse = z.infer<typeof clockResponseSchema>;
 

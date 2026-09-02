@@ -11,6 +11,9 @@
 import { z } from 'zod';
 import {
   MAX_CONSOLE_MESSAGE_CHARS,
+  MAX_CONTEXT_KEY_CHARS,
+  MAX_CONTEXT_KEYS_PER_SESSION,
+  MAX_CONTEXT_VALUE_CHARS,
   MAX_ERROR_MESSAGE_CHARS,
   MAX_ERROR_STACK_CHARS,
 } from './limits.js';
@@ -23,6 +26,7 @@ export const REQUEST_END = 'syncline.response' as const;
 export const PAGEVIEW = 'syncline.pageview' as const;
 export const ERROR = 'syncline.error' as const;
 export const CONSOLE = 'syncline.console' as const;
+export const CONTEXT = 'syncline.context' as const;
 
 /**
  * What moved the user to this page.
@@ -146,12 +150,86 @@ export const consolePayloadSchema = z.object({
 export type ErrorPayload = z.infer<typeof errorPayloadSchema>;
 export type ConsolePayload = z.infer<typeof consolePayloadSchema>;
 
+/**
+ * The key identity is stored under.
+ *
+ * Identity is context, not a parallel mechanism. Routing `identify()` through the same events as
+ * `setContext()` means one ordering rule, one way to clear it, and one path into the search index —
+ * rather than a second, subtly different one that has to be kept in step with the first.
+ */
+export const IDENTITY_KEY = 'user' as const;
+
+/**
+ * One thing the application says about the session it is recording.
+ *
+ * A value of `null` means unset, not "the empty string": logging out has to be able to take a key
+ * away, and a recording that stays findable by the customer who left it is the wrong answer.
+ *
+ * Numbers and booleans are carried as themselves rather than stringified by the SDK, because the
+ * server indexes a numeric value twice — as text for exact match, and as a number for the
+ * threshold filters that a string index cannot answer.
+ */
+export const contextValueSchema = z.union([
+  z.string().max(MAX_CONTEXT_VALUE_CHARS),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+]);
+
+/**
+ * Key names that are never transmitted and never stored, whatever anyone configures.
+ *
+ * Not a policy with an off switch, because the failure it prevents is not a preference: an
+ * application that spreads its auth state into `setContext` would put a live credential into a
+ * search index, readable by every member of the organization and surviving in backups long after
+ * the token was rotated. There is no version of that which is the customer's call to make.
+ *
+ * It lives in protocol rather than beside the index because both ends need it. The SDK refuses
+ * these before they reach the network, which is the only place refusing them actually protects
+ * anybody; the server refuses them again, because an older SDK is still a client.
+ *
+ * Matched as a case-insensitive substring, so `apiKey`, `stripe_secret` and `X-Auth-Token` are all
+ * caught. False positives are possible — a key genuinely called `tokenCount` is refused — and that
+ * is the right side to be wrong on.
+ */
+export const SENSITIVE_KEY_PATTERN =
+  /pass|secret|token|auth|cookie|session[_-]?id|credential|api[_-]?key|private|ssn|cvv|card[_-]?number/i;
+
+export function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEY_PATTERN.test(key);
+}
+
+export const contextEntrySchema = z.object({
+  key: z.string().min(1).max(MAX_CONTEXT_KEY_CHARS),
+  value: contextValueSchema,
+  /** When the application said it. What makes a later call win over an earlier one. */
+  timeMs: z.number().int().nonnegative(),
+});
+
+/**
+ * One `identify` or `setContext` call, at the frame it happened.
+ *
+ * Grouped rather than one marker per key, because the call is the event: "they logged in here" is a
+ * moment in the replay, and three markers in the same millisecond describe it worse than one.
+ */
+export const contextPayloadSchema = z.object({
+  entries: z
+    .array(contextEntrySchema.omit({ timeMs: true }))
+    .max(MAX_CONTEXT_KEYS_PER_SESSION),
+  timeMs: z.number().int().nonnegative(),
+});
+
+export type ContextValue = z.infer<typeof contextValueSchema>;
+export type ContextEntry = z.infer<typeof contextEntrySchema>;
+export type ContextPayload = z.infer<typeof contextPayloadSchema>;
+
 export type SynclineEventTag =
   | typeof REQUEST_START
   | typeof REQUEST_END
   | typeof PAGEVIEW
   | typeof ERROR
-  | typeof CONSOLE;
+  | typeof CONSOLE
+  | typeof CONTEXT;
 
 /** The shape rrweb wraps a custom event in. */
 export interface RrwebCustomEvent<Tag extends string, Payload> {
@@ -171,12 +249,14 @@ export type RequestEndEvent = RrwebCustomEvent<
 export type PageviewEvent = RrwebCustomEvent<typeof PAGEVIEW, PageviewPayload>;
 export type ErrorEvent = RrwebCustomEvent<typeof ERROR, ErrorPayload>;
 export type ConsoleEvent = RrwebCustomEvent<typeof CONSOLE, ConsolePayload>;
+export type ContextEvent = RrwebCustomEvent<typeof CONTEXT, ContextPayload>;
 export type SynclineEvent =
   | RequestStartEvent
   | RequestEndEvent
   | PageviewEvent
   | ErrorEvent
-  | ConsoleEvent;
+  | ConsoleEvent
+  | ContextEvent;
 
 /**
  * Narrows an arbitrary rrweb event to one of ours.
@@ -194,6 +274,7 @@ export function isSynclineEvent(event: unknown): event is SynclineEvent {
     tag === REQUEST_END ||
     tag === PAGEVIEW ||
     tag === ERROR ||
-    tag === CONSOLE
+    tag === CONSOLE ||
+    tag === CONTEXT
   );
 }
