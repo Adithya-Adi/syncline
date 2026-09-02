@@ -95,6 +95,27 @@ export default function BrowserSdk() {
           </tr>
           <tr>
             <td>
+              <code>captureErrors</code>
+            </td>
+            <td>
+              <code>true</code>
+            </td>
+            <td>Uncaught errors and unhandled promise rejections</td>
+          </tr>
+          <tr>
+            <td>
+              <code>captureConsole</code>
+            </td>
+            <td>
+              <code>false</code>
+            </td>
+            <td>
+              <code>true</code> for <code>error</code> and <code>warn</code>, or
+              a list of levels
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>debug</code>
             </td>
             <td>

@@ -92,3 +92,25 @@ export const TRIVIAL_SESSION_MS = 5_000;
 export const CLOCK_UNCERTAINTY_THRESHOLD_MS = 100;
 
 export const INGEST_KEY_HEADER = 'x-syncline-key';
+
+/**
+ * Bounds on captured diagnostics.
+ *
+ * Every one of these exists because the value being captured is written by the host page, not by
+ * us. A message is whatever the application threw, a stack is as deep as its bundler made it, and
+ * an argument to `console.log` can be a whole response body. Truncating is the difference between
+ * a recording and an exfiltration channel with a size limit.
+ */
+export const MAX_ERROR_MESSAGE_CHARS = 1_000;
+export const MAX_ERROR_STACK_CHARS = 4_000;
+export const MAX_CONSOLE_MESSAGE_CHARS = 1_000;
+
+/**
+ * Upper bounds per chunk, for the same reason `links` has one.
+ *
+ * A page in an error loop produces thousands of identical entries a second. Past these the SDK
+ * stops recording them rather than turning a recording into a log drain — the count is what
+ * answers "did this session break", and the first few are what say how.
+ */
+export const MAX_ERRORS_PER_CHUNK = 100;
+export const MAX_CONSOLE_ENTRIES_PER_CHUNK = 500;

@@ -7,6 +7,8 @@
 
 import { record } from 'rrweb';
 import {
+  CONSOLE,
+  ERROR,
   MAX_CHUNKS_PER_SESSION,
   PAGEVIEW,
   REQUEST_END,
@@ -19,6 +21,7 @@ import {
 import { resolveOptions, type SynclineOptions } from './config.js';
 import { EventBuffer, FLUSH_EVERY_MS, PendingRequests } from './buffer.js';
 import { measureClock } from './clock.js';
+import { installConsoleCapture, installErrorCapture } from './diagnostics.js';
 import { installNavigationWatch } from './navigation.js';
 import { PageviewTracker } from './pageviews.js';
 import {
@@ -125,6 +128,42 @@ export function startRecording(options: SynclineOptions): Recording {
         },
       )
     : () => undefined;
+
+  /**
+   * Errors and console output, when the host asked for them.
+   *
+   * Both write two things: a marker into the replay stream, so the entry sits at the frame it
+   * happened, and a denormalized copy on the chunk, so the worker can count them without walking
+   * the events. The marker is skipped when the buffer refused the copy — past the per-chunk
+   * ceiling, a page in an error loop would otherwise fill the stream with entries no table has.
+   */
+  const uninstallErrors = resolved.captureErrors
+    ? installErrorCapture(
+        window,
+        {
+          onError(payload) {
+            if (!buffer.addError(payload)) return;
+            addCustomEvent(ERROR, payload);
+            log(`${payload.source}: ${payload.message}`);
+          },
+        },
+        pageOrigin,
+      )
+    : () => undefined;
+
+  const uninstallConsole =
+    resolved.captureConsole.length > 0
+      ? installConsoleCapture(
+          window.console as unknown as Record<string, unknown>,
+          resolved.captureConsole,
+          {
+            onConsole(payload) {
+              if (!buffer.addLog(payload)) return;
+              addCustomEvent(CONSOLE, payload);
+            },
+          },
+        )
+      : () => undefined;
 
   /**
    * A route change closes one page and opens the next.
@@ -291,6 +330,8 @@ export function startRecording(options: SynclineOptions): Recording {
         events: drained.events,
         links: drained.links,
         pageviews: drained.pageviews,
+        errors: drained.errors,
+        logs: drained.logs,
         // The page these events belong to. Every flush happens either at a boundary or inside one
         // page, so this is unambiguous for the whole chunk.
         pageviewOrdinal: pageviews.current,
@@ -328,6 +369,8 @@ export function startRecording(options: SynclineOptions): Recording {
     uninstallNavigation();
     uninstallFetch();
     uninstallXhr();
+    uninstallErrors();
+    uninstallConsole();
     stopRrweb?.();
     await flush({ rotate: false });
   }

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { sessionChunkSchema } from './ingest.js';
-import { MAX_EVENTS_PER_CHUNK } from './limits.js';
 import {
+  MAX_ERRORS_PER_CHUNK,
+  MAX_ERROR_MESSAGE_CHARS,
+  MAX_EVENTS_PER_CHUNK,
+} from './limits.js';
+import {
+  CONSOLE,
+  ERROR,
   isSynclineEvent,
   REQUEST_START,
   RRWEB_CUSTOM_EVENT_TYPE,
@@ -73,15 +79,74 @@ describe('session chunk envelope', () => {
   });
 });
 
+describe('errors and console output on a chunk', () => {
+  const error = {
+    source: 'onerror',
+    name: 'TypeError',
+    message: "Cannot read properties of undefined (reading 'total')",
+    fileUrl: 'https://app.acme.com/static/main.js',
+    line: 42,
+    column: 7,
+    timeMs: 1724832000500,
+  };
+
+  it('accepts an error and a log line', () => {
+    const parsed = sessionChunkSchema.parse({
+      ...valid,
+      errors: [error],
+      logs: [{ level: 'warn', message: 'retrying', timeMs: 1724832000600 }],
+    });
+
+    expect(parsed.errors).toHaveLength(1);
+    expect(parsed.logs[0]).toMatchObject({ level: 'warn' });
+  });
+
+  it('defaults both, so a chunk from an SDK with capture off still parses', () => {
+    const parsed = sessionChunkSchema.parse(valid);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.logs).toEqual([]);
+  });
+
+  it('rejects an error source it does not know', () => {
+    expect(
+      sessionChunkSchema.safeParse({
+        ...valid,
+        errors: [{ ...error, source: 'console' }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a message longer than the SDK is allowed to send', () => {
+    // The SDK truncates before transmitting. A body over the bound did not come from it.
+    expect(
+      sessionChunkSchema.safeParse({
+        ...valid,
+        errors: [
+          { ...error, message: 'x'.repeat(MAX_ERROR_MESSAGE_CHARS + 1) },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('caps how many of each one chunk may carry', () => {
+    const errors = new Array(MAX_ERRORS_PER_CHUNK + 1).fill(error);
+    expect(sessionChunkSchema.safeParse({ ...valid, errors }).success).toBe(
+      false,
+    );
+  });
+});
+
 describe('syncline event detection', () => {
   it('recognizes our custom events', () => {
-    expect(
-      isSynclineEvent({
-        type: RRWEB_CUSTOM_EVENT_TYPE,
-        timestamp: 1,
-        data: { tag: REQUEST_START, payload: {} },
-      }),
-    ).toBe(true);
+    for (const tag of [REQUEST_START, ERROR, CONSOLE]) {
+      expect(
+        isSynclineEvent({
+          type: RRWEB_CUSTOM_EVENT_TYPE,
+          timestamp: 1,
+          data: { tag, payload: {} },
+        }),
+      ).toBe(true);
+    }
   });
 
   it('ignores ordinary rrweb events and junk', () => {

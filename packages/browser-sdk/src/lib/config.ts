@@ -7,6 +7,8 @@
  * See docs/ARCHITECTURE.md §3.7.
  */
 
+import { CONSOLE_LEVELS, type ConsoleLevel } from '@syncline/protocol';
+
 export interface SynclineOptions {
   /** Public project key, `pk_*`. Safe to ship in a bundle; it is gated by the origin allowlist. */
   key: string;
@@ -25,15 +27,51 @@ export interface SynclineOptions {
    * on screen, so the safe default has to be the one you opt out of.
    */
   maskAllInputs?: boolean;
+  /**
+   * Records uncaught errors and unhandled promise rejections. On by default.
+   *
+   * The one capture here that is not opt-in, because it is the one the product exists for: a
+   * recording of a session that broke, with no record of what broke, answers nothing. The volume
+   * is bounded by definition — a page throwing constantly is already unusable — and the content is
+   * an error the application itself surfaced rather than data it was holding.
+   */
+  captureErrors?: boolean;
+  /**
+   * Records console output. Off by default, and `['error', 'warn']` when switched on with `true`.
+   *
+   * Opt-in because the arguments are whatever the application chose to print, which on plenty of
+   * codebases includes tokens, request bodies, and personal data — none of which the person being
+   * recorded agreed to hand over. Pass the levels explicitly to go wider.
+   */
+  captureConsole?: boolean | ConsoleLevel[];
   /** Emits SDK diagnostics to the console. Off by default. */
   debug?: boolean;
 }
 
 export interface ResolvedOptions extends Required<
-  Omit<SynclineOptions, 'release' | 'user'>
+  Omit<SynclineOptions, 'release' | 'user' | 'captureConsole'>
 > {
   release?: string;
   user?: { id: string };
+  /** Resolved to the levels themselves; empty means console capture is off. */
+  captureConsole: ConsoleLevel[];
+}
+
+/** What `captureConsole: true` means. The two levels that describe something going wrong. */
+const DEFAULT_CONSOLE_LEVELS: ConsoleLevel[] = ['error', 'warn'];
+
+/**
+ * Turns the console option into a level list.
+ *
+ * An unknown level is dropped rather than rejected: a config written against a newer SDK should
+ * lose that one level, not stop the recording.
+ */
+export function resolveConsoleLevels(
+  option: boolean | ConsoleLevel[] | undefined,
+): ConsoleLevel[] {
+  if (option === undefined || option === false) return [];
+  if (option === true) return [...DEFAULT_CONSOLE_LEVELS];
+  return option.filter((level) => CONSOLE_LEVELS.includes(level));
 }
 
 export function resolveOptions(
@@ -48,6 +86,8 @@ export function resolveOptions(
     endpoint: options.endpoint.replace(/\/+$/, ''),
     traceOrigins: (options.traceOrigins ?? [pageOrigin]).map(normalizeOrigin),
     maskAllInputs: options.maskAllInputs ?? true,
+    captureErrors: options.captureErrors ?? true,
+    captureConsole: resolveConsoleLevels(options.captureConsole),
     debug: options.debug ?? false,
     ...(options.release ? { release: options.release } : {}),
     ...(options.user ? { user: options.user } : {}),

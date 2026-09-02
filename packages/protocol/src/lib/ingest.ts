@@ -8,12 +8,18 @@
 
 import { z } from 'zod';
 import {
+  MAX_CONSOLE_ENTRIES_PER_CHUNK,
+  MAX_ERRORS_PER_CHUNK,
   MAX_EVENTS_PER_CHUNK,
   MAX_LINKS_PER_CHUNK,
   MAX_CHUNKS_PER_SESSION,
   MAX_PAGEVIEWS_PER_CHUNK,
 } from './limits.js';
-import { PAGEVIEW_TRIGGERS } from './events.js';
+import {
+  consolePayloadSchema,
+  errorPayloadSchema,
+  PAGEVIEW_TRIGGERS,
+} from './events.js';
 
 const traceId = z.string().regex(/^[0-9a-f]{32}$/);
 const spanId = z.string().regex(/^[0-9a-f]{16}$/);
@@ -88,6 +94,19 @@ export const sessionChunkSchema = z.object({
   /** Pages that began inside this chunk. Empty when the chunk flushed mid-page on size or time. */
   pageviews: z.array(pageviewSchema).max(MAX_PAGEVIEWS_PER_CHUNK).default([]),
   /**
+   * Errors and console output, denormalized out of the rrweb stream like `links` and `pageviews`.
+   *
+   * Same reasoning: the markers are already inside `events`, but a worker deciding whether this
+   * session broke should not have to walk a five-thousand-event array to find out. Both default to
+   * empty, because an SDK with capture switched off — which is the default for console — sends
+   * neither.
+   */
+  errors: z.array(errorPayloadSchema).max(MAX_ERRORS_PER_CHUNK).default([]),
+  logs: z
+    .array(consolePayloadSchema)
+    .max(MAX_CONSOLE_ENTRIES_PER_CHUNK)
+    .default([]),
+  /**
    * Which page this chunk's events belong to.
    *
    * Chunks flush at every page boundary, so a chunk never straddles two pages — which is what lets
@@ -107,6 +126,8 @@ export type Viewport = z.infer<typeof viewportSchema>;
 export type SessionMeta = z.infer<typeof sessionMetaSchema>;
 export type RequestLink = z.infer<typeof requestLinkSchema>;
 export type Pageview = z.infer<typeof pageviewSchema>;
+export type ChunkError = z.infer<typeof errorPayloadSchema>;
+export type ChunkLog = z.infer<typeof consolePayloadSchema>;
 export type SessionChunk = z.infer<typeof sessionChunkSchema>;
 export type ClockResponse = z.infer<typeof clockResponseSchema>;
 

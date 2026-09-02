@@ -77,6 +77,26 @@ export default function Privacy() {
         filled, how long it took, and where the cursor went.
       </p>
 
+      <h2 className="docs__h2">Errors and console output</h2>
+      <p>
+        Uncaught errors and unhandled promise rejections are recorded by
+        default: the message, the constructor name, the script and line, and the
+        stack. That is the one capture switched on for you, because a recording
+        of a session that broke with no record of what broke answers nothing —
+        and because an error is something your application already surfaced
+        rather than data it was holding.
+      </p>
+      <p>
+        Console output is <em>not</em> recorded unless you set{' '}
+        <code>captureConsole</code>. The arguments to a console call are
+        whatever your code decided to print, which across most codebases
+        includes tokens, request bodies, and personal data. When you do turn it
+        on, arguments are rendered one level deep and truncated rather than
+        serialized: a nested object becomes <code>[Object]</code>, a DOM node
+        becomes <code>&lt;div&gt;</code>, and nothing descends into a response
+        body.
+      </p>
+
       <h2 className="docs__h2">Turning masking off</h2>
       <p>
         <code>maskAllInputs: false</code> exists, and it records what people

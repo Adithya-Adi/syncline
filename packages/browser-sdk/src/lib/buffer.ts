@@ -10,7 +10,11 @@
 import {
   FLUSH_BYTES,
   FLUSH_INTERVAL_MS,
+  MAX_CONSOLE_ENTRIES_PER_CHUNK,
+  MAX_ERRORS_PER_CHUNK,
   MAX_EVENTS_PER_CHUNK,
+  type ChunkError,
+  type ChunkLog,
   type Pageview,
   type RequestLink,
 } from '@syncline/protocol';
@@ -19,12 +23,16 @@ export interface PendingChunk {
   events: unknown[];
   links: RequestLink[];
   pageviews: Pageview[];
+  errors: ChunkError[];
+  logs: ChunkLog[];
 }
 
 export class EventBuffer {
   private events: unknown[] = [];
   private links: RequestLink[] = [];
   private pageviews: Pageview[] = [];
+  private errors: ChunkError[] = [];
+  private logs: ChunkLog[] = [];
   /** Rough running total. Exact byte accounting would mean serializing on every event. */
   private approximateBytes = 0;
 
@@ -48,6 +56,31 @@ export class EventBuffer {
     this.approximateBytes += 200;
   }
 
+  /**
+   * Records an error, up to the per-chunk ceiling.
+   *
+   * Over the ceiling it is dropped rather than flushed early, and the difference matters: a page in
+   * an error loop emits thousands a second, and flushing on each would turn a broken page into a
+   * denial of service against the ingest API. The first hundred say what went wrong; the count in
+   * the replay stream still says how often.
+   *
+   * Returns whether it was kept, so the caller knows whether the marker belongs in the stream.
+   */
+  addError(error: ChunkError): boolean {
+    if (this.errors.length >= MAX_ERRORS_PER_CHUNK) return false;
+    this.errors.push(error);
+    this.approximateBytes += error.message.length + (error.stack?.length ?? 0);
+    return true;
+  }
+
+  /** As `addError`, and for the same reason: a render loop that logs is the ordinary case. */
+  addLog(log: ChunkLog): boolean {
+    if (this.logs.length >= MAX_CONSOLE_ENTRIES_PER_CHUNK) return false;
+    this.logs.push(log);
+    this.approximateBytes += log.message.length;
+    return true;
+  }
+
   get size(): number {
     return this.events.length;
   }
@@ -56,7 +89,9 @@ export class EventBuffer {
     return (
       this.events.length === 0 &&
       this.links.length === 0 &&
-      this.pageviews.length === 0
+      this.pageviews.length === 0 &&
+      this.errors.length === 0 &&
+      this.logs.length === 0
     );
   }
 
@@ -73,10 +108,14 @@ export class EventBuffer {
       events: this.events,
       links: this.links,
       pageviews: this.pageviews,
+      errors: this.errors,
+      logs: this.logs,
     };
     this.events = [];
     this.links = [];
     this.pageviews = [];
+    this.errors = [];
+    this.logs = [];
     this.approximateBytes = 0;
     return chunk;
   }

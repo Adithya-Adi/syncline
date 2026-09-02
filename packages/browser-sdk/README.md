@@ -51,6 +51,13 @@ entirely, since implicit-flow tokens live there.
 Escape hatches for the host page: `.syncline-block` on an element keeps its subtree out of the
 recording; `.syncline-mask` keeps the structure but replaces the text.
 
+**Errors are recorded, console output is not** — unless you ask. An uncaught error is what the
+recording exists to explain, and its content is something the application already surfaced. Console
+arguments are whatever the application chose to print, which on plenty of codebases means tokens and
+request bodies, so `captureConsole` is off until you turn it on. When you do, arguments are rendered
+one level deep and truncated rather than serialized: a nested object becomes `[Object]`, a DOM node
+becomes `<div>`, and nothing walks into a response body.
+
 ## Details worth knowing
 
 **Sampling is inverted.** A recorded session always sets `sampled=1` on the traceparent, so a
@@ -85,15 +92,17 @@ package. Publish prereleases with:
 
 ## Options
 
-| Option          | Default     |                                        |
-| --------------- | ----------- | -------------------------------------- |
-| `key`           | —           | Public project key, `pk_*`             |
-| `endpoint`      | —           | Syncline API base URL                  |
-| `traceOrigins`  | page origin | Origins that receive a `traceparent`   |
-| `release`       | —           | Ties a replay to a deploy              |
-| `user`          | —           | `{ id }`                               |
-| `maskAllInputs` | `true`      | Masks every input, textarea and select |
-| `debug`         | `false`     | SDK diagnostics to the console         |
+| Option           | Default     |                                        |
+| ---------------- | ----------- | -------------------------------------- |
+| `key`            | —           | Public project key, `pk_*`             |
+| `endpoint`       | —           | Syncline API base URL                  |
+| `traceOrigins`   | page origin | Origins that receive a `traceparent`   |
+| `release`        | —           | Ties a replay to a deploy              |
+| `user`           | —           | `{ id }`                               |
+| `maskAllInputs`  | `true`      | Masks every input, textarea and select |
+| `captureErrors`  | `true`      | Uncaught errors and promise rejections |
+| `captureConsole` | `false`     | `true` for error+warn, or a level list |
+| `debug`          | `false`     | SDK diagnostics to the console         |
 
 ## The one thing an integrator has to do
 

@@ -3,6 +3,7 @@ import type { SessionChunkJob } from '@syncline/protocol';
 import type { PrismaClient } from '@syncline/models';
 import type { ObjectStore } from '@syncline/storage';
 import {
+  countConsole,
   eventTimestamps,
   isTrivial,
   pathOf,
@@ -46,9 +47,14 @@ function fakePrisma() {
     session: { upsert: jest.fn(), update: jest.fn() },
     sessionChunk: {
       upsert: jest.fn(),
-      aggregate: jest.fn().mockResolvedValue({ _min: {}, _max: {} }),
+      aggregate: jest.fn().mockResolvedValue({ _min: {}, _max: {}, _sum: {} }),
     },
     requestLink: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    sessionError: {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
@@ -193,6 +199,124 @@ describe('writes', () => {
   });
 });
 
+describe('errors and console output', () => {
+  const AT = 1_724_832_000_500;
+
+  const ERROR = {
+    source: 'onerror' as const,
+    name: 'TypeError',
+    message: "Cannot read properties of undefined (reading 'total')",
+    fileUrl: 'https://app.acme.com/static/main.js',
+    line: 42,
+    column: 7,
+    stack: 'TypeError: ...\n  at checkout (main.js:42:7)',
+    timeMs: AT,
+  };
+
+  it('writes a row per error, in client time', async () => {
+    const { prisma, tx } = fakePrisma();
+    const chunk = { ...CHUNK, errors: [ERROR] };
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(chunk))),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionError.createMany.mock.calls[0][0].data[0]).toMatchObject({
+      sessionId: SESSION_ID,
+      source: 'onerror',
+      name: 'TypeError',
+      line: 42,
+      clientMs: BigInt(AT),
+    });
+  });
+
+  it('replaces errors at the same instant rather than duplicating them on redelivery', async () => {
+    const { prisma, tx } = fakePrisma();
+    const chunk = { ...CHUNK, errors: [ERROR] };
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(chunk))),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionError.deleteMany).toHaveBeenCalledWith({
+      where: { sessionId: SESSION_ID, clientMs: { in: [BigInt(AT)] } },
+    });
+  });
+
+  it('counts console output onto the chunk, not the session', async () => {
+    // The chunk row is an upsert, so a redelivered job overwrites the count. A counter on the
+    // session would add to it a second time.
+    const { prisma, tx } = fakePrisma();
+    const chunk = {
+      ...CHUNK,
+      logs: [
+        { level: 'error', message: 'checkout failed', timeMs: AT },
+        { level: 'warn', message: 'retrying', timeMs: AT + 1 },
+        { level: 'log', message: 'rendered', timeMs: AT + 2 },
+      ],
+    };
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(chunk))),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionChunk.upsert.mock.calls[0][0].create).toMatchObject({
+      consoleErrorCount: 1,
+      consoleWarnCount: 1,
+    });
+    expect(tx.sessionChunk.upsert.mock.calls[0][0].update).toMatchObject({
+      consoleErrorCount: 1,
+      consoleWarnCount: 1,
+    });
+  });
+
+  it('touches neither table when a chunk carries neither', async () => {
+    const { prisma, tx } = fakePrisma();
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+
+    await processor.process(job());
+
+    expect(tx.sessionError.createMany).not.toHaveBeenCalled();
+    expect(tx.sessionChunk.upsert.mock.calls[0][0].create).toMatchObject({
+      consoleErrorCount: 0,
+      consoleWarnCount: 0,
+    });
+  });
+
+  it('sums the session totals from its chunks and its error rows', async () => {
+    const { prisma, tx } = fakePrisma();
+    tx.sessionChunk.aggregate.mockResolvedValue({
+      _min: { startedAt: new Date(1_724_832_000_000) },
+      _max: { endedAt: new Date(1_724_832_030_000) },
+      _sum: { consoleErrorCount: 4, consoleWarnCount: 2 },
+    });
+    tx.sessionError.count.mockResolvedValue(3);
+
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+
+    expect(tx.session.update.mock.calls[0][0].data).toMatchObject({
+      errorCount: 3,
+      consoleErrorCount: 4,
+      consoleWarnCount: 2,
+      // Thirty seconds with three errors in it is not a recording to hide.
+      trivial: false,
+    });
+  });
+});
+
 describe('the flow', () => {
   const PAGE = 1_724_832_000_000;
 
@@ -253,6 +377,7 @@ describe('the flow', () => {
     tx.sessionChunk.aggregate.mockResolvedValue({
       _min: { startedAt: new Date(PAGE) },
       _max: { endedAt: new Date(PAGE + 30_000) },
+      _sum: {},
     });
     tx.pageview.findMany.mockResolvedValue([
       { id: 'pv0', startedAt: new Date(PAGE), endedAt: null, durationMs: null },
@@ -285,6 +410,7 @@ describe('the flow', () => {
     tx.sessionChunk.aggregate.mockResolvedValue({
       _min: { startedAt: new Date(PAGE) },
       _max: { endedAt: new Date(PAGE + 1_000) },
+      _sum: {},
     });
     tx.pageview.findMany.mockResolvedValue([
       {
@@ -310,6 +436,7 @@ describe('the flow', () => {
     tx.sessionChunk.aggregate.mockResolvedValue({
       _min: { startedAt: new Date(PAGE) },
       _max: { endedAt: new Date(PAGE + 1_200) },
+      _sum: {},
     });
 
     const processor = new SessionChunkProcessor(
@@ -342,22 +469,53 @@ describe('pathOf', () => {
 });
 
 describe('isTrivial', () => {
+  const empty = {
+    durationMs: 900,
+    linkCount: 0,
+    failedCount: 0,
+    errorCount: 0,
+  };
+
   it('is true only for a recording that is both short and empty', () => {
-    expect(isTrivial({ durationMs: 900, linkCount: 0, failedCount: 0 })).toBe(
-      true,
-    );
-    expect(
-      isTrivial({ durationMs: 30_000, linkCount: 0, failedCount: 0 }),
-    ).toBe(false);
-    expect(isTrivial({ durationMs: 900, linkCount: 3, failedCount: 0 })).toBe(
-      false,
-    );
+    expect(isTrivial(empty)).toBe(true);
+    expect(isTrivial({ ...empty, durationMs: 30_000 })).toBe(false);
+    expect(isTrivial({ ...empty, linkCount: 3 })).toBe(false);
   });
 
   it('never marks a recording that contained a failure, however brief', () => {
-    expect(isTrivial({ durationMs: 200, linkCount: 1, failedCount: 1 })).toBe(
-      false,
-    );
+    expect(
+      isTrivial({
+        durationMs: 200,
+        linkCount: 1,
+        failedCount: 1,
+        errorCount: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it('never marks a recording that threw, even with no requests at all', () => {
+    // A two-second visit that ended in a TypeError is the shortest recording anyone will ever come
+    // looking for, and hiding it by default would be the one unforgivable default.
+    expect(isTrivial({ ...empty, errorCount: 1 })).toBe(false);
+  });
+});
+
+describe('countConsole', () => {
+  it('counts only the levels that mean something went wrong', () => {
+    expect(
+      countConsole([
+        { level: 'error' },
+        { level: 'warn' },
+        { level: 'error' },
+        { level: 'log' },
+        { level: 'info' },
+        { level: 'debug' },
+      ]),
+    ).toEqual({ error: 2, warn: 1 });
+  });
+
+  it('counts nothing when nothing was captured', () => {
+    expect(countConsole([])).toEqual({ error: 0, warn: 0 });
   });
 });
 

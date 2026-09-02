@@ -96,6 +96,8 @@ export class SessionChunkProcessor {
         },
       });
 
+      const consoleCounts = countConsole(parsed.logs);
+
       await tx.sessionChunk.upsert({
         where: { sessionId_seq: { sessionId, seq } },
         create: {
@@ -105,6 +107,8 @@ export class SessionChunkProcessor {
           endedAt: new Date(endedMs),
           eventCount: parsed.events.length,
           sizeBytes: raw.byteLength,
+          consoleErrorCount: consoleCounts.error,
+          consoleWarnCount: consoleCounts.warn,
           ...(parsed.pageviewOrdinal !== undefined
             ? { pageviewOrdinal: parsed.pageviewOrdinal }
             : {}),
@@ -113,6 +117,8 @@ export class SessionChunkProcessor {
         update: {
           eventCount: parsed.events.length,
           sizeBytes: raw.byteLength,
+          consoleErrorCount: consoleCounts.error,
+          consoleWarnCount: consoleCounts.warn,
           ...(parsed.pageviewOrdinal !== undefined
             ? { pageviewOrdinal: parsed.pageviewOrdinal }
             : {}),
@@ -141,6 +147,31 @@ export class SessionChunkProcessor {
             trigger: pageview.trigger,
             startedAt,
           },
+        });
+      }
+
+      // Errors are replaced rather than appended, keyed the way a redelivered chunk repeats them:
+      // same session, same instant, same message. Without this a retried job doubles a session's
+      // error count, and the count is what the recordings list sorts and filters on.
+      if (parsed.errors.length > 0) {
+        await tx.sessionError.deleteMany({
+          where: {
+            sessionId,
+            clientMs: { in: parsed.errors.map((e) => BigInt(e.timeMs)) },
+          },
+        });
+        await tx.sessionError.createMany({
+          data: parsed.errors.map((error) => ({
+            sessionId,
+            source: error.source,
+            name: error.name ?? null,
+            message: error.message,
+            fileUrl: error.fileUrl ?? null,
+            line: error.line ?? null,
+            column: error.column ?? null,
+            stack: error.stack ?? null,
+            clientMs: BigInt(error.timeMs),
+          })),
         });
       }
 
@@ -178,11 +209,21 @@ export class SessionChunkProcessor {
           bounds._max.endedAt.getTime() - bounds._min.startedAt.getTime();
 
         // Counted rather than tracked incrementally: a chunk can arrive twice, and a counter that
-        // drifts is worse than one query per chunk on a table indexed by session.
-        const [linkCount, failedCount] = await Promise.all([
-          tx.requestLink.count({ where: { sessionId } }),
-          tx.requestLink.count({ where: { sessionId, status: { gte: 400 } } }),
-        ]);
+        // drifts is worse than one query per chunk on a table indexed by session. Console output
+        // has no table, so it is summed from the chunks — whose rows are upserts, which gets the
+        // same guarantee by a different route.
+        const [linkCount, failedCount, errorCount, consoleTotals] =
+          await Promise.all([
+            tx.requestLink.count({ where: { sessionId } }),
+            tx.requestLink.count({
+              where: { sessionId, status: { gte: 400 } },
+            }),
+            tx.sessionError.count({ where: { sessionId } }),
+            tx.sessionChunk.aggregate({
+              where: { sessionId },
+              _sum: { consoleErrorCount: true, consoleWarnCount: true },
+            }),
+          ]);
 
         await tx.session.update({
           where: { id: sessionId },
@@ -190,7 +231,15 @@ export class SessionChunkProcessor {
             startedAt: bounds._min.startedAt,
             endedAt: bounds._max.endedAt,
             durationMs,
-            trivial: isTrivial({ durationMs, linkCount, failedCount }),
+            errorCount,
+            consoleErrorCount: consoleTotals._sum.consoleErrorCount ?? 0,
+            consoleWarnCount: consoleTotals._sum.consoleWarnCount ?? 0,
+            trivial: isTrivial({
+              durationMs,
+              linkCount,
+              failedCount,
+              errorCount,
+            }),
           },
         });
 
@@ -312,10 +361,34 @@ export function isTrivial(session: {
   durationMs: number;
   linkCount: number;
   failedCount: number;
+  errorCount: number;
 }): boolean {
   if (session.failedCount > 0) return false;
+  if (session.errorCount > 0) return false;
   if (session.linkCount > 0) return false;
   return session.durationMs < TRIVIAL_SESSION_MS;
+}
+
+/**
+ * How much of a chunk's console output was worth counting.
+ *
+ * Only the two levels that describe something going wrong. `info` and below can be captured and
+ * will sit in the replay stream, but counting them onto the session would put "this app logs a
+ * lot" in the same column as "this session had errors".
+ */
+export function countConsole(logs: { level: string }[]): {
+  error: number;
+  warn: number;
+} {
+  let error = 0;
+  let warn = 0;
+
+  for (const log of logs) {
+    if (log.level === 'error') error += 1;
+    else if (log.level === 'warn') warn += 1;
+  }
+
+  return { error, warn };
 }
 
 /**

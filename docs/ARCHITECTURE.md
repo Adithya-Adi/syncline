@@ -94,6 +94,22 @@ The consequence worth the trouble: the trace ID lives _inside_ the recording. Ex
 file, hand it to someone else, and it still resolves to its traces. The recording is
 self-describing rather than depending on a side table that has to be kept in sync.
 
+The same channel carries everything else that has to sit at a frame rather than beside it:
+
+```ts
+export const PAGEVIEW = 'syncline.pageview' as const; // route changes, with what triggered them
+export const ERROR = 'syncline.error' as const; // onerror, unhandledrejection
+export const CONSOLE = 'syncline.console' as const; // opt-in, per level
+```
+
+Each of these is also **denormalized onto the chunk envelope** — `pageviews`, `errors`, `logs`
+beside `links` — for one reason: a worker deciding whether a session broke should not have to walk
+a five-thousand-event array to find out. The marker is the record; the copy is the index.
+
+Console output is the one that stops at a count. Its lines stay in the replay stream and only
+`consoleErrorCount`/`consoleWarnCount` are lifted onto the session, because there is far more of it
+than there are errors and each line is worth far less.
+
 ### 3.3 The backend does nothing Syncline-specific
 
 Standard OpenTelemetry auto-instrumentation reads the incoming `traceparent`, makes the server span
@@ -398,7 +414,8 @@ otlp/{projectId}/{yyyy-mm-dd}/{ulid}.json.gz       raw OTLP bodies, kept for rep
 ## 7. Read API
 
 ```
-GET /v1/sessions/:id                  meta, clock calibration, chunk index, links
+GET /v1/sessions                      one row per recording: counts, flow, and why to open it
+GET /v1/sessions/:id                  meta, clock, chunk index, links, pageviews, errors
 GET /v1/sessions/:id/chunks/:seq      gzipped rrweb events (or a presigned redirect)
 GET /v1/traces/:traceId               span tree, timestamps normalized to client ms
 ```

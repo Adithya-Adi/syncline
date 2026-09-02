@@ -29,6 +29,40 @@ describe('options', () => {
     ).toBe(false);
   });
 
+  it('records errors by default and console output only when asked', () => {
+    // The asymmetry is the point. An error is what the product exists to explain; console
+    // arguments are whatever the application decided to print, which is nobody's to take.
+    const defaults = resolveOptions(
+      { key: 'pk_x', endpoint: 'https://s.io' },
+      ORIGIN,
+    );
+    expect(defaults.captureErrors).toBe(true);
+    expect(defaults.captureConsole).toEqual([]);
+  });
+
+  it('reads `captureConsole: true` as the two levels that mean trouble', () => {
+    expect(
+      resolveOptions(
+        { key: 'pk_x', endpoint: 'https://s.io', captureConsole: true },
+        ORIGIN,
+      ).captureConsole,
+    ).toEqual(['error', 'warn']);
+  });
+
+  it('takes an explicit level list, and drops a level it does not know', () => {
+    // A config written against a newer SDK should lose that one level, not the recording.
+    expect(
+      resolveOptions(
+        {
+          key: 'pk_x',
+          endpoint: 'https://s.io',
+          captureConsole: ['error', 'trace' as 'log'],
+        },
+        ORIGIN,
+      ).captureConsole,
+    ).toEqual(['error']);
+  });
+
   it('strips a trailing slash so URLs do not end up doubled', () => {
     expect(
       resolveOptions({ key: 'pk_x', endpoint: 'https://s.io/' }, ORIGIN)
@@ -272,6 +306,8 @@ describe('transport', () => {
     events: [{ type: 3, timestamp: 1 }],
     links: [],
     pageviews: [],
+    errors: [],
+    logs: [],
   };
 
   it('builds the ingest URL the API actually serves', () => {

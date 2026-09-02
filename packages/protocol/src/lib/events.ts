@@ -1,12 +1,19 @@
 /**
- * The rrweb custom events that carry trace IDs inside the replay stream.
+ * The custom events Syncline writes into the replay stream.
  *
- * These are what make a recording self-describing: the trace ID sits at the exact frame the
- * request fired, so an exported session still resolves to its traces without a side table.
+ * They are what make a recording self-describing. A trace ID sits at the exact frame the request
+ * fired, so an exported session still resolves to its traces without a side table — and the same
+ * holds for the rest: the page the user was on, the error that was thrown, the line that was
+ * logged, all at the frame it happened rather than in a table joined on a timestamp.
  * See docs/ARCHITECTURE.md §3.2.
  */
 
 import { z } from 'zod';
+import {
+  MAX_CONSOLE_MESSAGE_CHARS,
+  MAX_ERROR_MESSAGE_CHARS,
+  MAX_ERROR_STACK_CHARS,
+} from './limits.js';
 
 /** rrweb's EventType.Custom. Hard-coded so protocol does not depend on rrweb. */
 export const RRWEB_CUSTOM_EVENT_TYPE = 5;
@@ -14,6 +21,8 @@ export const RRWEB_CUSTOM_EVENT_TYPE = 5;
 export const REQUEST_START = 'syncline.request' as const;
 export const REQUEST_END = 'syncline.response' as const;
 export const PAGEVIEW = 'syncline.pageview' as const;
+export const ERROR = 'syncline.error' as const;
+export const CONSOLE = 'syncline.console' as const;
 
 /**
  * What moved the user to this page.
@@ -72,8 +81,77 @@ export const requestEndPayloadSchema = z.object({
 export type RequestStartPayload = z.infer<typeof requestStartPayloadSchema>;
 export type RequestEndPayload = z.infer<typeof requestEndPayloadSchema>;
 
+/**
+ * Where an error came from.
+ *
+ * Kept apart because they answer different questions. `onerror` is code that threw on the main
+ * thread and stopped whatever it was doing; `unhandledrejection` is a promise nobody caught, which
+ * routinely means a request failed and the UI simply never updated — no stack trace at the point
+ * the user noticed, and nothing on screen to say so.
+ */
+export const ERROR_SOURCES = ['onerror', 'unhandledrejection'] as const;
+
+export type ErrorSource = (typeof ERROR_SOURCES)[number];
+
+/**
+ * An uncaught error, as the page reported it.
+ *
+ * Everything here is written by the host application, so everything here is bounded. The SDK
+ * truncates before transmission rather than the API rejecting afterwards: a recording that drops
+ * its last chunk because one stack trace was long is a worse outcome than a shortened stack.
+ */
+export const errorPayloadSchema = z.object({
+  source: z.enum(ERROR_SOURCES),
+  /** The constructor name — `TypeError`, `ChunkLoadError`. Absent when a non-Error was thrown. */
+  name: z.string().max(128).optional(),
+  message: z.string().max(MAX_ERROR_MESSAGE_CHARS),
+  /** The script the error came from, sanitized the same way a request URL is. */
+  fileUrl: z.string().max(2048).optional(),
+  line: z.number().int().nonnegative().optional(),
+  column: z.number().int().nonnegative().optional(),
+  stack: z.string().max(MAX_ERROR_STACK_CHARS).optional(),
+  timeMs: z.number().int().nonnegative(),
+});
+
+/**
+ * Console levels worth keeping.
+ *
+ * `error` and `warn` are the two that describe something going wrong; the rest are opt-in on top
+ * because an application that logs per render would otherwise dominate every chunk it appears in.
+ */
+export const CONSOLE_LEVELS = [
+  'error',
+  'warn',
+  'info',
+  'log',
+  'debug',
+] as const;
+
+export type ConsoleLevel = (typeof CONSOLE_LEVELS)[number];
+
+/**
+ * One console call, flattened to a string.
+ *
+ * Arguments are rendered by the SDK rather than sent structurally, and that is a privacy decision
+ * rather than a convenience one: serializing arbitrary objects would walk into DOM nodes, framework
+ * internals, and whatever a response body happened to contain. A bounded string of what was
+ * printed is enough to read the recording alongside the replay.
+ */
+export const consolePayloadSchema = z.object({
+  level: z.enum(CONSOLE_LEVELS),
+  message: z.string().max(MAX_CONSOLE_MESSAGE_CHARS),
+  timeMs: z.number().int().nonnegative(),
+});
+
+export type ErrorPayload = z.infer<typeof errorPayloadSchema>;
+export type ConsolePayload = z.infer<typeof consolePayloadSchema>;
+
 export type SynclineEventTag =
-  typeof REQUEST_START | typeof REQUEST_END | typeof PAGEVIEW;
+  | typeof REQUEST_START
+  | typeof REQUEST_END
+  | typeof PAGEVIEW
+  | typeof ERROR
+  | typeof CONSOLE;
 
 /** The shape rrweb wraps a custom event in. */
 export interface RrwebCustomEvent<Tag extends string, Payload> {
@@ -91,7 +169,14 @@ export type RequestEndEvent = RrwebCustomEvent<
   RequestEndPayload
 >;
 export type PageviewEvent = RrwebCustomEvent<typeof PAGEVIEW, PageviewPayload>;
-export type SynclineEvent = RequestStartEvent | RequestEndEvent | PageviewEvent;
+export type ErrorEvent = RrwebCustomEvent<typeof ERROR, ErrorPayload>;
+export type ConsoleEvent = RrwebCustomEvent<typeof CONSOLE, ConsolePayload>;
+export type SynclineEvent =
+  | RequestStartEvent
+  | RequestEndEvent
+  | PageviewEvent
+  | ErrorEvent
+  | ConsoleEvent;
 
 /**
  * Narrows an arbitrary rrweb event to one of ours.
@@ -104,5 +189,11 @@ export function isSynclineEvent(event: unknown): event is SynclineEvent {
   const e = event as { type?: unknown; data?: { tag?: unknown } };
   if (e.type !== RRWEB_CUSTOM_EVENT_TYPE) return false;
   const tag = e.data?.tag;
-  return tag === REQUEST_START || tag === REQUEST_END || tag === PAGEVIEW;
+  return (
+    tag === REQUEST_START ||
+    tag === REQUEST_END ||
+    tag === PAGEVIEW ||
+    tag === ERROR ||
+    tag === CONSOLE
+  );
 }

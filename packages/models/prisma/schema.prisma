@@ -62,9 +62,17 @@ model Session {
   /// failed is never marked, because that is the recording someone will come looking for.
   trivial Boolean @default(false)
 
+  /// Counted here rather than derived, so "which sessions broke" is an indexed column instead of a
+  /// join against every error a project ever recorded. Rebuilt from the rows on every chunk, which
+  /// keeps a redelivered job from inflating them.
+  errorCount        Int @default(0)
+  consoleErrorCount Int @default(0)
+  consoleWarnCount  Int @default(0)
+
   chunks    SessionChunk[]
   links     RequestLink[]
   pageviews Pageview[]
+  errors    SessionError[]
 
   /// The session list: newest first, per project.
   @@index([projectId, startedAt(sort: Desc)])
@@ -80,6 +88,12 @@ model SessionChunk {
   endedAt    DateTime
   eventCount Int
   sizeBytes  Int
+  /// Console output is counted here and summed onto the session, rather than counted onto the
+  /// session directly. A chunk row is an upsert, so a redelivered job overwrites these; a counter
+  /// incremented on the session would double instead. The lines themselves stay in the replay
+  /// stream — there are far more of them than errors and each is worth far less.
+  consoleErrorCount Int @default(0)
+  consoleWarnCount  Int @default(0)
   /// Which page these events belong to. Chunks flush at page boundaries, so one chunk is one page —
   /// which is what lets the viewer load a single page of a long session. Null for chunks from an
   /// SDK that predates pageviews.
@@ -120,6 +134,37 @@ model Pageview {
   @@unique([sessionId, ordinal])
   /// "Which sessions reached /checkout" — the query the flow exists to answer.
   @@index([path])
+}
+
+/// An uncaught error the page reported, lifted out of the replay stream.
+///
+/// Rows rather than counts alone, because "it broke" is where an investigation starts and not
+/// where it ends: the message and the frame it happened at are what turn a red mark on the
+/// timeline into something someone can act on. Console output stays in the replay stream and is
+/// only counted — there is far more of it, each line is worth far less, and it is already on the
+/// timeline for anyone watching.
+model SessionError {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  /// onerror or unhandledrejection. Which one matters: a rejection usually means a request failed
+  /// and the interface never said so.
+  source  String
+  /// The constructor name, when something that had one was thrown.
+  name    String?
+  message String
+  /// Sanitized like a request URL: the script it came from, without query values.
+  fileUrl String?
+  line    Int?
+  column  Int?
+  stack   String?
+
+  /// Client time, the same frame of reference as the replay and the request lane.
+  clientMs BigInt
+
+  /// Draw the lane in order, and read a session's errors without a sort.
+  @@index([sessionId, clientMs])
 }
 
 model RequestLink {
