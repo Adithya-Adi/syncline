@@ -402,7 +402,21 @@ describe('the search summary', () => {
 });
 
 describe('the attribute index', () => {
-  const SESSION = {
+  /**
+   * A session row as Postgres hands it back — every optional column nullable, not absent. Typed
+   * rather than inferred so that a test can say "this session has no release", which is what the
+   * column actually holds and what the derivation has to cope with.
+   */
+  interface SessionRow {
+    userId: string | null;
+    release: string | null;
+    url: string | null;
+    userAgent: string | null;
+    viewport: { w: number; h: number } | null;
+    serviceNames: string[];
+  }
+
+  const SESSION: SessionRow = {
     userId: 'u_8823',
     release: 'web@2.4.1',
     url: 'https://app.acme.com/checkout',
@@ -411,7 +425,7 @@ describe('the attribute index', () => {
     serviceNames: ['checkout-api'],
   };
 
-  function indexing(over: Partial<typeof SESSION> = {}) {
+  function indexing(over: Partial<SessionRow> = {}) {
     const { prisma, tx } = fakePrisma();
     tx.session.findUnique.mockResolvedValue({ ...SESSION, ...over });
     return { prisma, tx };
