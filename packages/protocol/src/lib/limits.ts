@@ -141,3 +141,29 @@ export const MAX_CONTEXT_VALUE_CHARS = 200;
  */
 export const MAX_CONTEXT_KEYS_PER_SESSION = 50;
 export const MAX_CONTEXT_ENTRIES_PER_CHUNK = 200;
+
+/**
+ * What one project may send, per minute and per day.
+ *
+ * Every other bound in this file limits a single request. None of them limits how many requests
+ * arrive, and that gap is the whole reason these exist: the public key is *designed* to ship in a
+ * browser bundle, and the origin allowlist is enforced by browsers rather than by us — `curl` sets
+ * `Origin` to whatever it likes. So anybody who reads a customer's bundle can post as that project
+ * for as long as they care to, and without these two numbers nothing in the system would stop it
+ * or even notice.
+ *
+ * The defaults are deliberately generous. A limit that a real busy site trips is a limit somebody
+ * disables, and a disabled limit protects nothing. 1200 requests a minute is twenty a second
+ * sustained; at a five-second flush that is roughly a hundred sessions recording at once, per
+ * project. 5 GiB a day is far more than an honest install of this size writes.
+ *
+ * Both are overridable per deployment, and `0` disables one — which is the right answer for an
+ * install on a private network where the only client is your own application.
+ */
+export const DEFAULT_INGEST_REQUESTS_PER_MINUTE = 1_200;
+export const DEFAULT_INGEST_BYTES_PER_DAY = 5 * 1024 * 1024 * 1024;
+
+/** Which ceiling a 429 hit, so a client can tell "slow down" from "come back tomorrow". */
+export const INGEST_LIMITS = ['rate', 'volume'] as const;
+
+export type IngestLimit = (typeof INGEST_LIMITS)[number];

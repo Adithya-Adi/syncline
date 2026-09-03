@@ -52,10 +52,10 @@ Self-hostable, and in use. Building in the open, milestone by milestone:
 - [x] **M2** — OTLP ingest, trace stitching, the read API, the viewer
 - [x] **M3** — accounts, organizations, roles, the seeded demo recording
 - [x] **M4** — errors and console capture, `identify()`/`setContext()`, recordings search
-- [ ] **M5** — retention and deletion, ingest quotas, an audit log
+- [ ] **M5** — retention and deletion, project deletion, an audit log
 
 Deploy it with `docker-compose.prod.yml` — see [self-hosting](#self-hosting) below. What it does
-not have yet: no retention policy or scheduled deletion, no ingest rate limiting, no audit log.
+not have yet: no retention policy or scheduled deletion, no audit log.
 Deleting a project removes its rows but leaves its chunks in the object store.
 
 ## Architecture

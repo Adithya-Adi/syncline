@@ -6,6 +6,10 @@
  */
 
 import { z } from 'zod';
+import {
+  DEFAULT_INGEST_BYTES_PER_DAY,
+  DEFAULT_INGEST_REQUESTS_PER_MINUTE,
+} from '@syncline/protocol';
 
 export const CONFIG = Symbol('SYNCLINE_CONFIG');
 
@@ -27,6 +31,24 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: z.stringbool().default(true),
+
+  /**
+   * What one project may send. `0` disables a ceiling.
+   *
+   * These are the only bounds on *how many* requests arrive — everything else in the ingest path
+   * bounds a single one. See DEFAULT_INGEST_* in @syncline/protocol for why the defaults are as
+   * generous as they are.
+   */
+  INGEST_REQUESTS_PER_MINUTE: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(DEFAULT_INGEST_REQUESTS_PER_MINUTE),
+  INGEST_BYTES_PER_DAY: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(DEFAULT_INGEST_BYTES_PER_DAY),
 });
 
 export type AppConfig = z.infer<typeof schema>;

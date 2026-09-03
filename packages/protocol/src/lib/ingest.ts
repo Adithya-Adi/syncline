@@ -15,6 +15,7 @@ import {
   MAX_LINKS_PER_CHUNK,
   MAX_CHUNKS_PER_SESSION,
   MAX_PAGEVIEWS_PER_CHUNK,
+  type IngestLimit,
 } from './limits.js';
 import {
   consolePayloadSchema,
@@ -151,4 +152,20 @@ export interface IngestError {
   error: string;
   /** False for 4xx that will fail identically on retry, so the SDK drops the chunk. */
   retryable: boolean;
+}
+
+/**
+ * The body of a 429, alongside a `Retry-After` header.
+ *
+ * Detailed on purpose. "Too many requests" tells an operator nothing they can act on, and the two
+ * ceilings need different reactions: a rate limit clears in under a minute and the client should
+ * simply wait, while a daily volume limit means every chunk until midnight is going to be refused
+ * and something is genuinely wrong with how much that project is sending.
+ */
+export interface IngestThrottled extends IngestError {
+  limit: IngestLimit;
+  /** What the ceiling was — requests for `rate`, bytes for `volume`. */
+  allowed: number;
+  /** Seconds until the window rolls over. Matches the `Retry-After` header. */
+  resetsInSeconds: number;
 }

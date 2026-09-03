@@ -7,6 +7,7 @@ import { IngestKeyGuard } from './auth/ingest-key.guard.js';
 import { ProjectController } from './auth/project.controller.js';
 import { ClockController } from './clock/clock.controller.js';
 import { IngestController } from './ingest/ingest.controller.js';
+import { IngestLimitsService } from './ingest/ingest-limits.service.js';
 import { StorageService } from './storage/storage.service.js';
 import { QueueService } from './queue/queue.service.js';
 import { HealthController } from './health/health.controller.js';
@@ -30,6 +31,7 @@ import { SessionsListController } from './read/sessions-list.controller.js';
     ProjectService,
     StorageService,
     QueueService,
+    IngestLimitsService,
     // Registered globally but inert by default: it only acts on handlers marked with @RequireKey,
     // so adding a route cannot accidentally leave it unauthenticated *or* accidentally lock it.
     { provide: APP_GUARD, useClass: IngestKeyGuard },

@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveOptions, shouldTrace } from './config.js';
 import { sanitizeUrl } from './url.js';
 import { bestOf, calibrate, measureClock } from './clock.js';
 import { resolveSession } from './session.js';
 import { EventBuffer, PendingRequests } from './buffer.js';
-import { encodeBody, chunkUrl } from './transport.js';
+import {
+  chunkUrl,
+  encodeBody,
+  isThrottled,
+  resetThrottle,
+  sendChunk,
+} from './transport.js';
 
 const ORIGIN = 'https://app.acme.com';
 
@@ -321,5 +327,87 @@ describe('transport', () => {
     const { gzipped, body } = await encodeBody(chunk, false);
     expect(gzipped).toBe(false);
     expect(typeof body).toBe('string');
+  });
+});
+
+describe('being told to slow down', () => {
+  const chunk = {
+    sessionId: '01JQ8Z3KX9TVFMWQ2Y7B4CN5HD',
+    seq: 0,
+    sdk: { name: 'syncline-browser', version: '0.1.0' },
+    clock: { offsetMs: 0, rttMs: 0 },
+    events: [{ type: 3, timestamp: 1 }],
+    links: [],
+    pageviews: [],
+    errors: [],
+    logs: [],
+    context: [],
+  };
+
+  const options = (fetchImpl: typeof fetch) => ({
+    endpoint: 'https://s.io',
+    key: 'pk_test',
+    fetchImpl,
+  });
+
+  beforeEach(() => resetThrottle());
+  afterEach(() => resetThrottle());
+
+  function throttling(seconds: string | null) {
+    return vi.fn(
+      async () =>
+        new Response('{}', {
+          status: 429,
+          headers: seconds === null ? {} : { 'retry-after': seconds },
+        }),
+    ) as unknown as typeof fetch;
+  }
+
+  it('stops sending until the moment the server named', async () => {
+    // The worst possible answer to "too many requests" is the next chunk five seconds later.
+    const send = throttling('30');
+    expect(await sendChunk(options(send), chunk.sessionId, 0, chunk)).toBe(
+      false,
+    );
+    expect(isThrottled()).toBe(true);
+
+    // A second chunk is dropped without a request being made at all.
+    const next = vi.fn() as unknown as typeof fetch;
+    expect(await sendChunk(options(next), chunk.sessionId, 1, chunk)).toBe(
+      false,
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('resumes once the window has passed', async () => {
+    const send = throttling('1');
+    await sendChunk(options(send), chunk.sessionId, 0, chunk);
+
+    expect(isThrottled(Date.now() + 500)).toBe(true);
+    expect(isThrottled(Date.now() + 2_000)).toBe(false);
+  });
+
+  it('backs off anyway when the header is missing or nonsense', async () => {
+    // A proxy can strip Retry-After. Treating its absence as "carry on" would keep the flood going
+    // through the one response that exists to stop it.
+    for (const header of [null, 'soon', '-5']) {
+      resetThrottle();
+      await sendChunk(options(throttling(header)), chunk.sessionId, 0, chunk);
+      expect(isThrottled()).toBe(true);
+    }
+  });
+
+  it('leaves an ordinary failure alone', async () => {
+    // A 500 is not a request to be quiet; the next chunk should still be attempted.
+    const send = vi.fn(async () => new Response('{}', { status: 500 }));
+    expect(
+      await sendChunk(
+        options(send as unknown as typeof fetch),
+        chunk.sessionId,
+        0,
+        chunk,
+      ),
+    ).toBe(false);
+    expect(isThrottled()).toBe(false);
   });
 });

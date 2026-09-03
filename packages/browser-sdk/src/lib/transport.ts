@@ -59,6 +59,27 @@ export interface SendOptions {
   keepalive?: boolean;
 }
 
+/**
+ * When the server last said "not now", and until when.
+ *
+ * Module-level rather than per-recording, because the ceiling belongs to the project rather than
+ * to one tab: a site that opens Syncline in several tabs would otherwise have each of them
+ * discover the limit separately, which is the flood the limit exists to stop.
+ */
+let throttledUntilMs = 0;
+
+/** Used when a 429 arrives without a usable `Retry-After` — one flush interval, roughly. */
+const DEFAULT_THROTTLE_MS = 60_000;
+
+/** For tests, and for a host that wants to know whether recording is currently being refused. */
+export function isThrottled(now: number = Date.now()): boolean {
+  return now < throttledUntilMs;
+}
+
+export function resetThrottle(): void {
+  throttledUntilMs = 0;
+}
+
 export async function sendChunk(
   options: TransportOptions,
   sessionId: string,
@@ -66,6 +87,10 @@ export async function sendChunk(
   payload: SessionChunk,
   sendOptions: SendOptions = {},
 ): Promise<boolean> {
+  // Still inside the window the server asked for. Dropping the chunk here costs a gap in one
+  // replay; sending it costs the server the thing it just refused.
+  if (isThrottled()) return false;
+
   const keepalive = sendOptions.keepalive ?? false;
   const { body, gzipped } = await encodeBody(payload, !keepalive);
 
@@ -86,6 +111,19 @@ export async function sendChunk(
         keepalive,
       },
     );
+
+    // A 429 is the server asking for quiet, and the worst possible reply is the next chunk five
+    // seconds later. `Retry-After` names the moment it is worth trying again; until then the
+    // recorder stops sending rather than adding to the flood it is being asked to stop.
+    if (response.status === 429) {
+      const after = Number(response.headers.get('retry-after'));
+      throttledUntilMs =
+        Date.now() +
+        (Number.isFinite(after) && after > 0
+          ? after * 1000
+          : DEFAULT_THROTTLE_MS);
+      return false;
+    }
 
     return response.ok;
   } catch {

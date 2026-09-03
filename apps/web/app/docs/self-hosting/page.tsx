@@ -167,6 +167,33 @@ export default function SelfHosting() {
         <code>migrate</code> service runs first and the rest wait for it.
       </p>
 
+      <h2 className="docs__h2">Ingest limits</h2>
+      <p>
+        Every other bound in the ingest path limits a single request — the body
+        cap, the chunk ceiling, the per-session sequence limit. None of them
+        limits how many requests arrive, and that matters here more than it
+        might elsewhere: the public key is <em>designed</em> to ship in a
+        browser bundle, and the origin allowlist is enforced by browsers rather
+        than by the server. Anyone who reads a bundle can post as that project
+        from a script.
+      </p>
+      <p>
+        So each project has two ceilings, counted in Redis:{' '}
+        <code>INGEST_REQUESTS_PER_MINUTE</code> stops a flood happening now, and{' '}
+        <code>INGEST_BYTES_PER_DAY</code> stops a slow drip filling the object
+        store over a week — the one that arrives as a bill rather than an
+        outage. Past either, ingest answers <code>429</code> with{' '}
+        <code>Retry-After</code> and a body naming which ceiling was hit and
+        when it resets. The SDK reads that header and stops sending until it
+        passes.
+      </p>
+      <p>
+        The defaults are generous on purpose — a limit a real site trips is a
+        limit somebody disables. Set either to <code>0</code> to turn it off,
+        which is reasonable only when the network is private and the only client
+        is your own application.
+      </p>
+
       <h2 className="docs__h2">Roles</h2>
       <p>
         Membership decides what somebody can see; their role decides what they
@@ -178,9 +205,8 @@ export default function SelfHosting() {
 
       <div className="callout callout--warn">
         <strong>What is still missing.</strong> No retention policy or scheduled
-        deletion — recordings are kept until something removes them, and
-        deleting a project leaves its chunks in the object store. No ingest rate
-        limiting or per-project quotas. No audit log. Put it behind a proxy that
+        deletion — recordings are kept until something removes them — and no way
+        to delete a project at all. No audit log. Put it behind a proxy that
         terminates TLS: the session cookies are <code>secure</code>, so the
         browser will not send them over plain HTTP.
       </div>

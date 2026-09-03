@@ -2,11 +2,14 @@ import {
   BadRequestException,
   Controller,
   HttpCode,
+  HttpException,
+  HttpStatus,
   Param,
   Post,
   Req,
+  Res,
 } from '@nestjs/common';
-import type { IncomingMessage } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ulid } from 'ulid';
 import {
   MAX_CHUNK_BYTES,
@@ -14,12 +17,17 @@ import {
   otlpKey,
   sessionChunkKey,
   sessionIdSchema,
+  type IngestThrottled,
 } from '@syncline/protocol';
 import { CurrentProject, RequireKey } from '../auth/ingest-key.guard.js';
 import type { ResolvedProject } from '../auth/project.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { QueueService } from '../queue/queue.service.js';
 import { readBody } from './read-body.js';
+import {
+  IngestLimitsService,
+  type LimitVerdict,
+} from './ingest-limits.service.js';
 
 /** OTLP bodies are not chunked by an SDK we control, so they get their own, looser ceiling. */
 const MAX_OTLP_BYTES = 8 * 1024 * 1024;
@@ -37,7 +45,39 @@ export class IngestController {
   constructor(
     private readonly storage: StorageService,
     private readonly queue: QueueService,
+    private readonly limits: IngestLimitsService,
   ) {}
+
+  /**
+   * Turns a refusal into a 429 that says something useful.
+   *
+   * `Retry-After` because well-behaved clients and proxies read it, and a body because a person
+   * debugging this needs to know *which* ceiling they hit: a rate limit clears within the minute,
+   * while a daily volume limit means every request until midnight will be refused too, and the
+   * answer is to send less rather than to wait.
+   */
+  private throttled(res: ServerResponse, verdict: LimitVerdict): never {
+    const resetsInSeconds = verdict.resetsInSeconds ?? 60;
+
+    // Set on the response rather than carried through the exception, because a thrown body does
+    // not bring headers with it and `Retry-After` is the half of this that proxies and
+    // well-behaved clients actually act on.
+    res.setHeader('retry-after', String(resetsInSeconds));
+
+    const body: IngestThrottled = {
+      error:
+        verdict.limit === 'rate'
+          ? 'too many requests for this project'
+          : 'daily ingest volume exhausted for this project',
+      // Both clear on their own, so both are worth retrying — just not immediately.
+      retryable: true,
+      limit: verdict.limit ?? 'rate',
+      allowed: verdict.allowed ?? 0,
+      resetsInSeconds,
+    };
+
+    throw new HttpException(body, HttpStatus.TOO_MANY_REQUESTS);
+  }
 
   /**
    * Session id and sequence travel in the URL rather than the body.
@@ -56,7 +96,13 @@ export class IngestController {
     @Param('sessionId') sessionId: string,
     @Param('seq') seqParam: string,
     @Req() req: IncomingMessage,
+    @Res({ passthrough: true }) res: ServerResponse,
   ): Promise<{ ok: true }> {
+    // Before the body is read: the cheapest rejection is the one that never pulls two megabytes
+    // off a socket.
+    const rate = await this.limits.takeRequest(project.id);
+    if (!rate.ok) this.throttled(res, rate);
+
     if (!sessionIdSchema.safeParse(sessionId).success) {
       throw new BadRequestException('sessionId must be a ULID');
     }
@@ -70,6 +116,10 @@ export class IngestController {
 
     const body = await readBody(req, MAX_CHUNK_BYTES);
     if (body.bytes.length === 0) throw new BadRequestException('empty body');
+
+    // Before the store: a refused request should cost a socket read and nothing durable.
+    const volume = await this.limits.takeBytes(project.id, body.bytes.length);
+    if (!volume.ok) this.throttled(res, volume);
 
     const key = sessionChunkKey(project.id, sessionId, seq);
     await this.storage.put(key, body.bytes, {
@@ -104,9 +154,19 @@ export class IngestController {
   async traces(
     @CurrentProject() project: ResolvedProject,
     @Req() req: IncomingMessage,
+    @Res({ passthrough: true }) res: ServerResponse,
   ): Promise<{ ok: true }> {
+    // Limited too, and against the same ceilings. This path needs the secret key rather than the
+    // public one, so it is harder to abuse — but a misconfigured collector in a retry loop costs
+    // exactly as much as a malicious one.
+    const rate = await this.limits.takeRequest(project.id);
+    if (!rate.ok) this.throttled(res, rate);
+
     const body = await readBody(req, MAX_OTLP_BYTES);
     if (body.bytes.length === 0) throw new BadRequestException('empty body');
+
+    const volume = await this.limits.takeBytes(project.id, body.bytes.length);
+    if (!volume.ok) this.throttled(res, volume);
 
     const day = new Date().toISOString().slice(0, 10);
     const key = otlpKey(project.id, day, ulid());
