@@ -9,10 +9,13 @@
 
 import {
   CreateBucketCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3';
 import { gunzipSync } from 'node:zlib';
 
@@ -32,6 +35,9 @@ export interface PutOptions {
 }
 
 const GZIP_MAGIC = [0x1f, 0x8b];
+
+/** What S3 accepts in one DeleteObjects call. */
+const DELETE_BATCH = 1_000;
 
 export class ObjectStore {
   private readonly client: S3Client;
@@ -111,5 +117,71 @@ export class ObjectStore {
       bytes[0] === GZIP_MAGIC[0] &&
       bytes[1] === GZIP_MAGIC[1];
     return gzipped ? gunzipSync(bytes) : bytes;
+  }
+
+  /**
+   * Deletes objects, in batches of the thousand S3 allows per call.
+   *
+   * Deleting something that is not there is a success, not an error — which is what makes this
+   * safe to retry. Retention runs on a schedule and can be interrupted at any point; a second pass
+   * over keys the first pass already removed has to be a no-op rather than a failure that stops
+   * the sweep.
+   *
+   * Returns how many keys were sent, not how many existed. S3 does not distinguish, and a count
+   * that pretended to would be a number nobody could trust.
+   */
+  async deleteMany(keys: readonly string[]): Promise<number> {
+    if (keys.length === 0) return 0;
+
+    for (let i = 0; i < keys.length; i += DELETE_BATCH) {
+      const batch = keys.slice(i, i + DELETE_BATCH);
+      await this.client.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: {
+            Objects: batch.map((Key) => ({ Key })),
+            // Errors still come back; `Quiet` only suppresses the per-key success entries, which
+            // for a thousand keys is a response nobody reads.
+            Quiet: true,
+          },
+        }),
+      );
+    }
+
+    return keys.length;
+  }
+
+  /**
+   * Every key under a prefix, following pagination.
+   *
+   * Used by retention to find OTLP bodies, which are named with a ULID nothing records — the
+   * database knows a span's trace but never which raw batch it arrived in. For those the prefix
+   * *is* the index, which is why the day is in the key.
+   *
+   * `limit` bounds the walk. A bucket with a million objects under one prefix should slow a
+   * scheduled sweep down, not exhaust its heap.
+   */
+  async listPrefix(prefix: string, limit = 10_000): Promise<string[]> {
+    const keys: string[] = [];
+    let token: string | undefined;
+
+    do {
+      const page: ListObjectsV2CommandOutput = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: token,
+          MaxKeys: Math.min(1_000, limit - keys.length),
+        }),
+      );
+
+      for (const object of page.Contents ?? []) {
+        if (object.Key) keys.push(object.Key);
+      }
+
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token && keys.length < limit);
+
+    return keys;
   }
 }

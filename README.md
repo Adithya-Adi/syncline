@@ -52,11 +52,10 @@ Self-hostable, and in use. Building in the open, milestone by milestone:
 - [x] **M2** — OTLP ingest, trace stitching, the read API, the viewer
 - [x] **M3** — accounts, organizations, roles, the seeded demo recording
 - [x] **M4** — errors and console capture, `identify()`/`setContext()`, recordings search
-- [ ] **M5** — retention and deletion, project deletion, an audit log
+- [ ] **M5** — ~~retention~~, project deletion, an audit log
 
-Deploy it with `docker-compose.prod.yml` — see [self-hosting](#self-hosting) below. What it does
-not have yet: no retention policy or scheduled deletion, no audit log.
-Deleting a project removes its rows but leaves its chunks in the object store.
+Deploy it with `docker-compose.prod.yml` — see [self-hosting](#self-hosting) below. Retention is
+there and off by default; what is not: no way to delete a project, no audit log.
 
 ## Architecture
 
@@ -151,6 +150,11 @@ MinIO alongside. Put it behind a proxy that terminates TLS — the session cooki
 
 Migrations never run at container start: a dozen replicas booting together would race through the
 same migration, and one failing would take a rollout down rather than one job.
+
+**Retention.** `RETENTION_DAYS` on the worker deletes sessions older than that — their chunks in
+the object store, the spans nothing else points at, and the raw OTLP bodies — sweeping every
+`RETENTION_INTERVAL_MINUTES` (default 60). It is `0` out of the box, which keeps everything
+forever, and has no upper bound: set `3650` if ten years is the policy. Deletion is permanent.
 
 **Roles.** Membership decides what somebody can see, their role decides what they can change.
 Members read; admins run projects — settings, key rotation, search keys, invitations; owners

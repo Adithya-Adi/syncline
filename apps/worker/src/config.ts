@@ -25,6 +25,22 @@ const schema = z.object({
 
   /** Jobs processed in parallel per queue, per process. */
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(4),
+
+  /**
+   * Days to keep a recording when its project has no retention of its own.
+   *
+   * `0` — the default — keeps everything forever. Nothing here deletes anything until somebody
+   * asks it to, because an upgrade that quietly began destroying a customer's history would be
+   * the worst possible way to find out this feature exists.
+   */
+  RETENTION_DAYS: z.coerce.number().int().nonnegative().default(0),
+
+  /** How often the sweep runs. Hourly is often enough for a daily-granularity policy. */
+  RETENTION_INTERVAL_MINUTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60),
 });
 
 export type WorkerConfig = z.infer<typeof schema>;

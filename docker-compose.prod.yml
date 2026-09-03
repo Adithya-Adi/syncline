@@ -71,6 +71,9 @@ services:
     environment:
       <<: *syncline-env
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      # 0 keeps everything. See .env.production.example.
+      RETENTION_DAYS: ${RETENTION_DAYS:-0}
+      RETENTION_INTERVAL_MINUTES: ${RETENTION_INTERVAL_MINUTES:-60}
     depends_on:
       migrate:
         condition: service_completed_successfully

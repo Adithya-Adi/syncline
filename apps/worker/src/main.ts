@@ -13,6 +13,7 @@ import { ObjectStore } from '@syncline/storage';
 import { loadConfig } from './config.js';
 import { SessionChunkProcessor } from './app/session-chunk.processor.js';
 import { OtlpTracesProcessor } from './app/otlp-traces.processor.js';
+import { RetentionProcessor } from './app/retention.processor.js';
 
 const logger = new Logger('Worker');
 
@@ -63,6 +64,43 @@ async function bootstrap() {
     ),
   ];
 
+  /**
+   * Retention, on a timer rather than a queue.
+   *
+   * A repeatable BullMQ job would be the obvious choice and is the wrong one here: every worker
+   * process would need the schedule registered identically, and a stale repeat key from an older
+   * deployment keeps firing long after the code that made it is gone. An interval owned by the
+   * process is simpler, and the sweep is idempotent — two processes running it at once duplicate
+   * work but cannot corrupt anything, because deleting an absent object and an absent row are both
+   * successes.
+   */
+  const retention = new RetentionProcessor(
+    prisma,
+    storage,
+    config.RETENTION_DAYS,
+  );
+
+  const retentionTimer = setInterval(
+    () => {
+      void retention
+        .run()
+        .catch((error) =>
+          logger.error(`retention sweep failed: ${(error as Error).message}`),
+        );
+    },
+    config.RETENTION_INTERVAL_MINUTES * 60_000,
+  );
+
+  // Never hold the process open on its own account. If the queues are gone there is nothing left
+  // worth sweeping for.
+  retentionTimer.unref();
+
+  logger.log(
+    config.RETENTION_DAYS > 0
+      ? `retention: keeping ${config.RETENTION_DAYS} days, sweeping every ${config.RETENTION_INTERVAL_MINUTES}m`
+      : 'retention: disabled (RETENTION_DAYS is unset), keeping everything',
+  );
+
   for (const worker of workers) {
     worker.on('failed', (job, error) => {
       logger.error(
@@ -87,6 +125,7 @@ async function bootstrap() {
    */
   const shutdown = async (signal: string) => {
     logger.log(`${signal} received, draining`);
+    clearInterval(retentionTimer);
     await Promise.all(workers.map((w) => w.close()));
     connection.disconnect();
     await prisma.$disconnect();

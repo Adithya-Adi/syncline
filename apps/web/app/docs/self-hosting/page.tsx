@@ -194,6 +194,35 @@ export default function SelfHosting() {
         is your own application.
       </p>
 
+      <h2 className="docs__h2">Retention</h2>
+      <p>
+        Recordings are the bulkiest thing Syncline stores, and little about a
+        six-month-old session is worth what it costs to keep. Set{' '}
+        <code>RETENTION_DAYS</code> on the worker and it sweeps hourly, deleting
+        every session older than that along with its chunks in the object store,
+        the spans no surviving recording still points at, and the raw OTLP
+        bodies from those days.
+      </p>
+      <p>
+        It is <code>0</code> out of the box, which keeps everything forever. An
+        upgrade that quietly started destroying history would be the worst
+        possible way to find out this feature exists, so switching it on is
+        always a decision somebody made. There is no upper bound either — set it
+        to <code>3650</code> if ten years is the policy.
+      </p>
+      <div className="callout callout--warn">
+        <strong>This deletes recordings permanently.</strong> The objects are
+        removed from the bucket, not moved to a trash prefix, and there is no
+        undo. Check the number before setting it, and turn on bucket versioning
+        first if a safety net matters.
+      </div>
+      <p>
+        <code>RETENTION_INTERVAL_MINUTES</code> (default <code>60</code>) sets
+        how often the sweep runs. Each pass works in batches of 200 sessions, so
+        a first sweep against a year of backlog takes several passes rather than
+        one enormous delete holding locks while ingest is still writing.
+      </p>
+
       <h2 className="docs__h2">Roles</h2>
       <p>
         Membership decides what somebody can see; their role decides what they
@@ -204,9 +233,9 @@ export default function SelfHosting() {
       </p>
 
       <div className="callout callout--warn">
-        <strong>What is still missing.</strong> No retention policy or scheduled
-        deletion — recordings are kept until something removes them — and no way
-        to delete a project at all. No audit log. Put it behind a proxy that
+        <strong>What is still missing.</strong> No way to delete a project at
+        all — and deleting one would leave its chunks in the object store, which
+        only the retention sweep above reclaims. No audit log. Put it behind a proxy that
         terminates TLS: the session cookies are <code>secure</code>, so the
         browser will not send them over plain HTTP.
       </div>
