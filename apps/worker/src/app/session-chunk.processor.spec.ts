@@ -67,6 +67,11 @@ function fakePrisma() {
       createMany: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
+    projectAttributeKey: {
+      findMany: jest.fn().mockResolvedValue([]),
+      createMany: jest.fn(),
+      updateMany: jest.fn(),
+    },
     sessionContext: {
       findMany: jest.fn().mockResolvedValue([]),
       deleteMany: jest.fn(),
@@ -1062,5 +1067,112 @@ describe('late identity', () => {
       (fact: { key: string }) => fact.key === 'accountId',
     );
     expect(account).not.toHaveProperty('numValue');
+  });
+});
+
+describe('the project vocabulary', () => {
+  const SESSION_ROW = {
+    userId: 'u_1',
+    release: null,
+    url: null,
+    userAgent: null,
+    viewport: null,
+    serviceNames: [] as string[],
+  };
+
+  function discovering(context: { key: string; value: string }[] = []) {
+    const { prisma, tx } = fakePrisma();
+    tx.session.findUnique.mockResolvedValue({ ...SESSION_ROW });
+    tx.sessionContext.findMany.mockResolvedValue(
+      context.map((row) => ({
+        key: row.key,
+        value: row.value,
+        numValue: null,
+        clientMs: BigInt(1_000),
+      })),
+    );
+    return { prisma, tx };
+  }
+
+  async function run(prisma: ReturnType<typeof fakePrisma>['prisma']) {
+    const processor = new SessionChunkProcessor(
+      prisma,
+      storageReturning(Buffer.from(JSON.stringify(CHUNK))),
+    );
+    await processor.process(job());
+  }
+
+  it('records every key it indexed, so the search bar has something to suggest', async () => {
+    const { prisma, tx } = discovering([{ key: 'accountId', value: 'acct_9' }]);
+
+    await run(prisma);
+
+    const written = tx.projectAttributeKey.createMany.mock.calls[0][0];
+    expect(written.data).toContainEqual({
+      projectId: 'proj_1',
+      key: 'accountId',
+      source: 'custom',
+    });
+    // What Syncline derives is not the customer's to turn off, so the settings page has to be able
+    // to tell the two apart.
+    expect(written.data).toContainEqual({
+      projectId: 'proj_1',
+      key: 'user',
+      source: 'builtin',
+    });
+    expect(written.skipDuplicates).toBe(true);
+  });
+
+  it('records each key once however many facts share it', async () => {
+    // A session that visited forty pages has one `path` key, not forty.
+    const { prisma, tx } = fakePrisma();
+    tx.session.findUnique.mockResolvedValue({ ...SESSION_ROW });
+    tx.pageview.findMany.mockResolvedValue([
+      { path: '/a' },
+      { path: '/b' },
+      { path: '/c' },
+    ]);
+
+    await run(prisma);
+
+    const keys = tx.projectAttributeKey.createMany.mock.calls[0][0].data.map(
+      (row: { key: string }) => row.key,
+    );
+    expect(keys.filter((key: string) => key === 'path')).toHaveLength(1);
+  });
+
+  it('moves lastSeenAt only when it is already stale', async () => {
+    // Otherwise a busy project rewrites the same handful of rows thousands of times an hour for a
+    // timestamp nobody reads to the minute.
+    const { prisma, tx } = discovering();
+
+    await run(prisma);
+
+    const where = tx.projectAttributeKey.updateMany.mock.calls[0][0].where;
+    expect(where.lastSeenAt.lt).toBeInstanceOf(Date);
+    expect(Date.now() - where.lastSeenAt.lt.getTime()).toBeGreaterThan(
+      59 * 60 * 1000,
+    );
+  });
+
+  it('does not index a key the project switched off', async () => {
+    const { prisma, tx } = discovering([{ key: 'plan', value: 'pro' }]);
+    tx.projectAttributeKey.findMany.mockResolvedValue([{ key: 'plan' }]);
+
+    await run(prisma);
+
+    expect(
+      tx.sessionAttribute.createMany.mock.calls[0][0].data,
+    ).not.toContainEqual(expect.objectContaining({ key: 'plan' }));
+    // And it is not re-recorded as a key in use, which would put it back in the suggestions.
+    expect(
+      tx.projectAttributeKey.createMany.mock.calls[0][0].data,
+    ).not.toContainEqual(expect.objectContaining({ key: 'plan' }));
+  });
+
+  it('writes nothing at all for a session with no attributes', async () => {
+    const { prisma, tx } = fakePrisma();
+    await run(prisma);
+    expect(tx.projectAttributeKey.createMany).not.toHaveBeenCalled();
   });
 });

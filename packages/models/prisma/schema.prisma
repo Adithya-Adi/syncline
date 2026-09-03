@@ -32,7 +32,8 @@ model Project {
   origins        String[]
   createdAt      DateTime     @default(now())
 
-  sessions Session[]
+  sessions      Session[]
+  attributeKeys ProjectAttributeKey[]
 
   @@index([organizationId])
 }
@@ -145,6 +146,40 @@ model SessionAttribute {
   @@index([projectId, key, numValue])
   /// Read one session's attributes, and cascade its deletion.
   @@index([sessionId])
+}
+
+/// A key this project has been seen using, and what to do with it.
+///
+/// Discovered rather than configured. A vocabulary someone has to declare before it works means
+/// the first `setContext` always fails silently, and the list then lives in two places — the
+/// application's code and a settings page — that drift apart. So the worker records every key it
+/// indexes, and the settings page lists what it found.
+///
+/// A table rather than `SELECT DISTINCT key FROM SessionAttribute`: that distinct is a scan of
+/// every attribute row in the project, which is not something to run per keystroke of an
+/// autocomplete. And a key turned off has no rows to be distinct over, so there would be nothing
+/// left to show.
+model ProjectAttributeKey {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  key    String
+  /// `builtin` for what Syncline derives, `custom` for what setContext sent. The distinction is
+  /// for the settings page: one of them is not the customer's to turn off.
+  source String
+
+  /// Whether new values are indexed. Turning a key off stops it being written; what is already
+  /// there stays until someone deletes it, which is a separate and more destructive act.
+  indexed Boolean @default(true)
+
+  firstSeenAt DateTime @default(now())
+  /// Touched at most hourly, so a busy project does not rewrite this row on every chunk.
+  lastSeenAt  DateTime @default(now())
+
+  @@unique([projectId, key])
+  /// List a project's vocabulary, most recently used first.
+  @@index([projectId, lastSeenAt(sort: Desc)])
 }
 
 /// What the application said about a session, as it said it.

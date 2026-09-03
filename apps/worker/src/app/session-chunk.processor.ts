@@ -12,6 +12,7 @@ import {
 } from '@syncline/protocol';
 import {
   effectiveContext,
+  isReservedKey,
   missingChunkSeqs,
   rejectKey,
   sessionAttributes,
@@ -40,14 +41,25 @@ type PageviewTx = {
   };
 };
 
-/** The same, for the attribute index: whatever can answer these four calls. */
-type IndexTx = {
+/** Whatever can record a project vocabulary. Structural, so a test can hand it an object. */
+type KeyTx = {
+  projectAttributeKey: {
+    createMany(args: unknown): Promise<unknown>;
+    updateMany(args: unknown): Promise<unknown>;
+  };
+};
+
+/** The same, for the attribute index. */
+type IndexTx = KeyTx & {
   session: {
     findUnique(args: unknown): Promise<SessionIndexRow | null>;
     update(args: unknown): Promise<unknown>;
   };
   pageview: {
     findMany(args: unknown): Promise<{ path: string }[]>;
+  };
+  projectAttributeKey: KeyTx['projectAttributeKey'] & {
+    findMany(args: unknown): Promise<{ key: string }[]>;
   };
   sessionContext: {
     findMany(args: unknown): Promise<
@@ -586,7 +598,7 @@ export async function indexSession(
     await tx.session.update({ where: { id: sessionId }, data: { userId } });
   }
 
-  const desired = sessionAttributes({
+  const derived = sessionAttributes({
     userId,
     release: session.release,
     url: session.url,
@@ -596,6 +608,23 @@ export async function indexSession(
     serviceNames: session.serviceNames,
     context,
   });
+
+  // Keys somebody switched off in project settings. Normally none, so this is a lookup that
+  // usually returns nothing rather than a filter applied to every key.
+  const disabled = new Set(
+    (
+      await tx.projectAttributeKey.findMany({
+        where: { projectId, indexed: false },
+        select: { key: true },
+      })
+    ).map((row) => row.key),
+  );
+
+  const desired = disabled.size
+    ? derived.filter((fact) => !disabled.has(fact.key))
+    : derived;
+
+  await recordKeys(tx, projectId, desired);
 
   const existing = await tx.sessionAttribute.findMany({
     where: { sessionId },
@@ -629,6 +658,47 @@ export async function indexSession(
       skipDuplicates: true,
     });
   }
+}
+
+/** How often a key's `lastSeenAt` is worth moving. See `recordKeys`. */
+const KEY_TOUCH_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Records the vocabulary a project is using, so the search bar has something to suggest and the
+ * settings page has something to list.
+ *
+ * Two statements whatever the key count, which matters because this runs on every chunk. The
+ * insert skips what is already there rather than upserting, and `lastSeenAt` is moved only when it
+ * is more than an hour stale — a busy project would otherwise rewrite the same handful of rows
+ * thousands of times an hour for a timestamp nobody reads to the minute.
+ */
+export async function recordKeys(
+  tx: KeyTx,
+  projectId: string,
+  facts: readonly { key: string }[],
+): Promise<void> {
+  const keys = [...new Set(facts.map((fact) => fact.key))];
+  if (keys.length === 0) return;
+
+  await tx.projectAttributeKey.createMany({
+    data: keys.map((key) => ({
+      projectId,
+      key,
+      // What Syncline derives is not the customer's to turn off, and the settings page needs to
+      // know which is which to say so.
+      source: isReservedKey(key) ? 'builtin' : 'custom',
+    })),
+    skipDuplicates: true,
+  });
+
+  await tx.projectAttributeKey.updateMany({
+    where: {
+      projectId,
+      key: { in: keys },
+      lastSeenAt: { lt: new Date(Date.now() - KEY_TOUCH_INTERVAL_MS) },
+    },
+    data: { lastSeenAt: new Date() },
+  });
 }
 
 /** A key/value pair as one comparable string. NUL, because no attribute value contains one. */
