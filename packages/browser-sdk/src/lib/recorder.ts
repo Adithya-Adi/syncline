@@ -108,6 +108,20 @@ export function startRecording(options: SynclineOptions): Recording {
     // but replaces the text. These are the escape hatches a host page needs for a card form.
     blockClass: 'syncline-block',
     maskTextClass: 'syncline-mask',
+    /**
+     * Leaves out what a replay cannot use.
+     *
+     * Script contents are the reason this is set. Nothing executes during replay — the player
+     * paints a DOM — so every inlined script is bytes carried to be ignored, and modern frameworks
+     * inline a lot of them: an App Router page ships its RSC payload inside `<script>` tags, which
+     * is re-sent in full with every snapshot. The rest of what this drops is comments, favicons,
+     * head whitespace, and the social and robots meta tags, none of which are rendered.
+     *
+     * `true` rather than `'all'`: `'all'` additionally drops the description, keywords and
+     * authorship meta tags and stops tracking title changes. Those are hidden but real page
+     * content, and a recording is meant to be evidence of what was there.
+     */
+    slimDOMOptions: true,
   });
 
   const uninstallFetch = installFetchPatch(
