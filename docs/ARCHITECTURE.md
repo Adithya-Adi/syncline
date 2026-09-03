@@ -455,6 +455,40 @@ Three kinds of key are refused, and never stored:
 only what is currently true. The split is what makes ordering work — chunks arrive out of order and
 arrive twice, so latest-wins is computed at read time rather than merged at write time.
 
+`ProjectAttributeKey` is the vocabulary: one row per key a project has been seen using, discovered
+by the worker rather than declared by anyone. It exists so the search bar can suggest a project's
+own keys without a `SELECT DISTINCT` over every attribute row, and so a key that has been switched
+off still has somewhere to be listed.
+
+### The query language
+
+One syntax, one parser, two callers — `GET /v1/sessions?q=` and the dashboard's search box compile
+the same text with the same code, because two implementations of one language means two answers to
+one question.
+
+```
+user:u_8823 account:acct_412        an attribute, exactly
+plan:pro,enterprise                 any of
+cartValue:>100 duration:>10s        a threshold: numbers, and durations with a unit
+has:error has:accountId is:failed   presence — named conditions, or any indexed key
+-is:trivial                         negation
+01JQ8Z3KX9TVFMWQ2Y7B4CN5HD          a bare session or trace id, recognized by shape
+```
+
+Two properties hold it together. **Parsing never touches the database and compiling never parses**,
+so the whole language is tested without one. And **a compiled clause never names a project or an
+organization** — the caller supplies the scope and the search is placed underneath it, so a bug in
+the parser returns the wrong recordings from the right project, never the right ones from someone
+else's.
+
+A threshold on an attribute compares `numValue`, never `value`. Over text `'90' > '100'` is true,
+so the same filter would silently return the wrong sessions rather than failing.
+
+Anything not recognized as a column, a condition or an id is an attribute lookup. That is what
+makes `plan:pro` work on a key Syncline has never heard of, and it is the same decision as indexing
+on arrival: a filter that has to be declared somewhere before it works fails silently the first
+time, every time.
+
 A column per filter would need a migration every time someone wanted a new one; searching the
 session's JSON would read every recording in the project to answer one lookup. One table answers
 all of them at the same cost. `projectId` is denormalized onto the row on purpose — it is the

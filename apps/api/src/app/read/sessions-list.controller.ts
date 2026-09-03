@@ -2,6 +2,7 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { CurrentProject, RequireKey } from '../auth/ingest-key.guard.js';
 import type { ResolvedProject } from '../auth/project.service.js';
 import type { SessionListResponse } from '@syncline/protocol';
+import { compileQuery, parseQuery } from '@syncline/models';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const DEFAULT_LIMIT = 50;
@@ -25,8 +26,27 @@ export class SessionsListController {
     @CurrentProject() project: ResolvedProject,
     @Query('limit') limitParam?: string,
     @Query('before') before?: string,
+    @Query('q') q?: string,
   ): Promise<SessionListResponse> {
     const limit = clampLimit(limitParam);
+
+    // The same language the dashboard's search box speaks, compiled by the same code. Two
+    // implementations of one query syntax is two sets of results for one question.
+    const parsed = parseQuery(q ?? '');
+
+    // The project's vocabulary, and only when something was typed. An attribute key is stored with
+    // the case the application sent it in, and a caller will not have matched that exactly.
+    const keys =
+      parsed.terms.length > 0
+        ? (
+            await this.prisma.client.projectAttributeKey.findMany({
+              where: { projectId: project.id, indexed: true },
+              select: { key: true },
+            })
+          ).map((row) => row.key)
+        : [];
+
+    const search = compileQuery(parsed, { keys });
 
     // Keyset pagination on the id rather than an offset. Session ids are ULIDs, so they sort by
     // creation time, and a new recording arriving mid-scroll cannot shift a page boundary and make
@@ -35,6 +55,9 @@ export class SessionsListController {
       where: {
         projectId: project.id,
         ...(before ? { id: { lt: before } } : {}),
+        // Under the project scope, never beside it: a compiled clause names no project, so no
+        // query string can reach another one's recordings.
+        ...(search.where.length > 0 ? { AND: search.where } : {}),
       },
       orderBy: { id: 'desc' },
       take: limit + 1,

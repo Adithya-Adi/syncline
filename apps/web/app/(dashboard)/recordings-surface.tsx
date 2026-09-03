@@ -6,14 +6,18 @@ import {
   Clapperboard,
   Clock,
   Network,
+  Search,
 } from 'lucide-react';
 
 import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
 import { EmptyState, PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { compileQuery, parseQuery } from '@syncline/models';
+
 import { db } from '@/lib/db';
 import type { Viewer } from '@/lib/session';
+import { RecordingsSearch } from './recordings-search';
 
 const COLUMNS = '178px minmax(240px,1.6fr) 140px 96px 96px 86px 86px';
 const LIST_MIN_WIDTH = '980px';
@@ -43,6 +47,7 @@ export async function RecordingsSurface({
   project,
   showAll = false,
   before,
+  query = '',
 }: {
   viewer: Viewer;
   project: { id: string; name: string };
@@ -50,49 +55,75 @@ export async function RecordingsSurface({
   showAll?: boolean;
   /** Keyset cursor: the id of the last row on the previous page. */
   before?: string;
+  /** The search, as typed. */
+  query?: string;
 }) {
-  const rows = await db.session.findMany({
-    where: {
-      project: {
-        organizationId: viewer.organizationId,
-        id: project.id,
-      },
-      // Recordings with nothing in them are hidden rather than deleted, so a direct link to one
-      // still works and the "show empty" toggle brings them back.
-      ...(showAll ? {} : { trivial: false }),
-      ...(before ? { id: { lt: before } } : {}),
-    },
-    // Keyset pagination on the id, not an offset on the start time. Session ids are ULIDs, so
-    // they already sort by creation — and unlike an offset, a recording arriving while someone is
-    // paging cannot shift a page boundary and make a session appear twice or not at all.
-    orderBy: { id: 'desc' },
-    // One more than a page, purely to learn whether there is a next one.
-    take: PAGE_SIZE + 1,
-    select: {
-      id: true,
-      startedAt: true,
-      durationMs: true,
-      url: true,
-      userId: true,
-      trivial: true,
-      // The search summary, every number of it counted by the worker as the rows landed. This is
-      // what makes the list one query: nothing here is an aggregate over links or chunks.
-      errorCount: true,
-      consoleErrorCount: true,
-      requestCount: true,
-      failedRequestCount: true,
-      slowestRequestMs: true,
-      serviceNames: true,
-      missingChunkSeqs: true,
-      _count: { select: { pageviews: true } },
-      // The flow, trimmed to what a row can show: where they came in, and the first few steps.
-      pageviews: {
-        orderBy: { ordinal: 'asc' },
-        take: 4,
-        select: { ordinal: true, path: true },
-      },
-    },
+  const parsed = parseQuery(query);
+
+  // The vocabulary first, because the search needs it: an attribute key is stored with the case
+  // the application sent, and nobody types case exactly.
+  const vocabulary = await db.projectAttributeKey.findMany({
+    where: { projectId: project.id, indexed: true },
+    orderBy: [{ source: 'asc' }, { key: 'asc' }],
+    select: { key: true, source: true },
   });
+
+  const search = compileQuery(parsed, {
+    keys: vocabulary.map((entry) => entry.key),
+  });
+
+  const [rows] = await Promise.all([
+    db.session.findMany({
+      where: {
+        project: {
+          organizationId: viewer.organizationId,
+          id: project.id,
+        },
+        // Recordings with nothing in them are hidden rather than deleted, so a direct link to one
+        // still works and the "show empty" toggle brings them back. A search overrides that: if
+        // somebody asked for a specific session, hiding it because it was short is not help.
+        ...(showAll || search.where.length > 0 ? {} : { trivial: false }),
+        ...(before ? { id: { lt: before } } : {}),
+        // The search, under the scope rather than beside it. Compiled clauses never name a project
+        // or an organization, so nothing typed into the box can widen what is visible here.
+        ...(search.where.length > 0 ? { AND: search.where } : {}),
+      },
+      // Keyset pagination on the id, not an offset on the start time. Session ids are ULIDs, so
+      // they already sort by creation — and unlike an offset, a recording arriving while someone
+      // is paging cannot shift a page boundary and make a session appear twice or not at all.
+      orderBy: { id: 'desc' },
+      // One more than a page, purely to learn whether there is a next one.
+      take: PAGE_SIZE + 1,
+      select: {
+        id: true,
+        startedAt: true,
+        durationMs: true,
+        url: true,
+        userId: true,
+        trivial: true,
+        // The search summary, every number of it counted by the worker as the rows landed. This
+        // is what makes the list one query: nothing here is an aggregate over links or chunks.
+        errorCount: true,
+        consoleErrorCount: true,
+        requestCount: true,
+        failedRequestCount: true,
+        slowestRequestMs: true,
+        serviceNames: true,
+        missingChunkSeqs: true,
+        _count: { select: { pageviews: true } },
+        // The flow, trimmed to what a row can show: where they came in, and the first few steps.
+        pageviews: {
+          orderBy: { ordinal: 'asc' },
+          take: 4,
+          select: { ordinal: true, path: true },
+        },
+      },
+    }),
+  ]);
+
+  // "Somebody typed something", not "something compiled" — a query of only unparsable words still
+  // means the list on screen is an answer to a search, and must not be explained as a fresh project.
+  const searching = parsed.terms.length > 0 || parsed.unparsed.length > 0;
 
   const sessions = rows.slice(0, PAGE_SIZE);
   const nextCursor =
@@ -150,7 +181,9 @@ export async function RecordingsSurface({
              */}
             <Button asChild variant="ghost" size="sm">
               {/* Toggling drops the cursor: page four of one filter is not page four of another. */}
-              <Link href={recordingsHref(project.id, { all: !showAll })}>
+              <Link
+                href={recordingsHref(project.id, { all: !showAll, q: query })}
+              >
                 {showAll ? 'Hide empty' : 'Show empty'}
               </Link>
             </Button>
@@ -164,7 +197,47 @@ export async function RecordingsSurface({
         }
       />
 
-      {sessions.length === 0 ? (
+      <RecordingsSearch
+        projectId={project.id}
+        query={query}
+        showAll={showAll}
+        keys={vocabulary}
+        unparsed={parsed.unparsed}
+      />
+
+      {/*
+       * Two different emptinesses, and telling them apart is the whole point. A project with no
+       * recordings needs the SDK; a search that matched none needs a different search. Offering
+       * setup instructions to someone whose filter was too narrow reads as the product being
+       * broken.
+       */}
+      {sessions.length === 0 && searching ? (
+        <EmptyState
+          icon={<Search className="size-4" />}
+          title="No recordings match this search"
+          action={
+            <Button asChild variant="outline" size="sm">
+              <Link href={recordingsHref(project.id, { all: showAll })}>
+                Clear the search
+              </Link>
+            </Button>
+          }
+        >
+          {search.rejected.length > 0 ? (
+            <>
+              {search.rejected[0]?.reason} in{' '}
+              <span className="font-mono">{search.rejected[0]?.term.key}:</span>
+              . Fix that term, or clear the search.
+            </>
+          ) : (
+            <>
+              Every term narrows the result, so try removing one. Empty
+              recordings are included in a search, so this is not them being
+              hidden.
+            </>
+          )}
+        </EmptyState>
+      ) : sessions.length === 0 ? (
         <EmptyState
           icon={<Clapperboard className="size-4" />}
           title="No recordings for this project"
@@ -390,6 +463,7 @@ export async function RecordingsSurface({
                   <Link
                     href={recordingsHref(project.id, {
                       all: showAll,
+                      q: query,
                       before: nextCursor,
                     })}
                   >
@@ -408,10 +482,11 @@ export async function RecordingsSurface({
 /** The recordings URL for a given filter and page. Absent options are left off, not sent empty. */
 function recordingsHref(
   projectId: string,
-  { all, before }: { all?: boolean; before?: string },
+  { all, before, q }: { all?: boolean; before?: string; q?: string },
 ): string {
   const params = new URLSearchParams();
   if (all) params.set('all', '1');
+  if (q) params.set('q', q);
   if (before) params.set('before', before);
   const query = params.toString();
   return `/projects/${projectId}/recordings${query ? `?${query}` : ''}`;
