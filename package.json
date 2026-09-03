@@ -19,7 +19,7 @@
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "infra:logs": "docker compose logs -f",
-    "db:seed": "prisma db seed"
+    "db:seed": "nx run-many -t build -p protocol storage && prisma db seed"
   },
   "devDependencies": {
     "@nestjs/schematics": "^11.0.0",

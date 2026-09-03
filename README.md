@@ -109,9 +109,10 @@ pnpm db:migrate
 pnpm db:seed       # prints the project's pk_ / sk_ keys, and installs a demo recording
 ```
 
-Then run the three processes:
+Then build and run the three processes:
 
 ```sh
+pnpm build
 node apps/api/dist/main.js       # :4000
 node apps/worker/dist/main.js
 pnpm nx dev web                  # :3000
