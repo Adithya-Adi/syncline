@@ -20,6 +20,7 @@ import {
 } from '@/lib/projects';
 import { projectForViewer, requireViewer } from '@/lib/session';
 import { CopyField } from '@/components/copy-field';
+import { can } from '@/lib/permissions';
 import { AttributeKeys } from './attribute-keys';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,12 @@ export default async function ProjectPage({
 
   // Shown once, then gone — there is no stored copy to show a second time.
   const secret = await takeRevealedSecret(project.id);
+
+  // Read is membership; change is role. Controls a member cannot use are not drawn, and the
+  // actions behind them check again regardless.
+  const canRotate = can(viewer, 'project:keys');
+  const canWrite = can(viewer, 'project:write');
+  const canManageData = can(viewer, 'data:manage');
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
@@ -118,27 +125,31 @@ export default async function ProjectPage({
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            <form action={rotateSecretKey}>
-              <input type="hidden" name="projectId" value={project.id} />
-              <Button type="submit" variant="outline" size="sm">
-                Rotate secret key
-              </Button>
-            </form>
+          {canRotate && (
+            <>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <form action={rotateSecretKey}>
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <Button type="submit" variant="outline" size="sm">
+                    Rotate secret key
+                  </Button>
+                </form>
 
-            <form action={rotatePublicKey}>
-              <input type="hidden" name="projectId" value={project.id} />
-              <Button type="submit" variant="outline" size="sm">
-                Rotate public key
-              </Button>
-            </form>
-          </div>
+                <form action={rotatePublicKey}>
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <Button type="submit" variant="outline" size="sm">
+                    Rotate public key
+                  </Button>
+                </form>
+              </div>
 
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Rotating the public key revokes it everywhere at once, which is the
-            point — but every browser running the old bundle stops recording
-            until you deploy the new one.
-          </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Rotating the public key revokes it everywhere at once, which is
+                the point — but every browser running the old bundle stops
+                recording until you deploy the new one.
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -147,6 +158,11 @@ export default async function ProjectPage({
           <CardTitle>Settings</CardTitle>
         </CardHeader>
         <CardContent>
+          {/*
+            Read-only for a member rather than hidden: the origin allowlist is the first thing
+            somebody checks when recordings stop arriving, and hiding it would send them to ask an
+            admin what it says rather than what it should be.
+          */}
           <form action={updateProject} className="space-y-5">
             <input type="hidden" name="projectId" value={project.id} />
 
@@ -156,6 +172,7 @@ export default async function ProjectPage({
                 id="name"
                 name="name"
                 defaultValue={project.name}
+                readOnly={!canWrite}
                 required
               />
             </div>
@@ -168,6 +185,7 @@ export default async function ProjectPage({
                 rows={3}
                 className="font-mono text-xs"
                 defaultValue={project.origins.join('\n')}
+                readOnly={!canWrite}
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 One per line. Recordings from any other origin are refused with
@@ -176,12 +194,18 @@ export default async function ProjectPage({
               </p>
             </div>
 
-            <Button type="submit">Save</Button>
+            {canWrite ? (
+              <Button type="submit">Save</Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Your role can read these but not change them.
+              </p>
+            )}
           </form>
         </CardContent>
       </Card>
 
-      <AttributeKeys projectId={project.id} />
+      <AttributeKeys projectId={project.id} canManage={canManageData} />
     </main>
   );
 }

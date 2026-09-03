@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from './auth';
+import { can } from './permissions';
 import { db } from './db';
 
 /**
@@ -119,18 +120,13 @@ async function rememberOrganization(
   }
 }
 
-/** Roles that may invite, remove, and re-role other members. */
-const MANAGING_ROLES = new Set(['owner', 'admin']);
-
 /**
- * Better Auth stores roles as a comma-separated string once more than one is assigned, so a plain
- * equality check silently denies an owner who also holds another role.
+ * Kept as a named helper because the members page reads better for it, but the rule itself lives
+ * in one table — see `permissions.ts`. Two copies of "who may manage members" is two answers the
+ * day one of them is updated.
  */
 export function canManageMembers(role: string): boolean {
-  return role
-    .split(',')
-    .map((part) => part.trim())
-    .some((part) => MANAGING_ROLES.has(part));
+  return can({ role } as Viewer, 'members:manage');
 }
 
 export interface ViewerOrganization {

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { isReservedKey } from '@syncline/models';
+import { requirePermission } from './permissions';
 import { db } from './db';
 import { projectForViewer, requireViewer } from './session';
 
@@ -80,6 +81,8 @@ async function resolveKey(
   const key = String(formData.get('key') ?? '');
 
   const viewer = await requireViewer();
+  requirePermission(viewer, 'data:manage');
+
   const project = await projectForViewer(viewer, projectId);
   if (!project) throw new Error('No such project.');
   if (!key) throw new Error('No key given.');

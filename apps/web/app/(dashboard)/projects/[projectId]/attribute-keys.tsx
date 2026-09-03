@@ -27,7 +27,14 @@ const countFormat = new Intl.NumberFormat('en-US');
  * a text box for inventing one would create rows that match no session and a second place for the
  * vocabulary to live.
  */
-export async function AttributeKeys({ projectId }: { projectId: string }) {
+export async function AttributeKeys({
+  projectId,
+  canManage,
+}: {
+  projectId: string;
+  /** Whether this viewer's role may switch a key off or delete what is under it. */
+  canManage: boolean;
+}) {
   const keys = await projectAttributeKeys(projectId);
   const custom = keys.filter((entry) => entry.source === 'custom');
   const builtin = keys.filter((entry) => entry.source === 'builtin');
@@ -85,37 +92,39 @@ export async function AttributeKeys({ projectId }: { projectId: string }) {
                         </p>
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
-                        {/*
-                         * Two separate acts, and kept separate on purpose. Turning a key off tidies
-                         * the filter list and changes nothing already stored; deleting destroys a
-                         * month of data. One control doing both is how the second happens by
-                         * accident.
-                         */}
-                        <form action={setAttributeKeyIndexed}>
-                          <input
-                            type="hidden"
-                            name="projectId"
-                            value={projectId}
-                          />
-                          <input type="hidden" name="key" value={entry.key} />
-                          <input
-                            type="hidden"
-                            name="indexed"
-                            value={entry.indexed ? 'false' : 'true'}
-                          />
-                          <Button type="submit" variant="outline" size="sm">
-                            {entry.indexed ? 'Stop indexing' : 'Index again'}
-                          </Button>
-                        </form>
+                      {canManage && (
+                        <div className="flex shrink-0 items-center gap-2">
+                          {/*
+                           * Two separate acts, and kept separate on purpose. Turning a key off tidies
+                           * the filter list and changes nothing already stored; deleting destroys a
+                           * month of data. One control doing both is how the second happens by
+                           * accident.
+                           */}
+                          <form action={setAttributeKeyIndexed}>
+                            <input
+                              type="hidden"
+                              name="projectId"
+                              value={projectId}
+                            />
+                            <input type="hidden" name="key" value={entry.key} />
+                            <input
+                              type="hidden"
+                              name="indexed"
+                              value={entry.indexed ? 'false' : 'true'}
+                            />
+                            <Button type="submit" variant="outline" size="sm">
+                              {entry.indexed ? 'Stop indexing' : 'Index again'}
+                            </Button>
+                          </form>
 
-                        <DeleteKeyButton
-                          projectId={projectId}
-                          attributeKey={entry.key}
-                          values={entry.values}
-                          action={deleteAttributeKey}
-                        />
-                      </div>
+                          <DeleteKeyButton
+                            projectId={projectId}
+                            attributeKey={entry.key}
+                            values={entry.values}
+                            action={deleteAttributeKey}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

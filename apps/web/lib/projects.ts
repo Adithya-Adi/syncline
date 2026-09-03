@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { hashSecretKey, newPublicKey, newSecretKey } from '@syncline/models';
+import { requirePermission } from './permissions';
 import { db } from './db';
 import { projectForViewer, requireViewer } from './session';
 
@@ -62,6 +63,7 @@ function parseOrigins(raw: string): string[] {
 
 export async function createProject(formData: FormData): Promise<void> {
   const viewer = await requireViewer();
+  requirePermission(viewer, 'project:create');
 
   const name = String(formData.get('name') ?? '').trim();
   const origins = parseOrigins(String(formData.get('origins') ?? ''));
@@ -88,6 +90,7 @@ export async function createProject(formData: FormData): Promise<void> {
 
 export async function rotateSecretKey(formData: FormData): Promise<void> {
   const viewer = await requireViewer();
+  requirePermission(viewer, 'project:keys');
   const projectId = String(formData.get('projectId') ?? '');
 
   const project = await projectForViewer(viewer, projectId);
@@ -113,6 +116,7 @@ export async function rotateSecretKey(formData: FormData): Promise<void> {
  */
 export async function rotatePublicKey(formData: FormData): Promise<void> {
   const viewer = await requireViewer();
+  requirePermission(viewer, 'project:keys');
   const projectId = String(formData.get('projectId') ?? '');
 
   const project = await projectForViewer(viewer, projectId);
@@ -129,6 +133,7 @@ export async function rotatePublicKey(formData: FormData): Promise<void> {
 
 export async function updateProject(formData: FormData): Promise<void> {
   const viewer = await requireViewer();
+  requirePermission(viewer, 'project:write');
   const projectId = String(formData.get('projectId') ?? '');
 
   const project = await projectForViewer(viewer, projectId);
