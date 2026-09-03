@@ -1,0 +1,38 @@
+# Ingest. Authenticates, stores the raw body, enqueues, returns 202.
+#
+#   fly deploy -c fly.api.toml
+#
+# This is the only app browsers on customer sites talk to, so it is the one that has to stay up
+# and the one that must never auto-stop: a stopped machine turns a recording into a dropped chunk,
+# and the SDK treats a failed send as a gap rather than retrying forever.
+
+app = 'syncline-api'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+  build-target = 'api'
+
+[env]
+  API_PORT = '4000'
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  # Never stop. See above.
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  # The API's own check, which reports *which* dependency is down rather than just failing.
+  [[http_service.checks]]
+    grace_period = '20s'
+    interval = '15s'
+    method = 'GET'
+    timeout = '5s'
+    path = '/v1/health'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

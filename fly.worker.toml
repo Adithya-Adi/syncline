@@ -1,0 +1,32 @@
+# The worker. Decompresses, validates, normalizes, indexes, and sweeps.
+#
+#   fly deploy -c fly.worker.toml
+#
+# No `http_service`, because it consumes queues and serves nothing. That also means Fly has no
+# request to wake it on, so it simply runs — which is what a queue consumer has to do. Liveness is
+# "the process is up"; whether it is keeping up is a queue-depth question and belongs on the queue.
+#
+# Scaling is `fly scale count -c fly.worker.toml <n>`. The processors are idempotent and the queue
+# is the coordination point, so more of them is always safe.
+
+app = 'syncline-worker'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+  build-target = 'worker'
+
+[env]
+  # One machine, so concurrency is the whole of this worker's parallelism. Modest on a shared CPU:
+  # decompressing and indexing a chunk is not free, and a queue that drains slightly slower is
+  # better than a machine that thrashes.
+  WORKER_CONCURRENCY = '4'
+
+  # Off. Nothing is deleted until somebody decides how long recordings should live — see
+  # .env.production.example. Deleted *projects* are still reclaimed on the same sweep regardless.
+  RETENTION_DAYS = '0'
+  RETENTION_INTERVAL_MINUTES = '60'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
