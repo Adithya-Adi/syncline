@@ -20,6 +20,7 @@ import {
 } from '@/lib/projects';
 import { projectForViewer, requireViewer } from '@/lib/session';
 import { CopyField } from '@/components/copy-field';
+import { AttributeKeys } from './attribute-keys';
 
 export const dynamic = 'force-dynamic';
 
@@ -179,6 +180,8 @@ export default async function ProjectPage({
           </form>
         </CardContent>
       </Card>
+
+      <AttributeKeys projectId={project.id} />
     </main>
   );
 }
