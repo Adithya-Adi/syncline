@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { can } from '@/lib/permissions';
 import { EmptyState, PageHeader } from '@/components/page-header';
 import { db } from '@/lib/db';
-import { requireViewer } from '@/lib/session';
+import { LIVE, requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Projects' };
@@ -16,7 +16,7 @@ export default async function ProjectsPage() {
   const canCreate = can(viewer, 'project:create');
 
   const projects = await db.project.findMany({
-    where: { organizationId: viewer.organizationId },
+    where: { organizationId: viewer.organizationId, ...LIVE },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { sessions: true } } },
   });

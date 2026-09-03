@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { compileQuery, parseQuery } from '@syncline/models';
 
 import { db } from '@/lib/db';
-import type { Viewer } from '@/lib/session';
+import { LIVE, type Viewer } from '@/lib/session';
 import { RecordingsSearch } from './recordings-search';
 
 const COLUMNS = '178px minmax(240px,1.6fr) 140px 96px 96px 86px 86px';
@@ -77,6 +77,7 @@ export async function RecordingsSurface({
       where: {
         project: {
           organizationId: viewer.organizationId,
+          ...LIVE,
           id: project.id,
         },
         // Recordings with nothing in them are hidden rather than deleted, so a direct link to one

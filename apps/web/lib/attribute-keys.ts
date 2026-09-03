@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { isReservedKey } from '@syncline/models';
+import { audit } from './audit';
 import { requirePermission } from './permissions';
 import { db } from './db';
-import { projectForViewer, requireViewer } from './session';
+import { projectForViewer, requireViewer, type Viewer } from './session';
 
 /**
  * The search vocabulary a project has accumulated, and what can be done about it.
@@ -76,7 +77,7 @@ export async function projectAttributeKeys(
  */
 async function resolveKey(
   formData: FormData,
-): Promise<{ projectId: string; key: string }> {
+): Promise<{ projectId: string; projectName: string; key: string; viewer: Viewer }> {
   const projectId = String(formData.get('projectId') ?? '');
   const key = String(formData.get('key') ?? '');
 
@@ -88,7 +89,7 @@ async function resolveKey(
   if (!key) throw new Error('No key given.');
   if (isReservedKey(key)) throw new Error('Built-in keys cannot be changed.');
 
-  return { projectId: project.id, key };
+  return { projectId: project.id, projectName: project.name, key, viewer };
 }
 
 /**
@@ -101,12 +102,19 @@ async function resolveKey(
 export async function setAttributeKeyIndexed(
   formData: FormData,
 ): Promise<void> {
-  const { projectId, key } = await resolveKey(formData);
+  const { projectId, projectName, key, viewer } = await resolveKey(formData);
   const indexed = formData.get('indexed') === 'true';
 
   await db.projectAttributeKey.updateMany({
     where: { projectId, key },
     data: { indexed },
+  });
+
+  await audit(viewer, {
+    action: 'project.key.index',
+    targetId: projectId,
+    targetLabel: `${projectName} · ${key}`,
+    metadata: { key, indexed },
   });
 
   revalidatePath(`/projects/${projectId}`);
@@ -125,7 +133,7 @@ export async function setAttributeKeyIndexed(
  * delete — the button says so.
  */
 export async function deleteAttributeKey(formData: FormData): Promise<void> {
-  const { projectId, key } = await resolveKey(formData);
+  const { projectId, projectName, key, viewer } = await resolveKey(formData);
 
   await db.$transaction([
     db.sessionAttribute.deleteMany({ where: { projectId, key } }),
@@ -136,6 +144,13 @@ export async function deleteAttributeKey(formData: FormData): Promise<void> {
       data: { indexed: false },
     }),
   ]);
+
+  await audit(viewer, {
+    action: 'project.key.purge',
+    targetId: projectId,
+    targetLabel: `${projectName} · ${key}`,
+    metadata: { key },
+  });
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/recordings`);

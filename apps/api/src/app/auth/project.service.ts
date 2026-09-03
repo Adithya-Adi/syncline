@@ -8,7 +8,13 @@ export interface ResolvedProject {
   origins: string[];
 }
 
-/** Ingest runs one of these lookups per chunk, so the result is cached briefly. */
+/**
+ * Ingest runs one of these lookups per chunk, so the result is cached briefly.
+ *
+ * The TTL is also how long a deleted project keeps being accepted for — a request in flight when
+ * the delete lands is not worth a round trip on every chunk to prevent, and thirty seconds of
+ * writes to a project that is about to be swept costs nothing that was not already being swept.
+ */
 const CACHE_TTL_MS = 30_000;
 
 interface CacheEntry {
@@ -26,7 +32,9 @@ export class ProjectService {
   async byPublicKey(publicKey: string): Promise<ResolvedProject | null> {
     return this.resolve(`pk:${publicKey}`, () =>
       this.prisma.client.project.findUnique({
-        where: { publicKey },
+        // A deleted project's keys stop working. Its recordings are on their way out, and letting
+        // ingest keep filling a bucket nobody can read from is how a deletion turns into a bill.
+        where: { publicKey, deletedAt: null },
         select: { id: true, name: true, origins: true },
       }),
     );
@@ -40,7 +48,7 @@ export class ProjectService {
     const hash = hashSecretKey(secretKey);
     return this.resolve(`sk:${hash}`, () =>
       this.prisma.client.project.findUnique({
-        where: { secretKeyHash: hash },
+        where: { secretKeyHash: hash, deletedAt: null },
         select: { id: true, name: true, origins: true },
       }),
     );

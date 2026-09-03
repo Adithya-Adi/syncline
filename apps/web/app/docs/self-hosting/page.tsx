@@ -231,11 +231,35 @@ export default function SelfHosting() {
         <strong>Owners</strong> additionally delete. Every mutation checks the
         role on the server; hidden buttons are a courtesy, not the boundary.
       </p>
+      <p>
+        Every one of those mutations is recorded in the <strong>audit log</strong>,
+        which owners and admins read from the sidebar: who changed a project,
+        rotated a key, dropped a search key, invited or removed or re-roled
+        somebody. Reads are not recorded — a log of who watched which recording
+        is a surveillance feature, and it would bury the entries that matter.
+        Entries outlive the projects and accounts they name, and the recording
+        retention window does not touch them.
+      </p>
+
+      <h2 className="docs__h2">Deleting a project</h2>
+      <p>
+        An owner can delete a project from its settings page, after typing its
+        name. The project leaves the dashboard at once and ingest refuses its
+        keys within a minute; the recordings themselves — rows, chunks, spans
+        and raw OTLP bodies — are erased by the next sweep, which runs whether
+        or not <code>RETENTION_DAYS</code> is set. A deletion is an instruction,
+        not a retention policy.
+      </p>
+      <p>
+        The delay is deliberate. A project with a year of recordings is
+        hundreds of thousands of rows and as many objects, and deleting them
+        inside the request would time out partway through — leaving the rows
+        gone and their blobs stranded under keys nothing can reconstruct.
+      </p>
 
       <div className="callout callout--warn">
-        <strong>What is still missing.</strong> No way to delete a project at
-        all — and deleting one would leave its chunks in the object store, which
-        only the retention sweep above reclaims. No audit log. Put it behind a proxy that
+        <strong>What is still missing.</strong> No SSO, and no way to export a
+        project before deleting it. Put it behind a proxy that
         terminates TLS: the session cookies are <code>secure</code>, so the
         browser will not send them over plain HTTP.
       </div>

@@ -52,10 +52,10 @@ Self-hostable, and in use. Building in the open, milestone by milestone:
 - [x] **M2** — OTLP ingest, trace stitching, the read API, the viewer
 - [x] **M3** — accounts, organizations, roles, the seeded demo recording
 - [x] **M4** — errors and console capture, `identify()`/`setContext()`, recordings search
-- [ ] **M5** — ~~retention~~, project deletion, an audit log
+- [x] **M5** — retention, project deletion, an audit log
 
-Deploy it with `docker-compose.prod.yml` — see [self-hosting](#self-hosting) below. Retention is
-there and off by default; what is not: no way to delete a project, no audit log.
+Deploy it with `docker-compose.prod.yml` — see [self-hosting](#self-hosting) below. What it does
+not have: SSO, and no way to export a project before deleting it.
 
 ## Architecture
 
@@ -156,9 +156,14 @@ the object store, the spans nothing else points at, and the raw OTLP bodies — 
 `RETENTION_INTERVAL_MINUTES` (default 60). It is `0` out of the box, which keeps everything
 forever, and has no upper bound: set `3650` if ten years is the policy. Deletion is permanent.
 
+**Deleting a project.** Owners only, name typed to confirm. It leaves the dashboard at once and its
+keys stop working within a minute; the recordings are erased by the next sweep, whether or not
+`RETENTION_DAYS` is set.
+
 **Roles.** Membership decides what somebody can see, their role decides what they can change.
 Members read; admins run projects — settings, key rotation, search keys, invitations; owners
-additionally delete. Every mutation checks on the server.
+additionally delete. Every mutation checks on the server, and every one is written to an audit log
+that owners and admins can read. Reads are not recorded.
 
 ## License
 

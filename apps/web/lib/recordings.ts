@@ -8,7 +8,7 @@ import {
 import { buildSpanTree, PostgresSpanStore } from '@syncline/models';
 import { ObjectStore } from '@syncline/storage';
 import { db } from './db';
-import type { Viewer } from './session';
+import { LIVE, type Viewer } from './session';
 
 /**
  * Recording data, scoped to the viewer's organization.
@@ -54,7 +54,7 @@ export async function recordingForViewer(
   const session = await db.session.findFirst({
     where: {
       id: sessionId,
-      project: { organizationId: viewer.organizationId },
+      project: { organizationId: viewer.organizationId, ...LIVE },
     },
     include: {
       chunks: { orderBy: { seq: 'asc' } },
@@ -139,7 +139,7 @@ export async function chunkForViewer(
     where: {
       seq,
       sessionId,
-      session: { project: { organizationId: viewer.organizationId } },
+      session: { project: { organizationId: viewer.organizationId, ...LIVE } },
     },
     select: { storageKey: true },
   });
@@ -165,7 +165,7 @@ export async function traceForViewer(
   const link = await db.requestLink.findFirst({
     where: {
       traceId,
-      session: { project: { organizationId: viewer.organizationId } },
+      session: { project: { organizationId: viewer.organizationId, ...LIVE } },
     },
     select: { session: { select: { clockOffsetMs: true, rttMs: true } } },
   });

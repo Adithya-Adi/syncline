@@ -38,11 +38,19 @@ function fakePrisma(
     links: { traceId: string }[];
   }[] = [],
   stillLinked: string[] = [],
+  deletedProjects: { id: string; name: string }[] = [],
 ) {
   let served = false;
 
   const prisma = {
-    project: { findMany: jest.fn(async () => [{ id: 'proj_1' }]) },
+    project: {
+      findMany: jest.fn(async (args?: { where?: { deletedAt?: unknown } }) =>
+        // The sweep asks twice: once for deleted projects, once for live ones.
+        args?.where?.deletedAt === null ? [{ id: 'proj_1' }] : deletedProjects,
+      ),
+      delete: jest.fn(async () => ({})),
+    },
+    projectAttributeKey: { deleteMany: jest.fn(async () => ({ count: 0 })) },
     session: {
       // Served once, then empty — the sweep loops until a pass comes back short.
       findMany: jest.fn(async () => {
@@ -51,6 +59,7 @@ function fakePrisma(
         return sessions;
       }),
       deleteMany: jest.fn(async () => ({ count: sessions.length })),
+      count: jest.fn(async () => 0),
     },
     requestLink: {
       findMany: jest.fn(async () => stillLinked.map((traceId) => ({ traceId }))),
@@ -89,15 +98,15 @@ describe('the sweep', () => {
     links: [{ traceId: '4bf92f3577b34da6a3ce929d0e0e4736' }],
   };
 
-  it('does nothing at all when retention is unset', async () => {
-    // Out of the box this deletes nothing, and it must not even look.
+  it('deletes no recordings when retention is unset', async () => {
+    // Out of the box this destroys nothing. It still looks for deleted projects — that is not a
+    // retention policy, it is an instruction somebody gave — but with none marked it stops there.
     const prisma = fakePrisma([session]);
     const store = fakeStore();
 
     const result = await new RetentionProcessor(prisma, store, 0).run();
 
     expect(result.sessions).toBe(0);
-    expect(prisma.project.findMany).not.toHaveBeenCalled();
     expect(prisma.session.findMany).not.toHaveBeenCalled();
     expect(store.deleteMany).not.toHaveBeenCalled();
   });
@@ -157,6 +166,40 @@ describe('the sweep', () => {
 
     expect(result.spans).toBe(0);
     expect(prisma.span.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('empties a deleted project even with retention switched off', async () => {
+    // A deletion is not a retention policy. Someone typed the project's name to confirm it, and an
+    // install that keeps everything forever must still honour that.
+    const prisma = fakePrisma([session], [], [{ id: 'proj_1', name: 'Checkout' }]);
+    const store = fakeStore();
+
+    const result = await new RetentionProcessor(prisma, store, 0).run();
+
+    expect(result.sessions).toBe(1);
+    expect(result.projects).toBe(1);
+    expect(store.deleted).toContain(`sessions/proj_1/${session.id}/0.json.gz`);
+  });
+
+  it('deletes the project row only once nothing is left behind it', async () => {
+    // Session cascades from Project, so removing the row while sessions remain would take them
+    // with it and strand every object they point at — unreachable, since the key came from the row.
+    const prisma = fakePrisma([session], [], [{ id: 'proj_1', name: 'Checkout' }]);
+    (prisma.session.count as jest.Mock).mockResolvedValue(3);
+
+    const result = await new RetentionProcessor(prisma, fakeStore(), 0).run();
+
+    expect(result.projects).toBe(0);
+    expect(prisma.project.delete).not.toHaveBeenCalled();
+  });
+
+  it('takes a deleted project regardless of how recent its recordings are', async () => {
+    const prisma = fakePrisma([session], [], [{ id: 'proj_1', name: 'Checkout' }]);
+    await new RetentionProcessor(prisma, fakeStore(), 0).run();
+
+    // The cutoff for a deletion is "everything", not a window.
+    const where = (prisma.session.findMany as jest.Mock).mock.calls[0][0].where;
+    expect((where.startedAt.lt as Date).getTime()).toBeGreaterThan(Date.now());
   });
 
   it('does no work for a project with nothing expired', async () => {

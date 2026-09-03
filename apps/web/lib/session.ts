@@ -172,6 +172,20 @@ export async function viewerOrganizations(
  */
 export async function projectForViewer(viewer: Viewer, projectId: string) {
   return db.project.findFirst({
-    where: { id: projectId, organizationId: viewer.organizationId },
+    where: {
+      id: projectId,
+      organizationId: viewer.organizationId,
+      ...LIVE,
+    },
   });
 }
+
+/**
+ * The filter that hides a deleted project, written once.
+ *
+ * Deletion is a mark rather than a `DELETE` — the worker does the destroying, which can take until
+ * the next sweep. In between, the row is still there, and every query that forgets this clause
+ * shows somebody a project they deleted. Spelling it out at each call site is how the fourth query
+ * ships without it, so there is one spelling and it is imported.
+ */
+export const LIVE = { deletedAt: null } as const;

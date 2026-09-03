@@ -3,6 +3,9 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { organization } from 'better-auth/plugins/organization';
 import { nextCookies } from 'better-auth/next-js';
 import { randomUUID } from 'node:crypto';
+import type { AuditAction } from '@syncline/models';
+import { record } from './audit';
+import { currentAuditActor, type AuditActor } from './audit-actor';
 import { db } from './db';
 
 /**
@@ -95,6 +98,33 @@ async function openingOrganizationId(
     : memberships[0]?.organizationId;
 }
 
+/**
+ * One audit entry from inside a Better Auth hook.
+ *
+ * The actor is resolved from the request cookie unless the hook already handed one over — creation
+ * and invitation both name the person responsible, and taking it from the payload is both cheaper
+ * and more certain than reading it back out of the session.
+ */
+async function logMembership(
+  organizationId: string,
+  action: AuditAction,
+  input: {
+    targetId?: string;
+    targetLabel?: string;
+    metadata?: Record<string, unknown>;
+    actor?: AuditActor;
+  },
+): Promise<void> {
+  const actor = input.actor ?? (await currentAuditActor());
+
+  await record(organizationId, actor, {
+    action,
+    targetId: input.targetId,
+    targetLabel: input.targetLabel,
+    metadata: input.metadata,
+  });
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(db, { provider: 'postgresql' }),
 
@@ -159,6 +189,86 @@ export const auth = betterAuth({
     organization({
       allowUserToCreateOrganization: true,
       organizationLimit: 10,
+
+      /**
+       * Membership changes, into the audit log.
+       *
+       * These are the only mutations in the product that do not go through one of our own server
+       * actions — the browser calls Better Auth's endpoints directly — so this is the only place
+       * they can be recorded. They are also the ones most worth recording: who let somebody in,
+       * who made them an owner, who took it away.
+       *
+       * Every one is best-effort and swallowed. A failure to write the log must not fail the
+       * membership change that already happened, which would leave the UI reporting an error for
+       * an action that succeeded.
+       */
+      organizationHooks: {
+        afterCreateOrganization: async ({ organization, user }) => {
+          await logMembership(organization.id, 'organization.create', {
+            targetId: organization.id,
+            targetLabel: organization.name,
+            actor: { id: user.id, email: user.email, name: user.name },
+          });
+        },
+
+        afterCreateInvitation: async ({ invitation, inviter, organization }) => {
+          await logMembership(organization.id, 'member.invite', {
+            targetId: invitation.id,
+            targetLabel: invitation.email,
+            metadata: { role: invitation.role ?? 'member' },
+            actor: {
+              id: inviter.id,
+              email: inviter.email,
+              name: inviter.name,
+            },
+          });
+        },
+
+        afterCancelInvitation: async ({
+          invitation,
+          cancelledBy,
+          organization,
+        }) => {
+          await logMembership(organization.id, 'member.invite.cancel', {
+            targetId: invitation.id,
+            targetLabel: invitation.email,
+            actor: {
+              id: cancelledBy.id,
+              email: cancelledBy.email,
+              name: cancelledBy.name,
+            },
+          });
+        },
+
+        afterAddMember: async ({ member, user, organization }) => {
+          await logMembership(organization.id, 'member.invite', {
+            targetId: member.id,
+            targetLabel: user.email,
+            metadata: { role: member.role, accepted: true },
+          });
+        },
+
+        afterUpdateMemberRole: async ({
+          member,
+          previousRole,
+          user,
+          organization,
+        }) => {
+          await logMembership(organization.id, 'member.role', {
+            targetId: member.id,
+            targetLabel: user.email,
+            metadata: { from: previousRole, to: member.role },
+          });
+        },
+
+        afterRemoveMember: async ({ member, user, organization }) => {
+          await logMembership(organization.id, 'member.remove', {
+            targetId: member.id,
+            targetLabel: user.email,
+            metadata: { role: member.role },
+          });
+        },
+      },
     }),
     // Must come last: it writes Better Auth's cookies through Next's cookie API.
     nextCookies(),

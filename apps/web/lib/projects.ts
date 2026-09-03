@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { hashSecretKey, newPublicKey, newSecretKey } from '@syncline/models';
+import { audit } from './audit';
 import { requirePermission } from './permissions';
 import { db } from './db';
 import { projectForViewer, requireViewer } from './session';
@@ -84,8 +85,63 @@ export async function createProject(formData: FormData): Promise<void> {
 
   stashSecret(project.id, secretKey);
 
+  await audit(viewer, {
+    action: 'project.create',
+    targetId: project.id,
+    targetLabel: project.name,
+  });
+
   revalidatePath('/projects');
   redirect(`/projects/${project.id}?created=1`);
+}
+
+/**
+ * Deletes a project: marks it now, reclaims it later.
+ *
+ * Doing it here and now is not possible at any size that matters. A project with a year of
+ * recordings is hundreds of thousands of rows and as many objects in the bucket, and a server
+ * action that starts deleting them times out partway through — leaving rows gone and their blobs
+ * stranded under keys nothing can reconstruct. That is the exact failure the retention sweep was
+ * written to avoid, so this hands the work to the same sweep rather than repeating the mistake.
+ *
+ * What the click does guarantee is that the project is gone as far as anyone can observe: it stops
+ * being listed, its recordings stop being reachable, and ingest refuses its keys from the next
+ * request. Only the bytes lag, by at most one sweep.
+ *
+ * The name has to be typed to confirm. Not ceremony — this is the one irreversible action in the
+ * product, and the id in the form is not something the person clicking has read.
+ */
+export async function deleteProject(formData: FormData): Promise<void> {
+  const viewer = await requireViewer();
+  requirePermission(viewer, 'project:delete');
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const confirmation = String(formData.get('confirm') ?? '').trim();
+
+  const project = await projectForViewer(viewer, projectId);
+  if (!project) throw new Error('No such project.');
+
+  if (confirmation !== project.name) {
+    throw new Error(
+      `Type the project name exactly to confirm. Expected "${project.name}".`,
+    );
+  }
+
+  // Idempotent: a double submission finds it already marked and leaves the first timestamp alone,
+  // which is the one that says when it was actually deleted.
+  await db.project.updateMany({
+    where: { id: project.id, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+
+  await audit(viewer, {
+    action: 'project.delete',
+    targetId: project.id,
+    targetLabel: project.name,
+  });
+
+  revalidatePath('/projects');
+  redirect('/projects?deleted=1');
 }
 
 export async function rotateSecretKey(formData: FormData): Promise<void> {
@@ -103,6 +159,13 @@ export async function rotateSecretKey(formData: FormData): Promise<void> {
   });
 
   stashSecret(project.id, secretKey);
+
+  await audit(viewer, {
+    action: 'project.keys.rotate',
+    targetId: project.id,
+    targetLabel: project.name,
+    metadata: { key: 'secret' },
+  });
 
   revalidatePath(`/projects/${project.id}`);
   redirect(`/projects/${project.id}?rotated=secret`);
@@ -127,6 +190,13 @@ export async function rotatePublicKey(formData: FormData): Promise<void> {
     data: { publicKey: newPublicKey() },
   });
 
+  await audit(viewer, {
+    action: 'project.keys.rotate',
+    targetId: project.id,
+    targetLabel: project.name,
+    metadata: { key: 'public' },
+  });
+
   revalidatePath(`/projects/${project.id}`);
   redirect(`/projects/${project.id}?rotated=public`);
 }
@@ -147,6 +217,20 @@ export async function updateProject(formData: FormData): Promise<void> {
   await db.project.update({
     where: { id: project.id },
     data: { name, origins },
+  });
+
+  // Both fields, only when they moved. An entry saying nothing changed is noise in the one place
+  // that has to stay readable.
+  await audit(viewer, {
+    action: 'project.update',
+    targetId: project.id,
+    targetLabel: name,
+    metadata: {
+      ...(name !== project.name ? { renamedFrom: project.name } : {}),
+      ...(origins.join(',') !== project.origins.join(',')
+        ? { origins: { from: project.origins, to: origins } }
+        : {}),
+    },
   });
 
   revalidatePath(`/projects/${project.id}`);

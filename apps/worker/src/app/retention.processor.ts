@@ -26,6 +26,20 @@ export interface RetentionResult {
   objects: number;
   spans: number;
   otlp: number;
+  /** Deleted projects fully reclaimed and removed. */
+  projects: number;
+}
+
+function empty(): RetentionResult {
+  return { sessions: 0, objects: 0, spans: 0, otlp: 0, projects: 0 };
+}
+
+function add(total: RetentionResult, part: RetentionResult): void {
+  total.sessions += part.sessions;
+  total.objects += part.objects;
+  total.spans += part.spans;
+  total.otlp += part.otlp;
+  total.projects += part.projects;
 }
 
 export class RetentionProcessor {
@@ -39,38 +53,86 @@ export class RetentionProcessor {
   ) {}
 
   async run(): Promise<RetentionResult> {
-    const total: RetentionResult = {
-      sessions: 0,
-      objects: 0,
-      spans: 0,
-      otlp: 0,
-    };
+    const total = empty();
+
+    // Always, whatever retention says. A project somebody deleted is not being kept under a
+    // policy — the decision was made in the dashboard, and an install with retention switched off
+    // would otherwise hold deleted projects forever, which is the opposite of what was asked for.
+    add(total, await this.reclaimDeletedProjects());
 
     const days = retentionWindowDays(this.retentionDays);
-    if (days === null) return total;
 
-    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    if (days !== null) {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    // Walked per project because both things this deletes are addressed by project: a chunk's key
-    // is built from it, and the OTLP prefixes start with it.
-    const projects = await this.prisma.project.findMany({
-      select: { id: true },
-    });
+      // Walked per project because both things this deletes are addressed by project: a chunk's
+      // key is built from it, and the OTLP prefixes start with it.
+      const projects = await this.prisma.project.findMany({
+        // Deleted ones were emptied above, whatever their age.
+        where: { deletedAt: null },
+        select: { id: true },
+      });
 
-    for (const project of projects) {
-      const purged = await this.purgeProject(project.id, cutoff);
-
-      total.sessions += purged.sessions;
-      total.objects += purged.objects;
-      total.spans += purged.spans;
-      total.otlp += purged.otlp;
+      for (const project of projects) {
+        add(total, await this.purgeProject(project.id, cutoff));
+      }
     }
 
-    if (total.sessions > 0 || total.otlp > 0) {
+    if (total.sessions > 0 || total.otlp > 0 || total.projects > 0) {
       this.logger.log(
         `retention: removed ${total.sessions} session(s), ${total.objects} chunk object(s), ` +
-          `${total.spans} span(s), ${total.otlp} raw OTLP body(ies)`,
+          `${total.spans} span(s), ${total.otlp} raw OTLP body(ies), ` +
+          `${total.projects} deleted project(s)`,
       );
+    }
+
+    return total;
+  }
+
+  /**
+   * Projects somebody deleted in the dashboard.
+   *
+   * The click marks; this is what actually destroys. Everything in the project goes regardless of
+   * age — a deletion is not a retention window — and the project row goes last, for the same
+   * reason chunks go before sessions: while the row exists, the sweep can find its way back to
+   * whatever is left, and a crash halfway is simply redone on the next pass.
+   *
+   * `Session` cascades from `Project`, so removing the row would take the sessions with it and
+   * strand their objects. Hence the explicit purge first, with the row deleted only once nothing
+   * is left behind it.
+   */
+  private async reclaimDeletedProjects(): Promise<RetentionResult> {
+    const total = empty();
+
+    const deleted = await this.prisma.project.findMany({
+      where: { deletedAt: { not: null } },
+      select: { id: true, name: true },
+    });
+
+    for (const project of deleted) {
+      // A cutoff in the future means "everything", which is what deletion means.
+      add(total, await this.purgeSessions(project.id, new Date(8.64e15)));
+
+      // The whole prefix, rather than the day-by-day walk retention does. There is no window to
+      // respect here, and listing sixty dated prefixes to delete a project is sixty round trips
+      // that one prefix answers.
+      total.otlp += await this.storage.deleteMany(
+        await this.storage.listPrefix(`otlp/${project.id}/`),
+      );
+
+      // Only when the last batch came back empty is there nothing left to strand.
+      const remaining = await this.prisma.session.count({
+        where: { projectId: project.id },
+      });
+      if (remaining > 0) continue;
+
+      await this.prisma.projectAttributeKey.deleteMany({
+        where: { projectId: project.id },
+      });
+      await this.prisma.project.delete({ where: { id: project.id } });
+
+      total.projects += 1;
+      this.logger.log(`reclaimed deleted project "${project.name}"`);
     }
 
     return total;
@@ -87,12 +149,17 @@ export class RetentionProcessor {
     projectId: string,
     cutoff: Date,
   ): Promise<RetentionResult> {
-    const result: RetentionResult = {
-      sessions: 0,
-      objects: 0,
-      spans: 0,
-      otlp: 0,
-    };
+    const result = await this.purgeSessions(projectId, cutoff);
+    result.otlp += await this.purgeOtlpBodies(projectId, cutoff);
+    return result;
+  }
+
+  /** The session half of a purge: everything started before the cutoff, in batches. */
+  private async purgeSessions(
+    projectId: string,
+    cutoff: Date,
+  ): Promise<RetentionResult> {
+    const result = empty();
 
     for (;;) {
       const expired = await this.prisma.session.findMany({
@@ -131,7 +198,6 @@ export class RetentionProcessor {
       if (expired.length < BATCH) break;
     }
 
-    result.otlp += await this.purgeOtlpBodies(projectId, cutoff);
     return result;
   }
 

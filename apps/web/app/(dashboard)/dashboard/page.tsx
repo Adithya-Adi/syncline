@@ -5,7 +5,7 @@ import { FolderKanban, KeyRound, Layers3 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { db } from '@/lib/db';
-import { requireViewer } from '@/lib/session';
+import { LIVE, requireViewer } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard' };
@@ -15,7 +15,7 @@ const countFormat = new Intl.NumberFormat('en-US');
 export default async function DashboardPage() {
   const viewer = await requireViewer();
   const projects = await db.project.findMany({
-    where: { organizationId: viewer.organizationId },
+    where: { organizationId: viewer.organizationId, ...LIVE },
     orderBy: { name: 'asc' },
     select: {
       id: true,

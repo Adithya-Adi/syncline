@@ -9,6 +9,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   Menu,
+  ScrollText,
   Users,
   X,
 } from 'lucide-react';
@@ -57,6 +58,12 @@ const ORGANIZATION_LINKS: NavLink[] = [
     label: 'Members',
     icon: Users,
     isActive: (pathname) => pathname.startsWith('/members'),
+  },
+  {
+    href: '/audit',
+    label: 'Audit log',
+    icon: ScrollText,
+    isActive: (pathname) => pathname.startsWith('/audit'),
   },
 ];
 

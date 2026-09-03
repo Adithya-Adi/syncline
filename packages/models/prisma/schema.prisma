@@ -32,10 +32,23 @@ model Project {
   origins        String[]
   createdAt      DateTime     @default(now())
 
+  /// Set when someone deletes the project; the worker does the actual destroying.
+  ///
+  /// Deleting synchronously is not an option at any real size: a project with a year of recordings
+  /// is hundreds of thousands of rows and as many objects, and a server action that tries it times
+  /// out halfway — leaving the rows gone and the blobs stranded, which is precisely the failure
+  /// retention was written to avoid. So the click marks, and the sweep reclaims.
+  ///
+  /// Marked is gone as far as anyone can tell: the dashboard stops listing it and ingest stops
+  /// accepting its keys the moment this is set. The delay is only in when the bytes go.
+  deletedAt DateTime?
+
   sessions      Session[]
   attributeKeys ProjectAttributeKey[]
 
   @@index([organizationId])
+  /// The sweep's lookup: find what is marked, ignore everything else.
+  @@index([deletedAt])
 }
 
 model Session {
@@ -454,6 +467,49 @@ model Verification {
   @@map("verification")
 }
 
+/// Who changed what, and when.
+///
+/// The question this answers is asked after the fact and usually under pressure: a key stopped
+/// working, a project is gone, somebody has access they should not. Without a record the honest
+/// answer is "we cannot tell", and an organization that cannot tell cannot hold anyone to anything.
+///
+/// Only mutations are recorded — reads are not. A log of who watched which recording would be a
+/// surveillance feature wearing an accountability badge, and it would bury the handful of entries
+/// that matter under thousands that do not.
+///
+/// Flat columns rather than relations to `User` and `Project`, because this outlives both. A
+/// deleted user's rows would cascade away exactly when the log is being read to find out what they
+/// did, so the actor's email and the target's name are copied in as text: what was true at the
+/// time, kept whether or not the thing still exists.
+model AuditEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Null for anything the system did on nobody's behalf.
+  actorId    String?
+  /// Copied, not joined. See above.
+  actorEmail String
+  actorName  String
+
+  /// A verb from AUDIT_ACTIONS — `project.delete`, `member.role`, `project.keys.rotate`.
+  action String
+
+  /// What it happened to, if anything: a project id, a member id, a key name.
+  targetId    String?
+  /// That target's name as it read at the time.
+  targetLabel String?
+
+  /// Anything worth keeping that is not a column — the old and new role, the origins that changed.
+  /// Never credentials, and never a recording's contents.
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  /// The only way this is ever read: one organization's entries, newest first.
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
 model Organization {
   id          String       @id
   name        String
@@ -463,6 +519,7 @@ model Organization {
   metadata    String?
   members     Member[]
   invitations Invitation[]
+  auditEvents AuditEvent[]
   /// Not part of Better Auth's generated schema — this is the seam where our domain attaches.
   projects    Project[]
 

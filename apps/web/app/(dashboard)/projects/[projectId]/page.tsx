@@ -22,6 +22,7 @@ import { projectForViewer, requireViewer } from '@/lib/session';
 import { CopyField } from '@/components/copy-field';
 import { can } from '@/lib/permissions';
 import { AttributeKeys } from './attribute-keys';
+import { DeleteProject } from './delete-project';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +48,7 @@ export default async function ProjectPage({
   const canRotate = can(viewer, 'project:keys');
   const canWrite = can(viewer, 'project:write');
   const canManageData = can(viewer, 'data:manage');
+  const canDelete = can(viewer, 'project:delete');
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
@@ -206,6 +208,10 @@ export default async function ProjectPage({
       </Card>
 
       <AttributeKeys projectId={project.id} canManage={canManageData} />
+
+      {canDelete && (
+        <DeleteProject projectId={project.id} projectName={project.name} />
+      )}
     </main>
   );
 }
