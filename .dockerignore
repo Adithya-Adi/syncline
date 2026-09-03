@@ -1,0 +1,49 @@
+# What never belongs in a build context.
+#
+# Without this the context is the whole working tree — node_modules, .next, dist, the Nx cache —
+# which is hundreds of megabytes to transfer and, worse, would overwrite the image's own installed
+# dependencies with binaries built for the host platform. A Prisma engine or an esbuild binary
+# compiled for Windows does not run on Alpine, and the failure appears at runtime rather than build
+# time.
+
+node_modules
+**/node_modules
+
+# Build output. The image builds its own.
+dist
+**/dist
+.next
+**/.next
+out
+**/out
+**/test-output
+
+# Tooling caches
+.nx
+.pnpm-store
+**/.vite
+**/.turbo
+.gstack
+
+# Local state and secrets. `.env.example` and `.env.production.example` are kept: they are
+# documentation. Anything filled in is not.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Version control and editor noise
+.git
+.github
+.vscode
+.idea
+.claude
+.agents
+.codex
+.cursor
+.gemini
+.opencode
+
+# Not needed to build or run the services
+**/*.log
+viewer.png

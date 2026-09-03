@@ -45,12 +45,18 @@ Two design notes worth calling out:
 
 ## Status
 
-Pre-alpha. Nothing is installable yet. Building in the open, milestone by milestone:
+Self-hostable, and in use. Building in the open, milestone by milestone:
 
 - [x] **M0** — repo, architecture, scaffold
 - [x] **M1** — browser SDK captures, chunks land in Postgres
 - [x] **M2** — OTLP ingest, trace stitching, the read API, the viewer
-- [ ] **M3** — demo recording, clock-skew band against real latency, README gif
+- [x] **M3** — accounts, organizations, roles, the seeded demo recording
+- [x] **M4** — errors and console capture, `identify()`/`setContext()`, recordings search
+- [ ] **M5** — retention and deletion, ingest quotas, an audit log
+
+Deploy it with `docker-compose.prod.yml` — see [self-hosting](#self-hosting) below. What it does
+not have yet: no retention policy or scheduled deletion, no ingest rate limiting, no audit log.
+Deleting a project removes its rows but leaves its chunks in the object store.
 
 ## Architecture
 
@@ -127,6 +133,28 @@ node tools/build-demo-recording.mjs
 Ports 5442 and 6399 are deliberate — if you already run Postgres or Redis
 natively, the standard ports are taken, and a host connection can reach your own
 server instead of the container with nothing to tell you so.
+
+## Self-hosting
+
+Three Node processes — `api`, `worker`, `web` — plus Postgres, Redis and anything that speaks S3.
+One `Dockerfile` builds all three, and a `migrate` target runs to completion before any of them
+start:
+
+```sh
+cp .env.production.example .env.production   # nothing has a working default
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+Point `DATABASE_URL`, `REDIS_URL` and `S3_ENDPOINT` at managed services and that is the whole
+deployment. For a single box with none of those, `--profile bundled` brings up Postgres, Redis and
+MinIO alongside. Put it behind a proxy that terminates TLS — the session cookies are `secure`.
+
+Migrations never run at container start: a dozen replicas booting together would race through the
+same migration, and one failing would take a rollout down rather than one job.
+
+**Roles.** Membership decides what somebody can see, their role decides what they can change.
+Members read; admins run projects — settings, key rotation, search keys, invitations; owners
+additionally delete. Every mutation checks on the server.
 
 ## License
 

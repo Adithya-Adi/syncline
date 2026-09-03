@@ -1,0 +1,149 @@
+# A production-shaped Syncline, on one machine.
+#
+#   cp .env.production.example .env.production   # then fill it in
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# What this is: the three Syncline processes, wired correctly, with migrations run once before any
+# of them start. Enough to put Syncline in front of a team.
+#
+# What this is not: a highly available deployment. Postgres, Redis and the object store are managed
+# services in any serious install — this file points at whatever `DATABASE_URL`, `REDIS_URL` and
+# `S3_ENDPOINT` say, so pointing them at RDS, ElastiCache and S3 is the whole migration. The local
+# containers below are opt-in through the `bundled` profile for a single-box install that has none
+# of those.
+#
+# TLS is not here either. Put this behind a reverse proxy that terminates it — the auth cookies are
+# `secure` and the browser will not send them over plain HTTP on anything but localhost.
+
+x-syncline-env: &syncline-env
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+  REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+  S3_ENDPOINT: ${S3_ENDPOINT:?set S3_ENDPOINT}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+  # MinIO and most self-hosted stores need path-style addressing; S3 and R2 do not.
+  S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+
+services:
+  # Runs to completion before anything else starts. Migrations belong in a job, not in the boot
+  # path of a service that may have a dozen replicas racing through them.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      <<: *syncline-env
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      <<: *syncline-env
+      API_PORT: 4000
+    ports:
+      - '${API_PORT:-4000}:4000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      # The API's own check, which reports *which* dependency is down rather than just failing.
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+  worker:
+    build:
+      context: .
+      target: worker
+    environment:
+      <<: *syncline-env
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    # Scale with `--scale worker=3`. The queue is the coordination point; the processors are
+    # idempotent, so more of them is always safe.
+
+  web:
+    build:
+      context: .
+      target: web
+    environment:
+      <<: *syncline-env
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?set BETTER_AUTH_URL}
+      NEXT_PUBLIC_SYNCLINE_API: ${NEXT_PUBLIC_SYNCLINE_API:-}
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------------------------------
+  # Bundled infrastructure, for a single-box install with no managed services.
+  #
+  #   docker compose -f docker-compose.prod.yml --profile bundled up -d
+  #
+  # Point DATABASE_URL at `postgres`, REDIS_URL at `redis`, S3_ENDPOINT at `http://minio:9000`.
+  # ------------------------------------------------------------------------------------------
+  postgres:
+    profiles: ['bundled']
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-syncline}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-syncline}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-syncline} -d ${POSTGRES_DB:-syncline}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    profiles: ['bundled']
+    image: redis:8-alpine
+    # noeviction is not optional: BullMQ uses blocking reads and must never have keys evicted
+    # underneath it. A Redis configured to evict will lose jobs silently under memory pressure.
+    command: redis-server --maxmemory-policy noeviction --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    profiles: ['bundled']
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:

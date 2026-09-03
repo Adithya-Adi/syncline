@@ -133,10 +133,56 @@ export default function SelfHosting() {
         </li>
       </ul>
 
+      <h2 className="docs__h2">Running it</h2>
+      <p>
+        One <code>Dockerfile</code> with three targets — <code>api</code>,{' '}
+        <code>worker</code>, <code>web</code> — plus a <code>migrate</code>{' '}
+        target that runs to completion before any of them start.{' '}
+        <code>docker-compose.prod.yml</code> wires the four together:
+      </p>
+
+      <pre className="snippet">
+        <span className="c">
+          # fill this in first — nothing has a working default
+        </span>
+        {'\n'}
+        cp .env.production.example .env.production
+        {'\n\n'}
+        docker compose -f docker-compose.prod.yml \{'\n'}
+        {'  '}--env-file .env.production up -d --build
+      </pre>
+
+      <p>
+        Point <code>DATABASE_URL</code>, <code>REDIS_URL</code> and{' '}
+        <code>S3_ENDPOINT</code> at managed services and that is the whole
+        deployment. For a single box with none of those, the{' '}
+        <code>bundled</code> profile brings up Postgres, Redis and MinIO
+        alongside.
+      </p>
+
+      <p>
+        Migrations are never run at container start. A dozen replicas booting
+        together would race each other through the same migration, and one
+        failing would take the rollout down rather than one job — so the{' '}
+        <code>migrate</code> service runs first and the rest wait for it.
+      </p>
+
+      <h2 className="docs__h2">Roles</h2>
+      <p>
+        Membership decides what somebody can see; their role decides what they
+        can change. <strong>Members</strong> read. <strong>Admins</strong> run
+        projects — settings, key rotation, search keys, invitations.{' '}
+        <strong>Owners</strong> additionally delete. Every mutation checks the
+        role on the server; hidden buttons are a courtesy, not the boundary.
+      </p>
+
       <div className="callout callout--warn">
-        <strong>Not production-ready.</strong> There are no official container
-        images, no retention or deletion, and no authentication on the web app.
-        Run it on a trusted network.
+        <strong>What is still missing.</strong> No retention policy or scheduled
+        deletion — recordings are kept until something removes them, and
+        deleting a project leaves its chunks in the object store. No ingest rate
+        limiting or per-project quotas. No audit log. Put it behind a proxy that
+        terminates TLS: the session cookies are <code>secure</code>, so the
+        browser will not send them over plain HTTP.
       </div>
     </>
   );

@@ -52,7 +52,9 @@ Thumbs.db
 # env
 .env
 .env.*
+# The examples are documentation, not configuration — nothing in them is filled in.
 !.env.example
+!.env.production.example
 
 # local blob storage
 .data
