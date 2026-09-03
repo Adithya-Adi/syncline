@@ -6,16 +6,17 @@ a replay can resolve to its backend spans without a side table.
 
 ## Install
 
-Install the alpha prerelease with:
+Install with:
 
     npm install syncline-browser
 
-This package is currently an alpha prerelease. The supported public API is startRecording and the
-SynclineOptions type while the SDK integration surface is being validated.
+The supported public API is `startRecording`, the `SynclineOptions` type, and the handle it returns
+— `identify`, `setContext`, `clearIdentity`, `flush` and `stop`. Still pre-1.0: the integration
+surface is settled enough to build on, but a minor version may still move it.
 
-Documentation and the hosted Syncline application will be available at
-[syncline.adiverse.org](https://syncline.adiverse.org). The endpoint remains configurable for
-self-hosted installations.
+Documentation and the hosted Syncline application are at
+[syncline.co.in](https://syncline.co.in). The endpoint remains configurable for self-hosted
+installations.
 
 ```ts
 import { startRecording } from 'syncline-browser';

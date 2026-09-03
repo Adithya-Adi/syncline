@@ -1,11 +1,11 @@
 {
   "name": "syncline-browser",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0",
   "private": false,
   "type": "module",
   "description": "Browser session replay with synchronized distributed traces.",
   "license": "AGPL-3.0-only",
-  "homepage": "https://syncline.adiverse.org",
+  "homepage": "https://syncline.co.in",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Adithya-Adi/syncline.git"
