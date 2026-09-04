@@ -58,7 +58,7 @@ hands out, pasted in unchanged. Everything else is a storefront to click on.
    ```sh
    cp examples/storefront/.env.example examples/storefront/.env.local
    # fill in NEXT_PUBLIC_SYNCLINE_PUBLIC_KEY and SYNCLINE_SECRET_KEY
-   pnpm nx run example-storefront:dev
+   pnpm -w run example:dev
    ```
 
    Then open <http://localhost:4321> and click things. The first chunk is uploaded within about five
@@ -66,6 +66,12 @@ hands out, pasted in unchanged. Everything else is a storefront to click on.
 
 The `dev` target builds the browser SDK first, because `syncline-browser` is linked as a workspace
 package and its entry point is the built bundle.
+
+**Run it from the repository root, or use `pnpm -w` as above.** `nx run example-storefront:dev`
+from inside this directory fails with `Could not resolve "packages/browser-sdk/src/index.ts"`: the
+esbuild executor resolves the SDK's entry point against the current directory rather than the
+workspace root, so from here it looks for `examples/storefront/packages/...`. The `-w` flag runs the
+script at the root, which is why it works from anywhere.
 
 ## Which key goes where
 
@@ -81,7 +87,7 @@ inside route handlers, which is where the spans are exported from.
 looks like Syncline broke the application.
 
 ```sh
-BREAK_CORS=1 pnpm nx run example-storefront:dev
+BREAK_CORS=1 pnpm -w run example:dev
 ```
 
 Requests from the storefront itself keep working — the page and the API share an origin, so no
