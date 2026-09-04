@@ -12,7 +12,7 @@ import { ImageResponse } from 'next/og';
  */
 
 export const alt =
-  'Syncline — every layer of your stack, folded onto one timeline';
+  'Syncline: every layer of your stack, folded onto one timeline';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -83,7 +83,7 @@ export default function OpengraphImage() {
           marginTop: 40,
         }}
       >
-        Session replay · distributed tracing · self-hostable
+        Session replay, distributed tracing, self-hostable
       </div>
     </div>,
     size,

@@ -37,7 +37,7 @@ export const metadata: Metadata = {
    * the label on a tab, and "Self-hosting" alone says nothing about whose. Every docs page already
    * exports its own title, so this is the only place the product name gets attached to them.
    */
-  title: { default: `Syncline — ${TAGLINE}`, template: '%s · Syncline' },
+  title: { default: `Syncline: ${TAGLINE}`, template: '%s | Syncline' },
   description: DESCRIPTION,
   applicationName: 'Syncline',
   keywords: [
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   authors: [{ name: 'Syncline' }],
   alternates: { canonical: '/' },
   openGraph: {
-    title: `Syncline — ${TAGLINE}`,
+    title: `Syncline: ${TAGLINE}`,
     description: DESCRIPTION,
     siteName: 'Syncline',
     type: 'website',
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `Syncline — ${TAGLINE}`,
+    title: `Syncline: ${TAGLINE}`,
     description: DESCRIPTION,
   },
   /*
