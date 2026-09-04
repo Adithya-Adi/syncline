@@ -18,8 +18,10 @@ import {
   sessionAttributes,
   slowestRequestMs,
   type PrismaClient,
+  type SpanStore,
 } from '@syncline/models';
 import type { ObjectStore } from '@syncline/storage';
+import { applyServiceNames } from './session-services.js';
 
 /**
  * The slice of the client the pageview helpers need.
@@ -104,6 +106,14 @@ export class SessionChunkProcessor {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly storage: ObjectStore,
+    /**
+     * Read-only here, and only to answer "have this chunk's traces already been exported?".
+     *
+     * Optional so the existing tests, which have no interest in spans, keep constructing this with
+     * two arguments. Without it the backfill below simply does not run, which is the behaviour
+     * this class had before.
+     */
+    private readonly spans?: SpanStore,
   ) {}
 
   async process(job: Job<SessionChunkJob>): Promise<void> {
@@ -381,9 +391,59 @@ export class SessionChunkProcessor {
       await indexSession(tx, projectId, sessionId);
     });
 
+    // The other half of the linkage that otlp-traces.processor performs.
+    //
+    // Outside the transaction on purpose: it reads the span table through the port, which holds
+    // its own client, and nothing above depends on the result. A failure here costs a flag, not
+    // the chunk.
+    await this.backfillBackendSpans(sessionId, parsed.links);
+
     this.logger.log(
       `session ${sessionId} seq ${seq}: ${parsed.events.length} events, ${parsed.links.length} links`,
     );
+  }
+
+  /**
+   * Marks the session as backed by spans when its traces were exported before this chunk arrived.
+   *
+   * The OTLP processor does the same thing from the other side, and only one of the two can ever
+   * succeed: whichever half arrives second is the first moment both a link and its spans exist.
+   * Spans landing first is not the rare case it was assumed to be — an exporter that flushes in a
+   * second beats a five-second chunk interval — and when it happened, nothing retried and the
+   * session claimed to have no backend instrumentation while its spans sat in the table.
+   *
+   * Best-effort. The chunk is already committed and its recording is intact without this.
+   */
+  private async backfillBackendSpans(
+    sessionId: string,
+    links: readonly { traceId: string }[],
+  ): Promise<void> {
+    if (!this.spans || links.length === 0) return;
+
+    try {
+      const traceIds = [...new Set(links.map((link) => link.traceId))];
+      const byTrace = await this.spans.byTraces(traceIds);
+      if (byTrace.size === 0) return;
+
+      const services = new Set<string>();
+      for (const spans of byTrace.values())
+        for (const span of spans) services.add(span.serviceName);
+      if (services.size === 0) return;
+
+      const updated = await applyServiceNames(
+        this.prisma,
+        new Map([[sessionId, services]]),
+      );
+      if (updated > 0) {
+        this.logger.log(
+          `session ${sessionId}: spans had already arrived for ${byTrace.size} trace(s)`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `session ${sessionId}: could not backfill backend spans: ${(error as Error).message}`,
+      );
+    }
   }
 
   private parse(raw: Buffer, storageKey: string): SessionChunk {

@@ -44,12 +44,9 @@ async function bootstrap() {
     maxRetriesPerRequest: null,
   });
 
-  const chunks = new SessionChunkProcessor(prisma, storage);
-  const traces = new OtlpTracesProcessor(
-    new PostgresSpanStore(prisma),
-    storage,
-    prisma,
-  );
+  const spanStore = new PostgresSpanStore(prisma);
+  const chunks = new SessionChunkProcessor(prisma, storage, spanStore);
+  const traces = new OtlpTracesProcessor(spanStore, storage, prisma);
 
   const workers = [
     new Worker<SessionChunkJob>(
@@ -80,16 +77,13 @@ async function bootstrap() {
     config.RETENTION_DAYS,
   );
 
-  const retentionTimer = setInterval(
-    () => {
-      void retention
-        .run()
-        .catch((error) =>
-          logger.error(`retention sweep failed: ${(error as Error).message}`),
-        );
-    },
-    config.RETENTION_INTERVAL_MINUTES * 60_000,
-  );
+  const retentionTimer = setInterval(() => {
+    void retention
+      .run()
+      .catch((error) =>
+        logger.error(`retention sweep failed: ${(error as Error).message}`),
+      );
+  }, config.RETENTION_INTERVAL_MINUTES * 60_000);
 
   // Never hold the process open on its own account. If the queues are gone there is nothing left
   // worth sweeping for.

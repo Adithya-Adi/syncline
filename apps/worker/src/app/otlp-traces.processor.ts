@@ -1,35 +1,18 @@
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import type { OtlpTracesJob } from '@syncline/protocol';
-import {
-  MAX_SERVICE_NAMES,
-  type PrismaClient,
-  type SpanStore,
-} from '@syncline/models';
+import { type PrismaClient, type SpanStore } from '@syncline/models';
 import { normalizeOtlp } from '@syncline/otlp';
 import type { ObjectStore } from '@syncline/storage';
 import { UnrecoverableChunkError } from './session-chunk.processor.js';
+import { applyServiceNames, type ServiceTx } from './session-services.js';
 
 /**
  * The slice of Prisma the session linkage needs. Structural, so a test can hand it an object.
  */
-type LinkTx = {
+type LinkTx = ServiceTx & {
   requestLink: {
     findMany(args: unknown): Promise<{ sessionId: string; traceId: string }[]>;
-  };
-  session: {
-    findMany(args: unknown): Promise<
-      {
-        id: string;
-        projectId: string;
-        serviceNames: string[];
-        hasBackendSpans: boolean;
-      }[]
-    >;
-    update(args: unknown): Promise<unknown>;
-  };
-  sessionAttribute: {
-    createMany(args: unknown): Promise<unknown>;
   };
 };
 
@@ -132,58 +115,5 @@ export async function linkSpansToSessions(
     servicesBySession.set(link.sessionId, services);
   }
 
-  const sessions = await tx.session.findMany({
-    where: { id: { in: [...servicesBySession.keys()] } },
-    select: {
-      id: true,
-      projectId: true,
-      serviceNames: true,
-      hasBackendSpans: true,
-    },
-  });
-
-  let updated = 0;
-
-  for (const session of sessions) {
-    const merged = new Set([
-      ...session.serviceNames,
-      ...(servicesBySession.get(session.id) ?? []),
-    ]);
-
-    // Sorted before capping, so which names survive the cap is the same on every delivery —
-    // insertion order would make it depend on which batch arrived first. See MAX_SERVICE_NAMES.
-    const serviceNames = [...merged].sort().slice(0, MAX_SERVICE_NAMES);
-
-    // Nothing new to say. Skipping keeps a redelivered batch — or a service exporting in many
-    // small batches — from rewriting the same row once per batch, and it is compared against the
-    // final list rather than the merged set so a session at the cap settles instead of churning.
-    if (session.hasBackendSpans && same(serviceNames, session.serviceNames)) {
-      continue;
-    }
-    updated += 1;
-
-    await tx.session.update({
-      where: { id: session.id },
-      data: { hasBackendSpans: true, serviceNames },
-    });
-
-    // The searchable half. `skipDuplicates` rather than a diff: services are only ever added to a
-    // session, so there is nothing here that can become stale.
-    await tx.sessionAttribute.createMany({
-      data: serviceNames.map((value) => ({
-        sessionId: session.id,
-        projectId: session.projectId,
-        key: 'service',
-        value,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  return updated;
-}
-
-/** Two sorted lists, compared. */
-function same(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((value, i) => value === b[i]);
+  return applyServiceNames(tx, servicesBySession);
 }

@@ -5,7 +5,11 @@ import {
   type SessionResponse,
   type TraceResponse,
 } from '@syncline/protocol';
-import { buildSpanTree, PostgresSpanStore } from '@syncline/models';
+import {
+  alignmentOffsetMs,
+  buildSpanTree,
+  PostgresSpanStore,
+} from '@syncline/models';
 import { ObjectStore } from '@syncline/storage';
 import { db } from './db';
 import { LIVE, type Viewer } from './session';
@@ -167,7 +171,11 @@ export async function traceForViewer(
       traceId,
       session: { project: { organizationId: viewer.organizationId, ...LIVE } },
     },
-    select: { session: { select: { clockOffsetMs: true, rttMs: true } } },
+    select: {
+      clientStartMs: true,
+      clientEndMs: true,
+      session: { select: { rttMs: true } },
+    },
   });
 
   if (!link) return null;
@@ -177,7 +185,15 @@ export async function traceForViewer(
 
   return {
     traceId,
-    spans: buildSpanTree(spans, link.session.clockOffsetMs),
+    /*
+     * Aligned against this request, not against the session's clock handshake.
+     *
+     * `clockOffsetMs` measures the browser against Syncline's API. These spans came from the
+     * customer's backend, which never spoke to it — three machines, three clocks. Using it drew
+     * every span 363ms before the request that caused it on the session that surfaced this. The
+     * link's own start and end are a direct measurement of the only two clocks that matter here.
+     */
+    spans: buildSpanTree(spans, alignmentOffsetMs(link, spans)),
     uncertaintyMs:
       link.session.rttMs >= CLOCK_UNCERTAINTY_THRESHOLD_MS
         ? Math.round(link.session.rttMs / 2)

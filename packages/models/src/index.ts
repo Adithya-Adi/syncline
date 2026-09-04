@@ -1,6 +1,7 @@
 export * from './lib/client.js';
 export * from './lib/span-store.js';
 export * from './lib/span-tree.js';
+export * from './lib/span-alignment.js';
 export * from './lib/session-index.js';
 export * from './lib/session-query.js';
 export * from './lib/keys.js';
