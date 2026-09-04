@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!--
+    The same mark as components/logo.tsx, with the stratum tokens resolved to hex.
+
+    A favicon renders outside the document — in a tab strip, a bookmark bar, a search result — where
+    no stylesheet of ours is loaded, so `var(--stratum-network)` would resolve to nothing and the
+    bars would disappear. These are those three tokens, converted from oklch once.
+
+    The axis is drawn in a fixed slate rather than `currentColor` for the same reason: there is no
+    inherited color to pick up, and a mark that vanishes on a dark tab strip is worse than one that
+    is slightly off against it.
+  -->
+  <rect x="1" y="3" width="11" height="2" rx="1" fill="#1795b1" />
+  <rect x="3" y="7" width="9" height="2" rx="1" fill="#bd7816" />
+  <rect x="5" y="11" width="6" height="2" rx="1" fill="#8043cd" />
+  <path d="M9.5 1v14" stroke="#94a3b8" stroke-width="1" stroke-opacity="0.6" />
+</svg>

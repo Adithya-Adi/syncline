@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Geist, IBM_Plex_Mono, Space_Grotesk } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
+import { SITE, TAGLINE } from '@/lib/site';
 
 const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
 
@@ -25,21 +26,55 @@ const plexMono = IBM_Plex_Mono({
   variable: '--font-plex-mono',
 });
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-const TAGLINE = 'Every layer of your stack, folded onto one timeline.';
+const DESCRIPTION =
+  'Watch a user session replay and the backend distributed trace behind it on one timeline. ' +
+  'Open source, self-hostable session replay with OpenTelemetry tracing built in.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
-  title: { default: 'Syncline', template: '%s' },
-  description: TAGLINE,
+  /*
+   * `%s · Syncline` rather than a bare `%s`. A page title is the headline of a search result and
+   * the label on a tab, and "Self-hosting" alone says nothing about whose. Every docs page already
+   * exports its own title, so this is the only place the product name gets attached to them.
+   */
+  title: { default: `Syncline — ${TAGLINE}`, template: '%s · Syncline' },
+  description: DESCRIPTION,
+  applicationName: 'Syncline',
+  keywords: [
+    'session replay',
+    'distributed tracing',
+    'opentelemetry',
+    'observability',
+    'rrweb',
+    'open source session replay',
+    'self-hosted session replay',
+  ],
+  authors: [{ name: 'Syncline' }],
+  alternates: { canonical: '/' },
   openGraph: {
-    title: 'Syncline',
-    description: TAGLINE,
+    title: `Syncline — ${TAGLINE}`,
+    description: DESCRIPTION,
     siteName: 'Syncline',
     type: 'website',
     url: SITE,
+    locale: 'en_US',
   },
-  twitter: { card: 'summary_large_image', title: 'Syncline', description: TAGLINE },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Syncline — ${TAGLINE}`,
+    description: DESCRIPTION,
+  },
+  /*
+   * The dashboard is behind a session and every page in it is one customer's data, so the parts
+   * worth indexing opt in rather than out — see robots.ts, which allows the landing page and the
+   * docs and nothing else. This is the belt to that braces: a crawler ignoring robots.txt still
+   * reads the meta tag.
+   */
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+  },
 };
 
 /**

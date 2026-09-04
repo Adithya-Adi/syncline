@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -5,6 +6,13 @@ import { ArrowLeft } from 'lucide-react';
 import { Fold } from '@/app/(marketing)/fold';
 import { LogoMark } from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
+
+/**
+ * Never indexed. Every page under here is one organization's data, and a crawler reaching them
+ * gets a redirect to sign-in anyway — but a permalink pasted into a public issue tracker is a
+ * real way for one of these URLs to be discovered and followed.
+ */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * The pages you can reach without an account.
