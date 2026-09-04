@@ -229,6 +229,44 @@ describe('session lifetime', () => {
     expect(session.id).toBe('01H0000000000000000000000A');
   });
 
+  it('resumes chunk numbering across a page load', () => {
+    // The bug this pins: the session id survives a navigation but the recorder's counter is
+    // closure state, so the new page restarted at zero and uploaded over the previous page's
+    // chunks. The storage key is (session, seq), so the objects were replaced — and ingest
+    // deduplicates its queue job by the same pair, so the rows describing the originals were never
+    // corrected. The recording became the second page's footage on the first page's timeline.
+    const now = 10_000_000;
+    const storage = memoryStorage(
+      JSON.stringify({
+        id: '01H0000000000000000000000A',
+        lastSeenMs: now - 1_000,
+        startedMs: now - 30_000,
+        seq: 7,
+      }),
+    );
+
+    expect(resolveSession(storage, now).nextSeq).toBe(7);
+  });
+
+  it('starts numbering at zero for a session written by an older SDK', () => {
+    // No `seq` in storage. Resuming at zero is what those sessions already did, so an upgrade
+    // makes nothing worse than it was.
+    const now = 10_000_000;
+    const storage = memoryStorage(
+      JSON.stringify({
+        id: '01H0000000000000000000000A',
+        lastSeenMs: now - 1_000,
+        startedMs: now - 30_000,
+      }),
+    );
+
+    expect(resolveSession(storage, now).nextSeq).toBe(0);
+  });
+
+  it('numbers a brand-new session from zero', () => {
+    expect(resolveSession(memoryStorage(), 10_000_000).nextSeq).toBe(0);
+  });
+
   it('starts a new session after the idle timeout', () => {
     const now = 10_000_000;
     const storage = memoryStorage(

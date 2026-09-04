@@ -47,12 +47,24 @@ export class QueueService implements OnModuleDestroy {
    * The job id makes redelivery harmless at the queue level, before the worker's own idempotency
    * has to do anything: a retried upload of the same chunk collapses into one job.
    *
+   * It is keyed on the *body* as well as the slot, and that part is not decoration. Keyed on
+   * `(session, seq)` alone, a chunk uploaded a second time with different content was silently
+   * dropped — the object at that key had already been replaced, so the recording became the new
+   * bytes indexed by the old row's timings. Content in the key means an identical retry still
+   * collapses, while a replacement is treated as the new work it is.
+   *
    * `:` is reserved in BullMQ key names and is rejected outright, hence the double underscore.
    */
-  async enqueueSessionChunk(job: SessionChunkJob): Promise<void> {
-    await this.sessionChunks.add('chunk', job, {
-      jobId: `${job.sessionId}__${job.seq}`,
-    });
+  async enqueueSessionChunk(
+    job: SessionChunkJob,
+    /** Short digest of the stored body. Omitted only by callers with nothing to hash. */
+    bodyDigest?: string,
+  ): Promise<void> {
+    const id = bodyDigest
+      ? `${job.sessionId}__${job.seq}__${bodyDigest}`
+      : `${job.sessionId}__${job.seq}`;
+
+    await this.sessionChunks.add('chunk', job, { jobId: id });
   }
 
   async enqueueOtlpTraces(job: OtlpTracesJob): Promise<void> {

@@ -94,7 +94,7 @@ export function startRecording(options: SynclineOptions): Recording {
   const context = new SessionContext();
 
   let clock = { offsetMs: 0, rttMs: 0 };
-  let seq = 0;
+  let seq = session.nextSeq;
   let stopped = false;
   let flushing: Promise<void> = Promise.resolve();
 
@@ -420,7 +420,14 @@ export function startRecording(options: SynclineOptions): Recording {
       log(
         `chunk ${current}: ${drained.events.length} events, ${ok ? 'sent' : 'dropped'}`,
       );
-      touch(safeSessionStorage(), session.id, Date.now(), session.startedMs);
+      touch(
+        safeSessionStorage(),
+        session.id,
+        Date.now(),
+        session.startedMs,
+        // The next number, so a page load mid-session resumes instead of overwriting.
+        seq,
+      );
     });
 
     return flushing;

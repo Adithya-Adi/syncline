@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   Controller,
@@ -127,13 +128,18 @@ export class IngestController {
       ...(body.gzipped ? { contentEncoding: 'gzip' } : {}),
     });
 
-    await this.queue.enqueueSessionChunk({
-      projectId: project.id,
-      sessionId,
-      seq,
-      storageKey: key,
-      receivedMs: Date.now(),
-    });
+    await this.queue.enqueueSessionChunk(
+      {
+        projectId: project.id,
+        sessionId,
+        seq,
+        storageKey: key,
+        receivedMs: Date.now(),
+      },
+      // Of the stored bytes, so replacing an object always reindexes it while an identical retry
+      // still collapses into one job. Truncated because this only has to distinguish, not prove.
+      createHash('sha1').update(body.bytes).digest('hex').slice(0, 16),
+    );
 
     return { ok: true };
   }

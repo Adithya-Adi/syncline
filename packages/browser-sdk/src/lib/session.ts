@@ -35,12 +35,28 @@ interface StoredSession {
    * having just started — the alternative is rotating everyone's live session on deploy.
    */
   startedMs?: number;
+  /**
+   * The next chunk sequence number this session should use.
+   *
+   * Persisted because the session id deliberately survives a page load while the recorder's
+   * counter does not — it is closure state, so every navigation restarted numbering at zero and
+   * the new page uploaded its chunks over the old page's. The storage key is built from
+   * (session, seq), so the object was replaced; ingest deduplicates its queue job by the same
+   * pair, so the row describing the original was never corrected. The recording ended up as the
+   * second page's footage indexed against the first page's timeline.
+   *
+   * Absent in sessions written by an older SDK. Those resume at zero, which is what they did
+   * before, so nothing gets worse on upgrade.
+   */
+  seq?: number;
 }
 
 export interface SessionState {
   id: string;
   startedMs: number;
   isNew: boolean;
+  /** Where this page starts numbering. Zero for a session that began here. */
+  nextSeq: number;
 }
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -59,7 +75,8 @@ export function resolveSession(
   const { idleTimeoutMs = IDLE_TIMEOUT_MS, maxDurationMs = MAX_DURATION_MS } =
     typeof limits === 'number' ? { idleTimeoutMs: limits } : limits;
 
-  if (!storage) return { id: ulid(now), startedMs: now, isNew: true };
+  if (!storage)
+    return { id: ulid(now), startedMs: now, isNew: true, nextSeq: 0 };
 
   try {
     const raw = storage.getItem(STORAGE_KEY);
@@ -74,8 +91,12 @@ export function resolveSession(
         now - stored.lastSeenMs < idleTimeoutMs &&
         now - startedMs < maxDurationMs
       ) {
-        touch(storage, stored.id, now, startedMs);
-        return { id: stored.id, startedMs, isNew: false };
+        // Resume numbering where the last page left off, so this one cannot overwrite its chunks.
+        const nextSeq =
+          typeof stored.seq === 'number' && stored.seq >= 0 ? stored.seq : 0;
+
+        touch(storage, stored.id, now, startedMs, nextSeq);
+        return { id: stored.id, startedMs, isNew: false, nextSeq };
       }
     }
   } catch {
@@ -84,8 +105,8 @@ export function resolveSession(
   }
 
   const id = ulid(now);
-  touch(storage, id, now, now);
-  return { id, startedMs: now, isNew: true };
+  touch(storage, id, now, now, 0);
+  return { id, startedMs: now, isNew: true, nextSeq: 0 };
 }
 
 /** Forgets the stored session, so the next resolve mints a new one. Used when rotating. */
@@ -103,6 +124,11 @@ export function touch(
   id: string,
   now = Date.now(),
   startedMs = now,
+  /**
+   * The next sequence number to hand out. Written on every flush, so a page load part-way through
+   * a session resumes numbering instead of restarting it and overwriting what is already stored.
+   */
+  seq = 0,
 ): void {
   if (!storage) return;
   try {
@@ -112,6 +138,7 @@ export function touch(
         id,
         lastSeenMs: now,
         startedMs,
+        seq,
       } satisfies StoredSession),
     );
   } catch {
