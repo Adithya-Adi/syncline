@@ -42,7 +42,7 @@ import { sendChunk, type TransportOptions } from './transport.js';
 import { sanitizeUrl } from './url.js';
 
 const SDK_NAME = 'syncline-browser';
-const SDK_VERSION = '0.1.3';
+const SDK_VERSION = '0.1.5';
 
 export interface Recording {
   sessionId: string;
