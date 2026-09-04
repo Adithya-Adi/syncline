@@ -3,7 +3,15 @@
 <p align="center"><strong>Every layer of your stack, folded onto one timeline.</strong></p>
 
 <p align="center">
-  <a href="#status"><img alt="status" src="https://img.shields.io/badge/status-pre--alpha-orange"></a>
+  <a href="https://syncline.co.in">syncline.co.in</a>
+  ·
+  <a href="https://www.npmjs.com/package/syncline-browser">syncline-browser on npm</a>
+  ·
+  <a href="#self-hosting">self-hosting</a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/syncline-browser"><img alt="npm" src="https://img.shields.io/npm/v/syncline-browser?color=cb3837&label=syncline-browser"></a>
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
 </p>
 
