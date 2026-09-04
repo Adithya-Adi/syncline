@@ -85,6 +85,10 @@ services:
     build:
       context: .
       target: web
+      args:
+        # Needed at build, not at runtime: the static pages freeze their canonical URL and their
+        # social card address into the HTML. Leave it unset and they claim to be localhost.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
     environment:
       <<: *syncline-env
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}

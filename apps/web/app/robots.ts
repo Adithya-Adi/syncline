@@ -2,6 +2,16 @@ import type { MetadataRoute } from 'next';
 import { SITE, PUBLIC_PATHS } from '@/lib/site';
 
 /**
+ * Rendered per request rather than frozen at build.
+ *
+ * These two carry absolute URLs, and the address of an install is not known when its image is
+ * built — a self-hoster who did not pass the build argument would otherwise ship a sitemap
+ * advertising localhost. Both files are a few hundred bytes and are fetched by crawlers, not by
+ * users, so rendering them per request costs nothing worth saving.
+ */
+export const dynamic = 'force-dynamic';
+
+/**
  * What a crawler may read.
  *
  * Only the landing page and the docs. Everything else is either behind a session — where a crawler

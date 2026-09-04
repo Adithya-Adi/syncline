@@ -47,6 +47,19 @@ ENV NX_DAEMON=false
 # Better Auth warns loudly when its secret is unset, and the web build evaluates page modules.
 # Build-time only and deliberately not a real secret — the running container reads its own.
 ENV BETTER_AUTH_SECRET=build-time-only-not-a-real-secret
+
+# Where this install will answer, needed *here* rather than at runtime.
+#
+# The landing page and the docs are statically rendered, and Next resolves their metadata at build
+# — so the canonical URL, og:url and the social card's address are frozen into the HTML now. A
+# runtime environment variable arrives far too late to affect them, and the fallback that gets
+# baked in instead is `http://localhost:3000`: a canonical pointing at a host no crawler can reach,
+# which is worse for the site than having no canonical at all.
+#
+# Not a secret. It is the public address of the site, and it ends up in the served HTML by design.
+ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+
 RUN pnpm exec nx run-many -t build --projects=api,worker,web
 
 # ---------------------------------------------------------------------------------------------

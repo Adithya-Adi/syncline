@@ -21,6 +21,10 @@ primary_region = 'sin'
   dockerfile = 'Dockerfile'
   build-target = 'web'
 
+  [build.args]
+    # Baked in, not set at runtime: the static pages resolve their canonical and og:url at build.
+    NEXT_PUBLIC_SITE_URL = 'https://syncline.co.in'
+
 [env]
   PORT = '3000'
 
