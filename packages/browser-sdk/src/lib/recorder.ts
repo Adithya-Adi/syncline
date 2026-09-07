@@ -42,7 +42,7 @@ import { sendChunk, type TransportOptions } from './transport.js';
 import { sanitizeUrl } from './url.js';
 
 const SDK_NAME = 'syncline-browser';
-const SDK_VERSION = '0.1.5';
+const SDK_VERSION = '0.1.6';
 
 export interface Recording {
   sessionId: string;
@@ -73,8 +73,17 @@ export function startRecording(options: SynclineOptions): Recording {
   const pageOrigin = window.location.origin;
   const resolved = resolveOptions(options, pageOrigin);
 
+  /**
+   * Bound now, before the console patch installed further down.
+   *
+   * Same rule as `rawFetch` below, for the same reason: the recorder must not appear in its own
+   * recording. Calling `console.info` through the patched method would put every "flushed chunk 4"
+   * into the replay stream, and with `debug` on that is the majority of what a viewer would read.
+   */
+  const rawInfo = window.console.info.bind(window.console);
+
   const log = (message: string) => {
-    if (resolved.debug) console.info(`[syncline] ${message}`);
+    if (resolved.debug) rawInfo(`[syncline] ${message}`);
   };
 
   // Captured before patching, so uploads never carry a traceparent and never appear in their own
