@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -46,3 +47,77 @@ jobs:
           # the secret is unset, which is noise in a job that never signs anyone in; the running
           # app reads the real value from its own environment.
           BETTER_AUTH_SECRET: ci-build-only-not-a-real-secret
+
+  # -------------------------------------------------------------------------------------------
+  # Deploys.
+  #
+  # Off until somebody turns them on: every job below is gated on the FLY_DEPLOY repository
+  # variable, so merging this workflow deploys nothing. To enable it, once:
+  #
+  #   fly tokens create deploy -a syncline-api      # and worker, and web — or one org token
+  #   gh secret set FLY_API_TOKEN
+  #   gh variable set FLY_DEPLOY --body true
+  #
+  # `environment: production` is what makes a deploy pausable. GitHub creates the environment on
+  # first use with no rules, which gates nothing — add required reviewers to it in repository
+  # settings if you want a deploy to wait for a human. Worth doing here: this repository pushes
+  # straight to main, so without it whatever lands on main goes live.
+  #
+  # There is no per-app choice on workflow_dispatch. It would need conditions on every job and a
+  # `needs` graph that tolerates skipped dependencies, to replace a one-line `fly deploy -c
+  # fly.web.toml` that already works from a terminal.
+  # -------------------------------------------------------------------------------------------
+
+  deploy-api:
+    # First, and alone at first: the api owns `release_command`, so this is where the schema moves.
+    # Anything that depends on the new schema deploys after it, or deploys against the old one.
+    needs: main
+    if: github.ref == 'refs/heads/main' && vars.FLY_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    # Not cancel-in-progress: an interrupted deploy can leave a release machine part-way through a
+    # migration, and two runs racing through the same one is the case `release_command` exists to
+    # avoid. A queued deploy is cheaper than either.
+    concurrency:
+      group: fly-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # --remote-only: the build happens on Fly's builder, so the runner needs no Docker daemon
+      # and the image is pushed from the same place it was built.
+      - run: flyctl deploy -c fly.api.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-worker:
+    needs: deploy-api
+    if: github.ref == 'refs/heads/main' && vars.FLY_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: fly-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy -c fly.worker.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-web:
+    needs: deploy-api
+    if: github.ref == 'refs/heads/main' && vars.FLY_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: fly-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # NEXT_PUBLIC_SITE_URL is a build arg in fly.web.toml, not an environment variable here: the
+      # static pages freeze their canonical and og:url at build, so it has to reach the image.
+      - run: flyctl deploy -c fly.web.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
