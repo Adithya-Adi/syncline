@@ -77,24 +77,100 @@ export interface AuditEntry {
   createdAt: Date;
 }
 
-/** One page of the log, newest first. */
-export async function recentAuditEvents(
+/** Entries per page. */
+export const AUDIT_PAGE_SIZE = 100;
+
+export interface AuditPage {
+  entries: AuditEntry[];
+  /** Opaque cursor for the next page, absent when this is the last one. */
+  nextCursor?: string;
+}
+
+/**
+ * One page of the log, newest first.
+ *
+ * Keyset rather than an offset, and the reason is the direction this list grows: entries are newest
+ * first, so a new one arrives at the top — exactly where an offset shifts every page boundary below
+ * it and repeats a row somebody has already read.
+ *
+ * The cursor is `(createdAt, id)` because `createdAt` alone is not a total order: one mutation can
+ * write several entries in the same millisecond, and a cursor that cannot separate them either
+ * shows a row twice or skips it. `id` is a cuid, so it carries no time of its own — it is only ever
+ * a tiebreaker, never the sort.
+ */
+export async function auditEventPage(
   viewer: Viewer,
-  limit = 100,
-): Promise<AuditEntry[]> {
+  options: { before?: string } = {},
+): Promise<AuditPage> {
+  const cursor = parseCursor(options.before);
+
   const rows = await db.auditEvent.findMany({
-    where: { organizationId: viewer.organizationId },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
+    where: {
+      organizationId: viewer.organizationId,
+      // Under the organization scope, never beside it: a malformed or forged cursor must not be
+      // able to reach another organization's log, so it only ever narrows this one.
+      ...(cursor
+        ? {
+            OR: [
+              { createdAt: { lt: cursor.createdAt } },
+              { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+            ],
+          }
+        : {}),
+    },
+    // Both columns, in the order the index stores them. Sorting by `createdAt` alone would leave
+    // ties in whatever order the scan produced, and a cursor into an unstable order is not one.
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    // One more than a page, purely to learn whether there is a next one.
+    take: AUDIT_PAGE_SIZE + 1,
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    actorName: row.actorName,
-    actorEmail: row.actorEmail,
-    action: row.action,
-    targetLabel: row.targetLabel,
-    metadata: (row.metadata ?? null) as Record<string, unknown> | null,
-    createdAt: row.createdAt,
-  }));
+  const page = rows.slice(0, AUDIT_PAGE_SIZE);
+  const last = page[page.length - 1];
+
+  return {
+    entries: page.map((row) => ({
+      id: row.id,
+      actorName: row.actorName,
+      actorEmail: row.actorEmail,
+      action: row.action,
+      targetLabel: row.targetLabel,
+      metadata: (row.metadata ?? null) as Record<string, unknown> | null,
+      createdAt: row.createdAt,
+    })),
+    ...(rows.length > AUDIT_PAGE_SIZE && last
+      ? { nextCursor: formatCursor(last) }
+      : {}),
+  };
+}
+
+/**
+ * `<epoch millis>.<id>`.
+ *
+ * Millis and not an ISO string because the column is `TIMESTAMP(3)`: a millisecond is the finest
+ * distinction it can hold, so this round-trips exactly rather than nearly.
+ */
+function formatCursor(row: { createdAt: Date; id: string }): string {
+  return `${row.createdAt.getTime()}.${row.id}`;
+}
+
+/**
+ * Anything unreadable is no cursor at all.
+ *
+ * A cursor arrives in the URL, so it is user input and half of them will be truncated by a chat
+ * client or edited by hand. Showing the first page is the right answer to a broken one — the
+ * alternative is an error page for what is, to the person reading it, a stale link.
+ */
+function parseCursor(
+  raw: string | undefined,
+): { createdAt: Date; id: string } | null {
+  if (!raw) return null;
+
+  const dot = raw.indexOf('.');
+  if (dot <= 0 || dot === raw.length - 1) return null;
+
+  const millis = Number(raw.slice(0, dot));
+  if (!Number.isSafeInteger(millis) || millis < 0) return null;
+
+  return { createdAt: new Date(millis), id: raw.slice(dot + 1) };
 }

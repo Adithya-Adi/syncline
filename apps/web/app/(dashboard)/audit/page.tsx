@@ -1,8 +1,11 @@
 import { describeAuditAction } from '@syncline/models';
 
+import Link from 'next/link';
+
 import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
 import { EmptyState, PageHeader } from '@/components/page-header';
-import { recentAuditEvents } from '@/lib/audit';
+import { Button } from '@/components/ui/button';
+import { auditEventPage } from '@/lib/audit';
 import { can } from '@/lib/permissions';
 import { requireViewer } from '@/lib/session';
 
@@ -29,7 +32,12 @@ const dateFormat = new Intl.DateTimeFormat('en-US', {
  * Restricted to admins and owners. A member cannot change anything the log records, so the only
  * thing this page would give them is a list of their colleagues' movements.
  */
-export default async function AuditPage() {
+export default async function AuditPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ before?: string }>;
+}) {
+  const { before } = await searchParams;
   const viewer = await requireViewer();
 
   // Reusing members:manage rather than adding a permission that would name exactly one page. The
@@ -46,7 +54,9 @@ export default async function AuditPage() {
     );
   }
 
-  const events = await recentAuditEvents(viewer);
+  const { entries: events, nextCursor } = await auditEventPage(viewer, {
+    ...(before ? { before } : {}),
+  });
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-7 px-5 py-7 sm:px-6 lg:px-8">
@@ -65,7 +75,22 @@ export default async function AuditPage() {
         }
       />
 
-      {events.length === 0 ? (
+      {events.length === 0 && before ? (
+        /*
+         * Past the end rather than empty. A cursor outlives the page it came from — a bookmark, a
+         * pasted link — and "nothing recorded yet" would be false for a log that has plenty.
+         */
+        <EmptyState
+          title="No entries older than this"
+          action={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/audit">Back to the newest</Link>
+            </Button>
+          }
+        >
+          This is the end of the log.
+        </EmptyState>
+      ) : events.length === 0 ? (
         <EmptyState title="Nothing recorded yet">
           Entries appear as soon as somebody changes a project, a key or who
           belongs here.
@@ -113,10 +138,38 @@ export default async function AuditPage() {
         </DataList>
       )}
 
+      {/*
+       * Forward only, and deliberately: a "newer" link needs a cursor in the other direction and
+       * the sort reversed, while the back button already does exactly that for the page somebody
+       * just came from.
+       */}
+      {nextCursor && (
+        <div className="flex justify-center">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/audit?before=${encodeURIComponent(nextCursor)}`}>
+              Older entries
+            </Link>
+          </Button>
+        </div>
+      )}
+
+      {/*
+       * No count. The old line said "the N most recent entries", which was true of the page and
+       * read as a statement about the log — on an organization with more than one page it named a
+       * limit that was not the limit, and said nothing about the rest being reachable.
+       */}
       <p className="text-xs leading-relaxed text-muted-foreground">
-        The {events.length} most recent entries. Entries are kept for as long as
-        the organization exists and are not affected by the recording retention
-        window.
+        Every entry is kept for as long as the organization exists, unaffected
+        by the recording retention window.
+        {before && (
+          <>
+            {' '}
+            <Link href="/audit" className="underline hover:text-foreground">
+              Back to the newest
+            </Link>
+            .
+          </>
+        )}
       </p>
     </main>
   );

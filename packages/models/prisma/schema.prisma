@@ -507,7 +507,11 @@ model AuditEvent {
   createdAt DateTime @default(now())
 
   /// The only way this is ever read: one organization's entries, newest first.
-  @@index([organizationId, createdAt(sort: Desc)])
+  ///
+  /// `id` is in the index because the log is paged by keyset, and `createdAt` alone is not a total
+  /// order — one mutation can write several entries within the same millisecond. The tiebreaker
+  /// has to be sorted by the index or the last column of every page is sorted in memory.
+  @@index([organizationId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model Organization {
