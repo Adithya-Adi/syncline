@@ -10,8 +10,12 @@
 #
 # Migrations are deliberately not run at container start. A dozen replicas booting at once would
 # race each other through the same migration, and a failed one would take the whole rollout down
-# rather than one job. Run `pnpm db:migrate` once, from a release job or by hand, before rolling.
-# The `migrate` target below exists for exactly that.
+# rather than one job. They run once per deploy, before any machine is replaced: on Fly that is
+# `release_command` in fly.api.toml, which uses the api image — so that image carries the Prisma
+# CLI and `prisma.config.ts`, and nothing boots into a migration.
+#
+# The `migrate` target below is the same job for anywhere without a release step: a one-shot
+# container, or `pnpm db:migrate` by hand.
 
 FROM node:22-alpine AS base
 # libc6-compat: Prisma's query engine is glibc-linked, and Alpine is musl.
@@ -74,6 +78,10 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/packages ./packages
+# For the release command, not for serving: `prisma migrate deploy` reads the schema and migration
+# paths from here, and both are relative to the directory it runs in — hence `cd /app` in
+# fly.api.toml rather than the WORKDIR below. The migrations themselves arrive with `packages`.
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 WORKDIR /app/apps/api
 # Nothing in the image needs to write. Run unprivileged, as the node user the image already has.
 USER node
