@@ -167,6 +167,36 @@ function unquote(value: string): string {
     : trimmed;
 }
 
+const COMPARATOR_TEXT: Record<Comparator, string> = {
+  eq: '',
+  gt: '>',
+  gte: '>=',
+  lt: '<',
+  lte: '<=',
+};
+
+/**
+ * Terms back to text.
+ *
+ * Roughly the inverse of `parseQuery`, and it exists so that a query this module rewrote can be
+ * offered as a query — something a person can read in a link, run, and then edit. A suggestion
+ * that exists only as a Prisma clause cannot be any of those things.
+ *
+ * It round-trips meaning, not formatting: spacing and unnecessary quotes are not preserved, and
+ * the words the parser could not read are kept so a rewrite never silently drops them.
+ */
+export function formatQuery(parsed: ParsedQuery): string {
+  return [...parsed.terms.map(formatTerm), ...parsed.unparsed].join(' ');
+}
+
+function formatTerm(term: QueryTerm): string {
+  const values = term.values
+    .map((value) => (/[\s,"]/.test(value) ? `"${value}"` : value))
+    .join(',');
+  const sign = term.negated ? '-' : '';
+  return `${sign}${term.key}:${COMPARATOR_TEXT[term.comparator]}${values}`;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Compiling terms to a filter
 // ---------------------------------------------------------------------------------------------
@@ -232,6 +262,50 @@ const PRESENCE: Record<string, object> = {
   user: { userId: { not: null } },
   release: { release: { not: null } },
 };
+
+/**
+ * Presence filters that answer a question next to the one that was asked.
+ *
+ * `has:error` is an uncaught exception — `onerror` or an unhandled rejection, code that stopped.
+ * `has:console-error` is a line the application chose to print. Keeping them apart is deliberate
+ * and worth keeping: they are found by different people for different reasons, and a thrown error
+ * is not the same evidence as a logged one.
+ *
+ * What is not defensible is the dead end. A session that logged twenty console errors and threw
+ * nothing does not match `has:error`, and an empty result reads as "this project has no errors"
+ * rather than "not that kind of error" — so the near miss is named here and offered where the
+ * search came up empty. Named rather than merged: the answer is a different search, not a wider
+ * definition of the word.
+ */
+const PRESENCE_ALTERNATIVES: Record<string, string> = {
+  error: 'console-error',
+};
+
+/**
+ * The same query, asking the neighbouring question — or `null` when it has no neighbour.
+ *
+ * Only positive single-value `has:` terms are rewritten. `-has:error` already matched everything
+ * it could, and a rewrite of a negation would be a different claim rather than a near miss.
+ */
+export function alternativeQuery(parsed: ParsedQuery): ParsedQuery | null {
+  let swapped = false;
+
+  const terms = parsed.terms.map((term) => {
+    if (term.negated || term.key !== 'has' || term.values.length !== 1) {
+      return term;
+    }
+    const [first] = term.values;
+    if (first === undefined) return term;
+
+    const alternative = PRESENCE_ALTERNATIVES[first.toLowerCase()];
+    if (!alternative) return term;
+
+    swapped = true;
+    return { ...term, values: [alternative] };
+  });
+
+  return swapped ? { ...parsed, terms } : null;
+}
 
 const IS_CONDITIONS: Record<string, object> = {
   trivial: { trivial: true },

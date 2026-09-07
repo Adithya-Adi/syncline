@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  alternativeQuery,
   compileQuery,
+  formatQuery,
   parseDuration,
   parseQuery,
   type ParsedQuery,
@@ -250,5 +252,72 @@ describe('resolving a key against the project vocabulary', () => {
     expect(compileQuery(parseQuery('plan:pro')).where).toEqual([
       { attributes: { some: { key: 'plan', value: { in: ['pro'] } } } },
     ]);
+  });
+});
+
+describe('formatQuery', () => {
+  it('round-trips what the parser read', () => {
+    for (const query of [
+      'user:u_8823',
+      'has:error',
+      '-is:trivial',
+      'duration:>10s',
+      'slowest:<=2s',
+      'plan:pro,enterprise',
+    ]) {
+      expect(formatQuery(parseQuery(query))).toBe(query);
+    }
+  });
+
+  it('quotes a value only when it has to', () => {
+    expect(formatQuery(parseQuery('path:"/a b" plan:pro'))).toBe(
+      'path:"/a b" plan:pro',
+    );
+  });
+
+  it('keeps the words it could not read', () => {
+    // A rewrite offered to somebody has to carry the whole query, including the part this module
+    // did not understand — dropping it would change the search under them.
+    expect(formatQuery(parseQuery('has:error nonsense'))).toBe(
+      'has:error nonsense',
+    );
+  });
+});
+
+describe('alternativeQuery', () => {
+  it('offers console errors when uncaught ones were asked for', () => {
+    const alternative = alternativeQuery(parseQuery('has:error'));
+    expect(alternative && formatQuery(alternative)).toBe('has:console-error');
+  });
+
+  it('keeps every other term of the search intact', () => {
+    const alternative = alternativeQuery(
+      parseQuery('user:u_1 has:error path:/checkout'),
+    );
+    expect(alternative && formatQuery(alternative)).toBe(
+      'user:u_1 has:console-error path:/checkout',
+    );
+  });
+
+  it('compiles to the console column, not the error one', () => {
+    const alternative = alternativeQuery(parseQuery('has:error'));
+    expect(alternative && compileQuery(alternative).where).toEqual([
+      { consoleErrorCount: { gt: 0 } },
+    ]);
+  });
+
+  it('leaves a negation alone', () => {
+    // `-has:error` already matched everything it could. Rewriting it would assert something the
+    // person never asked, rather than offering the question next to theirs.
+    expect(alternativeQuery(parseQuery('-has:error'))).toBeNull();
+  });
+
+  it('has nothing to offer for a search with no near miss', () => {
+    expect(alternativeQuery(parseQuery('user:u_1 has:gap'))).toBeNull();
+  });
+
+  it('reads the value the way the compiler does', () => {
+    const alternative = alternativeQuery(parseQuery('has:ERROR'));
+    expect(alternative && formatQuery(alternative)).toBe('has:console-error');
   });
 });

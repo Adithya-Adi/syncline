@@ -13,7 +13,12 @@ import { DataList, DataListHeader, DataListRow } from '@/components/data-list';
 import { EmptyState, PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { compileQuery, parseQuery } from '@syncline/models';
+import {
+  alternativeQuery,
+  compileQuery,
+  formatQuery,
+  parseQuery,
+} from '@syncline/models';
 
 import { db } from '@/lib/db';
 import { LIVE, type Viewer } from '@/lib/session';
@@ -72,18 +77,24 @@ export async function RecordingsSurface({
     keys: vocabulary.map((entry) => entry.key),
   });
 
+  // The scope, once. Both the list and the near-miss count below read recordings, and a second
+  // copy of these three clauses is a second place for the organization check to go missing.
+  const scope = {
+    project: {
+      organizationId: viewer.organizationId,
+      ...LIVE,
+      id: project.id,
+    },
+    // Recordings with nothing in them are hidden rather than deleted, so a direct link to one
+    // still works and the "show empty" toggle brings them back. A search overrides that: if
+    // somebody asked for a specific session, hiding it because it was short is not help.
+    ...(showAll || search.where.length > 0 ? {} : { trivial: false }),
+  };
+
   const [rows] = await Promise.all([
     db.session.findMany({
       where: {
-        project: {
-          organizationId: viewer.organizationId,
-          ...LIVE,
-          id: project.id,
-        },
-        // Recordings with nothing in them are hidden rather than deleted, so a direct link to one
-        // still works and the "show empty" toggle brings them back. A search overrides that: if
-        // somebody asked for a specific session, hiding it because it was short is not help.
-        ...(showAll || search.where.length > 0 ? {} : { trivial: false }),
+        ...scope,
         ...(before ? { id: { lt: before } } : {}),
         // The search, under the scope rather than beside it. Compiled clauses never name a project
         // or an organization, so nothing typed into the box can widen what is visible here.
@@ -127,6 +138,32 @@ export async function RecordingsSurface({
   const searching = parsed.terms.length > 0 || parsed.unparsed.length > 0;
 
   const sessions = rows.slice(0, PAGE_SIZE);
+
+  /*
+   * The near miss, and only once the search has already come up empty.
+   *
+   * `has:error` asks for an uncaught exception, so a project whose failures are all `console.error`
+   * matches none of them — and "no recordings match" reads as "nothing is wrong here", which is the
+   * opposite of true. One extra count buys the difference between a dead end and a next search. It
+   * costs nothing on the path that found rows, because there is nothing to explain there.
+   */
+  const alternative =
+    sessions.length === 0 && searching ? alternativeQuery(parsed) : null;
+
+  // No cursor: the question is whether the other search matches anything at all, not what its
+  // fourth page holds.
+  const alternativeMatches = alternative
+    ? await db.session.count({
+        where: {
+          ...scope,
+          AND: compileQuery(alternative, {
+            keys: vocabulary.map((entry) => entry.key),
+          }).where,
+        },
+      })
+    : 0;
+
+  const alternativeQueryText = alternative ? formatQuery(alternative) : '';
   const nextCursor =
     rows.length > PAGE_SIZE ? sessions[sessions.length - 1]?.id : undefined;
 
@@ -217,11 +254,29 @@ export async function RecordingsSurface({
           icon={<Search className="size-4" />}
           title="No recordings match this search"
           action={
-            <Button asChild variant="outline" size="sm">
-              <Link href={recordingsHref(project.id, { all: showAll })}>
-                Clear the search
-              </Link>
-            </Button>
+            /*
+             * The near miss becomes the primary action when there is one: it is a search that
+             * returns something, which is more use than a cleared box.
+             */
+            alternativeMatches > 0 ? (
+              <Button asChild size="sm">
+                <Link
+                  href={recordingsHref(project.id, {
+                    all: showAll,
+                    q: alternativeQueryText,
+                  })}
+                >
+                  Search{' '}
+                  <span className="font-mono">{alternativeQueryText}</span>
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild variant="outline" size="sm">
+                <Link href={recordingsHref(project.id, { all: showAll })}>
+                  Clear the search
+                </Link>
+              </Button>
+            )
           }
         >
           {search.rejected.length > 0 ? (
@@ -229,6 +284,15 @@ export async function RecordingsSurface({
               {search.rejected[0]?.reason} in{' '}
               <span className="font-mono">{search.rejected[0]?.term.key}:</span>
               . Fix that term, or clear the search.
+            </>
+          ) : alternativeMatches > 0 ? (
+            <>
+              <span className="font-mono">has:error</span> means an uncaught
+              exception — code that threw and stopped. Nothing here threw, but{' '}
+              {formatCount(alternativeMatches)}{' '}
+              {alternativeMatches === 1 ? 'recording' : 'recordings'} logged a{' '}
+              <span className="font-mono">console.error</span>, which is a
+              different question and a different search.
             </>
           ) : (
             <>
