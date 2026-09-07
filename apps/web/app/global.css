@@ -160,8 +160,44 @@
   color: var(--bone-100);
 }
 
-.stage {
+.railbar__toggle {
+  /* Pushed to the far end, away from the identifying fields — it is a control, not a fact. */
+  margin-left: auto;
+  background: transparent;
+  border: var(--rule);
+  border-radius: 2px;
+  color: var(--bone-500);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.railbar__toggle:hover {
+  color: var(--bone-100);
+  border-color: var(--rock-500);
+}
+
+.railbar__toggle--on {
+  color: var(--bone-100);
+  border-color: var(--stratum-network);
+}
+
+/* The replay and the sidecar, side by side. Row, so the panel takes width rather than covering it. */
+.deck {
   flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.stage {
+  /* Basis 0 rather than auto, and it matters: with `auto` the stage would size to the player it
+     contains, the player is sized from the stage, and the ResizeObserver that connects them would
+     have a loop to run around. */
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,6 +206,7 @@
   /* Without min-height:0 a flex child refuses to shrink below its content, and an oversized
      player would push the strata off the bottom of the screen. */
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -370,6 +407,272 @@
   background: rgba(232, 236, 241, 0.05);
   pointer-events: none;
   z-index: 2;
+}
+
+/* --------------------------------------------------------------- sidecar */
+
+/*
+ * Console and network, beside the replay.
+ *
+ * Fixed basis with a clamp rather than a percentage: the panel's job is to hold a line of console
+ * output legibly, which needs a floor no proportion of the window can promise, and past ~460px it
+ * is taking space from the thing it annotates.
+ */
+.sidecar {
+  flex: 0 0 clamp(300px, 30%, 460px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: var(--rule);
+  background: var(--rock-850);
+}
+
+.sidecar__tabs {
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  border-bottom: var(--rule);
+  background: var(--rock-800);
+}
+
+.sidecar__tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  background: transparent;
+  border: 0;
+  /* The underline carries the selected state, so it is reserved on both tabs — otherwise the row
+     of tabs shifts by a pixel every time you switch. */
+  border-bottom: 2px solid transparent;
+  color: var(--bone-500);
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sidecar__tab:hover {
+  color: var(--bone-100);
+}
+
+.sidecar__tab--on {
+  color: var(--bone-100);
+  border-bottom-color: var(--stratum-network);
+}
+
+.sidecar__count {
+  font-size: 9.5px;
+  letter-spacing: 0;
+  color: var(--bone-500);
+  background: var(--rock-900);
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+
+.sidecar__close {
+  margin-left: auto;
+  width: 34px;
+  background: transparent;
+  border: 0;
+  border-left: var(--rule);
+  color: var(--bone-500);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sidecar__close:hover {
+  color: var(--bone-100);
+}
+
+.sidecar__filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.6);
+}
+
+.sidecar__query {
+  flex: 1 1 110px;
+  min-width: 0;
+  background: var(--rock-900);
+  border: 1px solid rgba(39, 51, 67, 0.8);
+  border-radius: 2px;
+  padding: 4px 7px;
+  color: var(--bone-100);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.sidecar__query::placeholder {
+  color: var(--bone-500);
+}
+
+.sidecar__chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sidecar__chip {
+  background: transparent;
+  border: 1px solid rgba(39, 51, 67, 0.8);
+  border-radius: 2px;
+  padding: 3px 6px;
+  color: var(--bone-500);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.sidecar__chip:hover {
+  color: var(--bone-100);
+}
+
+.sidecar__chip--on {
+  color: var(--rock-900);
+  background: var(--bone-300);
+  border-color: var(--bone-300);
+}
+
+.sidecar__follow {
+  margin-left: auto;
+}
+
+.sidecar__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* The offset parent for the follow scroll, which reads `row.offsetTop` against this box. */
+  position: relative;
+}
+
+.sidecar__empty {
+  margin: 0;
+  padding: 16px 14px;
+  color: var(--bone-500);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.sidecar__empty code {
+  color: var(--bone-300);
+}
+
+/* The row cap, said out loud. A list that silently stopped would be worse than a short one. */
+.sidecar__more {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--bone-500);
+  font-size: 10.5px;
+  border-top: 1px solid rgba(39, 51, 67, 0.6);
+}
+
+.sidecar__row {
+  display: grid;
+  grid-template-columns: 54px 30px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px;
+  background: transparent;
+  border: 0;
+  /* Reserved on every row so the selected row does not shift its own text sideways. */
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid rgba(39, 51, 67, 0.35);
+  color: var(--bone-300);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.sidecar__row--net {
+  grid-template-columns: 54px 38px minmax(0, 1fr) 34px 48px;
+}
+
+.sidecar__row:hover {
+  background: rgba(232, 236, 241, 0.04);
+}
+
+/* The row the playhead is on. The same relationship `.bar--live` draws in the lanes. */
+.sidecar__row--here {
+  background: rgba(232, 236, 241, 0.07);
+  border-left-color: var(--bone-100);
+  color: var(--bone-100);
+}
+
+/*
+ * Rows the recording has not reached yet.
+ *
+ * Dimmed rather than hidden: a console that emptied itself as you scrubbed backwards would be a
+ * worse tool than one that shows the whole session and says where you are in it.
+ */
+.sidecar__row--ahead {
+  /* Dim enough to read as "not yet", light enough to still be read: at the start of a recording
+     every row is ahead of the playhead, and a list at 40% would look disabled rather than early. */
+  opacity: 0.58;
+}
+
+.sidecar__at {
+  color: var(--bone-500);
+  font-size: 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidecar__level {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--bone-500);
+}
+
+.sidecar__level--error {
+  color: var(--fault);
+}
+
+.sidecar__level--warn {
+  color: var(--stratum-backend);
+}
+
+.sidecar__level--info {
+  color: var(--stratum-network);
+}
+
+.sidecar__method {
+  font-size: 9.5px;
+  color: var(--bone-500);
+}
+
+/*
+ * Wraps, and breaks mid-token if it has to.
+ *
+ * A console line is whatever the application printed — routinely a URL or a serialized object with
+ * no spaces in it. Truncating it would hide the end, which is where the interesting part of a
+ * stringified object usually is.
+ */
+.sidecar__message {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sidecar__status,
+.sidecar__dur {
+  color: var(--bone-500);
+  font-size: 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidecar__status--error {
+  color: var(--fault);
 }
 
 .detail {
@@ -843,5 +1146,23 @@
   .docs__footer {
     padding-left: 20px;
     padding-right: 20px;
+  }
+}
+
+/*
+ * Narrow viewports: the sidecar goes under the replay rather than beside it.
+ *
+ * A 300px floor is most of a phone's width, and taking that from the canvas would leave a replay
+ * too small to read the page being replayed.
+ */
+@media (max-width: 860px) {
+  .deck {
+    flex-direction: column;
+  }
+
+  .sidecar {
+    flex: 0 0 45%;
+    border-left: 0;
+    border-top: var(--rule);
   }
 }

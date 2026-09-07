@@ -82,12 +82,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         error?: string;
       };
 
-      note(
-        `${method} ${path} → ${response.status} in ${elapsed}ms${
-          payload.error ? ` · ${payload.error}` : ''
-        }`,
-        response.ok ? 'ok' : 'bad',
-      );
+      const line = `${method} ${path} → ${response.status} in ${elapsed}ms${
+        payload.error ? ` · ${payload.error}` : ''
+      }`;
+
+      note(line, response.ok ? 'ok' : 'bad');
+
+      // The example logs what it just did, the way an application would — and nothing here mentions
+      // Syncline. Console capture is switched on in `recording.tsx`, so these lines end up in the
+      // viewer's console panel beside the replay, which is the thing worth seeing in the example.
+      if (response.ok) console.info(line);
+      else console.error(line, payload);
 
       return payload;
     },

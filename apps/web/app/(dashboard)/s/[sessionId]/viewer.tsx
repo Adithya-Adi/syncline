@@ -10,13 +10,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'rrweb-player/dist/style.css';
+import { CONSOLE, isSynclineEvent } from '@syncline/protocol';
 import type {
+  ConsolePayload,
   SessionError,
   SessionPageview,
   SessionResponse,
   TraceResponse,
   ViewerSpan,
 } from '@syncline/protocol';
+import { formatMs, shortPath } from './format';
+import {
+  Sidecar,
+  type ConsoleRow,
+  type NetworkRow,
+  type SidecarTab,
+} from './sidecar';
 
 /**
  * Recording data comes from this app, not from the ingest API.
@@ -60,20 +69,64 @@ type Selection =
 /** How much of the recording to show either side of an error, once one is picked. */
 const ERROR_FOCUS_PAD_MS = 1_000;
 
+/** rrweb's controller, drawn below the canvas and not counted in the height prop. */
+const CONTROLLER_HEIGHT = 90;
+
+/** Remembers whether the sidecar was open, so it is not re-opened on every recording. */
+const SIDECAR_KEY = 'syncline.viewer.sidecar';
+
 export function Viewer({ sessionId }: { sessionId: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<{
     getReplayer: () => { getCurrentTime: () => number };
     /** rrweb-player's own seek. Offset from the start of the recording, not wall-clock. */
     goto?: (timeOffset: number, play?: boolean) => void;
+    /** Svelte's prop setter. How the player is told the stage changed size. */
+    $set?: (props: { width?: number; height?: number }) => void;
+    /** Recomputes the canvas scale from the current width and height props. */
+    triggerResize?: () => void;
   } | null>(null);
   const buildingRef = useRef(false);
+  /** The viewport the recording was made at, kept for resizes after the build. */
+  const recordedRef = useRef({ w: 1024, h: 768 });
 
   const [session, setSession] = useState<SessionResponse | null>(null);
+  /**
+   * The replay stream, kept rather than handed to the player and dropped.
+   *
+   * The console lines the sidecar lists are custom events inside it — lifting them out here is
+   * what makes the panel free: the chunks are already downloaded to build the player, and asking
+   * the server for the same output a second time would be work for its own sake.
+   */
+  const [events, setEvents] = useState<unknown[] | null>(null);
   const [traces, setTraces] = useState<Record<string, TraceResponse>>({});
   const [error, setError] = useState<string | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
   const [selected, setSelected] = useState<Selection | null>(null);
+  const [sidecarOpen, setSidecarOpen] = useState(true);
+  const [sidecarTab, setSidecarTab] = useState<SidecarTab>('console');
+
+  // Read after mount rather than during the first render: this component renders on the server
+  // too, and reaching for localStorage there is a hydration mismatch at best.
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(SIDECAR_KEY);
+      if (stored !== null) setSidecarOpen(stored === '1');
+    } catch {
+      // Storage refused. The default stands.
+    }
+  }, []);
+
+  const toggleSidecar = useCallback(() => {
+    setSidecarOpen((open) => {
+      try {
+        localStorage.setItem(SIDECAR_KEY, open ? '0' : '1');
+      } catch {
+        /* not fatal */
+      }
+      return !open;
+    });
+  }, []);
 
   // ------------------------------------------------------------------ data
 
@@ -136,10 +189,60 @@ export function Viewer({ sessionId }: { sessionId: string }) {
 
   // ---------------------------------------------------------------- player
 
+  // The chunks, downloaded once. Kept apart from building the player so the events survive for
+  // the sidecar to read, and so toggling the panel never re-downloads a recording.
   useEffect(() => {
-    if (!session || !stageRef.current) return;
+    if (!session) return;
+    let cancelled = false;
 
-    // Claimed synchronously. `playerRef` is only assigned after two awaits, so checking it alone
+    (async () => {
+      const collected: unknown[] = [];
+      for (const chunk of session.chunks) {
+        const res = await fetch(chunk.url);
+        if (!res.ok) continue;
+        const body = (await res.json()) as { events: unknown[] };
+        collected.push(...body.events);
+      }
+      if (!cancelled) setEvents(collected);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  /**
+   * The space the replay canvas gets, given the stage as it is now.
+   *
+   * Scale the recording into the space that is actually left, rather than letting its original
+   * viewport dictate the layout. Sizing from the recorded viewport alone pushes the strata off the
+   * bottom of the screen on any recording taller than the gap — which is the common case, and it
+   * hides the one thing this page exists to show.
+   */
+  const fitToStage = useCallback((stage: HTMLDivElement) => {
+    const recorded = recordedRef.current;
+    const budgetWidth = Math.max(320, stage.clientWidth - 8);
+    const budgetHeight = Math.max(
+      200,
+      stage.clientHeight - 8 - CONTROLLER_HEIGHT,
+    );
+
+    const scale = Math.min(
+      budgetWidth / recorded.w,
+      budgetHeight / recorded.h,
+      1,
+    );
+
+    return {
+      width: Math.floor(recorded.w * scale),
+      height: Math.floor(recorded.h * scale),
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!session || !events || !stageRef.current) return;
+
+    // Claimed synchronously. `playerRef` is only assigned after an await, so checking it alone
     // lets StrictMode's double-invoke — or any fast remount — build two players into one element.
     if (buildingRef.current) return;
     buildingRef.current = true;
@@ -148,16 +251,6 @@ export function Viewer({ sessionId }: { sessionId: string }) {
     let built: { $destroy?: () => void } | null = null;
 
     (async () => {
-      const events: unknown[] = [];
-      for (const chunk of session.chunks) {
-        const res = await fetch(chunk.url);
-        if (!res.ok) continue;
-        const body = (await res.json()) as { events: unknown[] };
-        events.push(...body.events);
-      }
-
-      if (cancelled || !stageRef.current) return;
-
       // rrweb needs a full snapshot plus something after it before there is anything to play.
       if (events.length < 2) {
         setError('recording has too few events to replay');
@@ -169,29 +262,8 @@ export function Viewer({ sessionId }: { sessionId: string }) {
       const { default: RrwebPlayer } = await import('rrweb-player');
       if (cancelled || !stageRef.current) return;
 
-      const recorded = session.meta.viewport ?? { w: 1024, h: 768 };
-
-      // Scale the recording into the space that is actually left, rather than letting its original
-      // viewport dictate the layout. Sizing from `recorded` alone pushes the strata off the bottom
-      // of the screen on any recording taller than the gap — which is the common case, and it
-      // hides the one thing this page exists to show.
-      //
-      // The controller is rrweb's own transport bar, drawn below the canvas and not counted in the
-      // height prop, so it has to come out of the budget explicitly.
-      const CONTROLLER_HEIGHT = 90;
-      const budgetWidth = Math.max(320, stageRef.current.clientWidth - 8);
-      const budgetHeight = Math.max(
-        200,
-        stageRef.current.clientHeight - 8 - CONTROLLER_HEIGHT,
-      );
-
-      const scale = Math.min(
-        budgetWidth / recorded.w,
-        budgetHeight / recorded.h,
-        1,
-      );
-      const width = Math.floor(recorded.w * scale);
-      const height = Math.floor(recorded.h * scale);
+      recordedRef.current = session.meta.viewport ?? { w: 1024, h: 768 };
+      const { width, height } = fitToStage(stageRef.current);
 
       built = new RrwebPlayer({
         target: stageRef.current,
@@ -220,7 +292,32 @@ export function Viewer({ sessionId }: { sessionId: string }) {
       playerRef.current = null;
       buildingRef.current = false;
     };
-  }, [session]);
+  }, [session, events, fitToStage]);
+
+  /**
+   * The canvas follows the stage.
+   *
+   * Sizing once at build time was enough while the stage was the whole width of the window. It is
+   * not now: showing or hiding the sidecar changes the space available, and a player still scaled
+   * to the old width would either overflow the panel or leave a gap beside it. Resizing rather
+   * than rebuilding, because a rebuild would throw away where the recording was paused.
+   */
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const observer = new ResizeObserver(() => {
+      const player = playerRef.current;
+      if (!player?.$set) return;
+      player.$set(fitToStage(stage));
+      player.triggerResize?.();
+    });
+
+    observer.observe(stage);
+    return () => observer.disconnect();
+    // `session` is in the deps because the stage element does not exist until it renders — with an
+    // empty list this effect runs once, against a null ref, and observes nothing.
+  }, [session, fitToStage]);
 
   // The lanes follow the player, every frame, forever. This is the master-clock rule in code.
   useEffect(() => {
@@ -292,6 +389,105 @@ export function Viewer({ sessionId }: { sessionId: string }) {
 
     return { bars: out, startMs: min, durationMs: Math.max(1, max - min) };
   }, [session, traces]);
+
+  // --------------------------------------------------------------- sidecar
+
+  /**
+   * The console, in order.
+   *
+   * Console lines are read out of the replay stream rather than from a field on the session,
+   * because that is where they are: there is far more console output than there are errors, each
+   * line is worth far less, and lifting all of it into the session document would make every list
+   * query carry it. Uncaught errors are merged in from `session.errors`, where the server already
+   * lifted and skew-corrected them, so the list reads the way a browser console does.
+   */
+  const consoleRows = useMemo<ConsoleRow[]>(() => {
+    const rows: ConsoleRow[] = [];
+
+    (events ?? []).forEach((event, index) => {
+      if (!isSynclineEvent(event)) return;
+      if (event.data.tag !== CONSOLE) return;
+      const payload = event.data.payload as ConsolePayload;
+      rows.push({
+        key: `console:${index}`,
+        level: payload.level,
+        message: payload.message,
+        // `timeMs` is when the call happened; the event timestamp is when rrweb wrote it. They are
+        // the same millisecond in practice, and the payload is the one the SDK measured.
+        atMs: payload.timeMs || event.timestamp,
+      });
+    });
+
+    (session?.errors ?? []).forEach((thrown, index) => {
+      rows.push({
+        key: `uncaught:${index}`,
+        level: 'error',
+        message: `${thrown.name ?? 'Error'}: ${thrown.message}`,
+        atMs: thrown.atMs,
+        uncaught: true,
+      });
+    });
+
+    return rows.sort((a, b) => a.atMs - b.atMs);
+  }, [events, session]);
+
+  /**
+   * The requests, in order.
+   *
+   * Built from `session.links` — the same data the network lane draws, so a row and its bar are
+   * never two different accounts of one request. Keys match the lane's, which is how clicking a
+   * row selects the bar rather than a copy of it.
+   */
+  const networkRows = useMemo<NetworkRow[]>(
+    () =>
+      [...(session?.links ?? [])]
+        .sort((a, b) => a.startMs - b.startMs)
+        .map((link) => ({
+          key: `link:${link.spanId}`,
+          method: link.method,
+          path: shortPath(link.url),
+          ...(link.status !== undefined ? { status: link.status } : {}),
+          startMs: link.startMs,
+          durationMs: Math.max(0, link.endMs - link.startMs),
+          failed: (link.status ?? 200) >= 400,
+        })),
+    [session],
+  );
+
+  /**
+   * Seeks the replay to a moment in client time.
+   *
+   * Against `session.startedMs` rather than the widened timeline start, because rrweb counts from
+   * its first event — the same base the playhead is drawn from.
+   */
+  const seekTo = useCallback(
+    (atMs: number) => {
+      if (!session) return;
+      playerRef.current?.goto?.(Math.max(0, atMs - session.startedMs), false);
+    },
+    [session],
+  );
+
+  const pickConsole = useCallback(
+    (row: ConsoleRow) => {
+      // Only an uncaught error has anything more to show. A console line is already entirely on
+      // screen, and swapping the detail panel to repeat it would cost whatever was selected there.
+      if (!row.uncaught || !session) return;
+      const thrown = session.errors[Number(row.key.split(':')[1])];
+      if (thrown) setSelected({ kind: 'error', error: thrown });
+    },
+    [session],
+  );
+
+  const pickNetwork = useCallback(
+    (key: string) => {
+      const bar = bars.find((candidate) => candidate.key === key);
+      if (!bar) return;
+      setSelected({ kind: 'bar', bar });
+      setFocus({ from: bar.startMs, to: bar.endMs });
+    },
+    [bars],
+  );
 
   /**
    * The window the strata are drawn against.
@@ -402,9 +598,46 @@ export function Viewer({ sessionId }: { sessionId: string }) {
           label="skew"
           value={`${session.clock.offsetMs}ms ±${Math.round(session.clock.rttMs / 2)}`}
         />
+
+        <button
+          type="button"
+          className={`railbar__toggle${sidecarOpen ? ' railbar__toggle--on' : ''}`}
+          onClick={toggleSidecar}
+          aria-pressed={sidecarOpen}
+        >
+          {sidecarOpen ? 'hide' : 'show'} console + network
+        </button>
       </div>
 
-      <div className="stage" ref={stageRef} />
+      {/*
+        The replay and the sidecar share one row so the panel takes width from the canvas rather
+        than being drawn over it. A player overlapped by a panel is a player you cannot see the
+        bottom of, which on a checkout page is where the button is.
+      */}
+      <div className="deck">
+        <div className="stage" ref={stageRef} />
+
+        {sidecarOpen && (
+          <Sidecar
+            tab={sidecarTab}
+            onTab={setSidecarTab}
+            consoleRows={consoleRows}
+            networkRows={networkRows}
+            startMs={session.startedMs}
+            /*
+              Quantized, and every other prop is stable, so the panel re-renders about twenty times
+              a second instead of sixty. The lanes need every frame — a playhead that steps is a
+              playhead that looks broken — but "which log line are we on" does not change
+              perceptibly inside 50ms, and a long list reconciled on every frame does.
+            */
+            playheadMs={Math.round(playheadMs / 50) * 50}
+            onSeek={seekTo}
+            onPickConsole={pickConsole}
+            onPickNetwork={pickNetwork}
+            onClose={toggleSidecar}
+          />
+        )}
+      </div>
 
       <div className="strata">
         {focus && (
@@ -656,12 +889,6 @@ function Flow({
   );
 }
 
-function formatMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60_000)}m${Math.round((ms % 60_000) / 1000)}s`;
-}
-
 function Ruler({ fromMs, spanMs }: { fromMs: number; spanMs: number }) {
   const steps = 6;
   return (
@@ -766,13 +993,4 @@ function ErrorDetail({ error }: { error: SessionError }) {
       {error.stack && <pre className="detail__stack">{error.stack}</pre>}
     </div>
   );
-}
-
-function shortPath(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return parsed.pathname + parsed.search;
-  } catch {
-    return url;
-  }
 }

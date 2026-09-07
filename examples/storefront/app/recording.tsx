@@ -62,6 +62,10 @@ export function Recording({
       traceOrigins: [window.location.origin],
       release,
       user: { id: userId },
+      // Off by default in the SDK, because console arguments are whatever an application chose to
+      // print. The example opts in at every level so the viewer's console panel has something to
+      // show — a real integration should pick the levels it is willing to store.
+      captureConsole: ['error', 'warn', 'info', 'log'],
       debug: true,
     });
 

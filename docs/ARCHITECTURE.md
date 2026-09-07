@@ -114,7 +114,7 @@ than there are errors and each line is worth far less.
 
 Context is the one that arrives **late**. A recording starts at page load and who the user is
 becomes known after they sign in, several chunks later — so `identify()` and `setContext()` emit
-timestamped *changes* rather than writing into the session's opening metadata, and the server
+timestamped _changes_ rather than writing into the session's opening metadata, and the server
 applies the latest value of each key to the whole recording. A session that was anonymous for its
 first ten seconds is still findable by the person it turned out to be.
 
@@ -564,18 +564,30 @@ no arithmetic:
 Route `/s/[sessionId]`.
 
 ```
-┌─────────────────────────────────────────┐
-│              rrweb player               │
-├─────────────────────────────────────────┤
-│ Network    ▭▭   ▭    ▭▭▭▭▭   ▭          │  client timings, from RequestLink
-│ Backend    │▬▬▬▬▬▬▬│   │▬▬▬│            │  spans, skew-corrected
-│ Database   │  ▪▪▪▪ │   │ ▪ │            │  spans where attributes.db.system exists
-└──────────▲──────────────────────────────┘
+┌─────────────────────────────────┬───────────────┐
+│                                 │ Console │ Net │  the sidecar, toggleable
+│          rrweb player           ├───────────────┤
+│                                 │ 1.2s ERR …    │  console lines and requests,
+│                                 │ 1.4s LOG …    │  dimmed until the playhead
+├─────────────────────────────────┴───────────────┤
+│ flow   /catalogue │ /cart │ /checkout           │  pageviews, proportional
+│ Errors          ◆                               │  instants, not spans
+│ Network    ▭▭   ▭    ▭▭▭▭▭   ▭                  │  client timings, from RequestLink
+│ Backend    │▬▬▬▬▬▬▬│   │▬▬▬│                    │  spans, skew-corrected
+│ Database   │  ▪▪▪▪ │   │ ▪ │                    │  spans where attributes.db.system exists
+└──────────▲──────────────────────────────────────┘
            └ one scrubber drives everything
 ```
 
 - **The player is the master clock.** Lanes read `replayer.getCurrentTime()` on
   `requestAnimationFrame`; they never hold their own time. One clock, no drift, no reconciliation.
+  The sidecar follows the same rule: a row is "current" because it is the last one at or before the
+  playhead, not because the panel timed anything.
+- **The sidecar costs no extra fetch.** Console lines are `syncline.console` custom events inside
+  the chunks the player already downloaded, lifted out client-side; the network list is the same
+  `links` the network lane draws, so a row and its bar can never disagree. Console capture is
+  opt-in in the SDK, so an empty panel means "not captured" at least as often as "nothing logged",
+  and it says so.
 - **Lanes render to `<canvas>`.** A few thousand spans as DOM nodes is a dropped-frame machine.
   Hit-testing is a binary search over start times.
 - **Traces load lazily.** `GET /v1/sessions/:id` returns links; span trees are fetched for the
