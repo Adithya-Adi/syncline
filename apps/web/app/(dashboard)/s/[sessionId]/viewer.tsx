@@ -559,6 +559,10 @@ export function Viewer({ sessionId }: { sessionId: string }) {
       ? Math.round(session.clock.rttMs / 2)
       : 0;
 
+  // Clamp both edges, not the width: zoomed inside the RTT, a span-derived width overflows.
+  const bandFrom = clampedPct(playheadMs - uncertaintyMs) / 100;
+  const bandTo = clampedPct(playheadMs + uncertaintyMs) / 100;
+
   // ----------------------------------------------------------------- render
 
   if (error) {
@@ -690,33 +694,42 @@ export function Viewer({ sessionId }: { sessionId: string }) {
                 Errors
               </div>
               <div className="lane__track">
-                {session.errors.map((error, index) => (
-                  <button
-                    key={`${error.atMs}:${index}`}
-                    type="button"
-                    className={
-                      selected?.kind === 'error' && selected.error === error
-                        ? 'mark mark--selected'
-                        : 'mark'
-                    }
-                    style={{ left: `${pct(error.atMs)}%` }}
-                    title={`${error.name ?? error.source}: ${error.message}`}
-                    onClick={() => {
-                      setSelected({ kind: 'error', error });
-                      // An instant has no width to zoom to, so a window is put around it — and
-                      // the replay is seeked to just before, because what happened in the second
-                      // leading up to a throw is the part worth watching.
-                      setFocus({
-                        from: error.atMs - ERROR_FOCUS_PAD_MS,
-                        to: error.atMs + ERROR_FOCUS_PAD_MS,
-                      });
-                      playerRef.current?.goto?.(
-                        Math.max(0, error.atMs - startMs - ERROR_FOCUS_PAD_MS),
-                        false,
-                      );
-                    }}
-                  />
-                ))}
+                {session.errors.map((error, index) => {
+                  // Drop marks outside the window rather than pinning them to an edge.
+                  const at = pct(error.atMs);
+                  if (at < 0 || at > 100) return null;
+
+                  return (
+                    <button
+                      key={`${error.atMs}:${index}`}
+                      type="button"
+                      className={
+                        selected?.kind === 'error' && selected.error === error
+                          ? 'mark mark--selected'
+                          : 'mark'
+                      }
+                      style={{ left: `${at}%` }}
+                      title={`${error.name ?? error.source}: ${error.message}`}
+                      onClick={() => {
+                        setSelected({ kind: 'error', error });
+                        // An instant has no width to zoom to, so a window is put around it — and
+                        // the replay is seeked to just before, because what happened in the second
+                        // leading up to a throw is the part worth watching.
+                        setFocus({
+                          from: error.atMs - ERROR_FOCUS_PAD_MS,
+                          to: error.atMs + ERROR_FOCUS_PAD_MS,
+                        });
+                        playerRef.current?.goto?.(
+                          Math.max(
+                            0,
+                            error.atMs - startMs - ERROR_FOCUS_PAD_MS,
+                          ),
+                          false,
+                        );
+                      }}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -734,8 +747,14 @@ export function Viewer({ sessionId }: { sessionId: string }) {
                 {bars
                   .filter((b) => b.lane === lane.key)
                   .map((bar) => {
-                    const left = pct(bar.startMs);
-                    const width = Math.max(0.25, pct(bar.endMs) - left);
+                    // Clip to the window. Zoomed in, an unclamped bar runs thousands of
+                    // percent wide and paints over the whole page.
+                    const from = pct(bar.startMs);
+                    const to = pct(bar.endMs);
+                    if (to < 0 || from > 100) return null;
+
+                    const left = Math.max(0, from);
+                    const width = Math.max(0.25, Math.min(100, to) - left);
                     const live =
                       playheadMs >= bar.startMs && playheadMs <= bar.endMs;
                     return (
@@ -779,10 +798,8 @@ export function Viewer({ sessionId }: { sessionId: string }) {
             <div
               className="uncertainty"
               style={{
-                left: `calc(108px + (100% - 108px) * ${clampedPct(playheadMs - uncertaintyMs) / 100})`,
-                // Scaled to the visible window, not the whole recording: zoomed in, the same
-                // number of milliseconds of uncertainty covers proportionally more of the screen.
-                width: `calc((100% - 108px) * ${(uncertaintyMs * 2) / view.span})`,
+                left: `calc(108px + (100% - 108px) * ${bandFrom})`,
+                width: `calc((100% - 108px) * ${bandTo - bandFrom})`,
               }}
             />
           )}

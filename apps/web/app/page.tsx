@@ -195,7 +195,7 @@ export default function Landing() {
                 Syncline replays a user session as video{' '}
                 <span className="text-foreground">and</span> the backend
                 distributed trace <span className="text-foreground">and</span>{' '}
-                the SQL queries that ran — on one synchronized scrubber.
+                the SQL queries that ran - on one synchronized scrubber.
               </p>
             </Reveal>
 

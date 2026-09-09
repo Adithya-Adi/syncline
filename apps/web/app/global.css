@@ -290,6 +290,7 @@
 /* Stratification: hairlines that read as bedding planes and help place a bar vertically. */
 .lane__track {
   position: relative;
+  overflow: hidden;
   background-image: repeating-linear-gradient(
     180deg,
     rgba(232, 236, 241, 0.028) 0px,

@@ -18,7 +18,7 @@
 ---
 
 Syncline replays a user session as video **and** the backend distributed trace **and** the SQL
-queries that ran — on one synchronized scrubber.
+queries that ran - on one synchronized scrubber.
 
 Drag to `00:42`, and you see all of it at once: the user clicked **Checkout**, that fired
 `POST /api/checkout`, which fanned out to four spans, one of which was a Prisma query that took
