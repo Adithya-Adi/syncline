@@ -35,9 +35,9 @@ const dateFormat = new Intl.DateTimeFormat('en-US', {
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: Promise<{ before?: string }>;
+  searchParams: Promise<{ before?: string; after?: string }>;
 }) {
-  const { before } = await searchParams;
+  const { before, after } = await searchParams;
   const viewer = await requireViewer();
 
   // Reusing members:manage rather than adding a permission that would name exactly one page. The
@@ -54,9 +54,16 @@ export default async function AuditPage({
     );
   }
 
-  const { entries: events, nextCursor } = await auditEventPage(viewer, {
-    ...(before ? { before } : {}),
+  const {
+    entries: events,
+    newerCursor,
+    olderCursor,
+  } = await auditEventPage(viewer, {
+    ...(after ? { after } : before ? { before } : {}),
   });
+
+  // "Somebody is paging", which is what separates an empty page from an empty log.
+  const paging = Boolean(before || after);
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-7 px-5 py-7 sm:px-6 lg:px-8">
@@ -75,20 +82,24 @@ export default async function AuditPage({
         }
       />
 
-      {events.length === 0 && before ? (
+      {events.length === 0 && paging ? (
         /*
          * Past the end rather than empty. A cursor outlives the page it came from — a bookmark, a
          * pasted link — and "nothing recorded yet" would be false for a log that has plenty.
          */
         <EmptyState
-          title="No entries older than this"
+          title={
+            after ? 'No entries newer than this' : 'No entries older than this'
+          }
           action={
             <Button asChild variant="outline" size="sm">
               <Link href="/audit">Back to the newest</Link>
             </Button>
           }
         >
-          This is the end of the log.
+          {after
+            ? 'Nothing has been recorded since the page you came from.'
+            : 'This is the end of the log.'}
         </EmptyState>
       ) : events.length === 0 ? (
         <EmptyState title="Nothing recorded yet">
@@ -139,38 +150,47 @@ export default async function AuditPage({
       )}
 
       {/*
-       * Forward only, and deliberately: a "newer" link needs a cursor in the other direction and
-       * the sort reversed, while the back button already does exactly that for the page somebody
-       * just came from.
+       * The pager.
+       *
+       * Both directions, because one of them was the back button and a log somebody is reading
+       * backwards through is exactly where "how do I get back" should not be a browser question.
+       * Rendered only when there is somewhere to go: a single page of entries gets no controls at
+       * all, which is the difference between a pager and decoration.
        */}
-      {nextCursor && (
-        <div className="flex justify-center">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/audit?before=${encodeURIComponent(nextCursor)}`}>
-              Older entries
-            </Link>
-          </Button>
-        </div>
-      )}
+      {(newerCursor || olderCursor) && (
+        <nav
+          aria-label="Audit log pages"
+          className="flex items-center justify-between gap-2"
+        >
+          {newerCursor ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/audit?after=${encodeURIComponent(newerCursor)}`}>
+                Newer
+              </Link>
+            </Button>
+          ) : (
+            // A placeholder rather than nothing, so the older control keeps its position instead
+            // of sliding across when the newer one appears.
+            <span />
+          )}
 
-      {/*
-       * No count. The old line said "the N most recent entries", which was true of the page and
-       * read as a statement about the log — on an organization with more than one page it named a
-       * limit that was not the limit, and said nothing about the rest being reachable.
-       */}
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Every entry is kept for as long as the organization exists, unaffected
-        by the recording retention window.
-        {before && (
-          <>
-            {' '}
-            <Link href="/audit" className="underline hover:text-foreground">
-              Back to the newest
-            </Link>
-            .
-          </>
-        )}
-      </p>
+          {paging && (
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/audit">Newest</Link>
+            </Button>
+          )}
+
+          {olderCursor ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/audit?before=${encodeURIComponent(olderCursor)}`}>
+                Older
+              </Link>
+            </Button>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
     </main>
   );
 }

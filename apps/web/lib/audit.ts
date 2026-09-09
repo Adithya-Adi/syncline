@@ -82,8 +82,10 @@ export const AUDIT_PAGE_SIZE = 100;
 
 export interface AuditPage {
   entries: AuditEntry[];
-  /** Opaque cursor for the next page, absent when this is the last one. */
-  nextCursor?: string;
+  /** Opaque cursor for the page of newer entries, absent on the newest page. */
+  newerCursor?: string;
+  /** Opaque cursor for the page of older entries, absent on the oldest page. */
+  olderCursor?: string;
 }
 
 /**
@@ -100,9 +102,12 @@ export interface AuditPage {
  */
 export async function auditEventPage(
   viewer: Viewer,
-  options: { before?: string } = {},
+  options: { before?: string; after?: string } = {},
 ): Promise<AuditPage> {
-  const cursor = parseCursor(options.before);
+  // `after` wins if somebody hand-assembles a URL carrying both. One direction has to, and the
+  // alternative is a query with two contradictory bounds that quietly returns nothing.
+  const backwards = options.after !== undefined;
+  const cursor = parseCursor(options.after ?? options.before);
 
   const rows = await db.auditEvent.findMany({
     where: {
@@ -110,26 +115,55 @@ export async function auditEventPage(
       // Under the organization scope, never beside it: a malformed or forged cursor must not be
       // able to reach another organization's log, so it only ever narrows this one.
       ...(cursor
-        ? {
-            OR: [
-              { createdAt: { lt: cursor.createdAt } },
-              { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-            ],
-          }
+        ? backwards
+          ? {
+              OR: [
+                { createdAt: { gt: cursor.createdAt } },
+                { createdAt: cursor.createdAt, id: { gt: cursor.id } },
+              ],
+            }
+          : {
+              OR: [
+                { createdAt: { lt: cursor.createdAt } },
+                { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+              ],
+            }
         : {}),
     },
     // Both columns, in the order the index stores them. Sorting by `createdAt` alone would leave
     // ties in whatever order the scan produced, and a cursor into an unstable order is not one.
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    // One more than a page, purely to learn whether there is a next one.
+    //
+    // Ascending when walking backwards, so the page taken is the hundred *nearest* the cursor
+    // rather than the hundred oldest in the log. It is reversed below for display.
+    orderBy: backwards
+      ? [{ createdAt: 'asc' }, { id: 'asc' }]
+      : [{ createdAt: 'desc' }, { id: 'desc' }],
+    // One more than a page, purely to learn whether there is another one in this direction.
     take: AUDIT_PAGE_SIZE + 1,
   });
 
+  const more = rows.length > AUDIT_PAGE_SIZE;
   const page = rows.slice(0, AUDIT_PAGE_SIZE);
-  const last = page[page.length - 1];
+  // Newest first, whichever direction the query ran in.
+  const ordered = backwards ? [...page].reverse() : page;
+
+  const newest = ordered[0];
+  const oldest = ordered[ordered.length - 1];
+
+  /*
+   * Which arrows to offer, without a second query.
+   *
+   * `take + 1` only ever answers for the direction the query ran in. The other direction is
+   * answered by how we got here: arriving via `before` means there are newer entries, because we
+   * were just looking at them. Walking back with `after` and finding no further page means the top
+   * of the log, so the newer arrow goes away — the page may be short, which is the honest shape of
+   * "there were only forty newer than that one".
+   */
+  const hasNewer = backwards ? more : cursor !== null;
+  const hasOlder = backwards ? true : more;
 
   return {
-    entries: page.map((row) => ({
+    entries: ordered.map((row) => ({
       id: row.id,
       actorName: row.actorName,
       actorEmail: row.actorEmail,
@@ -138,9 +172,8 @@ export async function auditEventPage(
       metadata: (row.metadata ?? null) as Record<string, unknown> | null,
       createdAt: row.createdAt,
     })),
-    ...(rows.length > AUDIT_PAGE_SIZE && last
-      ? { nextCursor: formatCursor(last) }
-      : {}),
+    ...(hasNewer && newest ? { newerCursor: formatCursor(newest) } : {}),
+    ...(hasOlder && oldest ? { olderCursor: formatCursor(oldest) } : {}),
   };
 }
 
