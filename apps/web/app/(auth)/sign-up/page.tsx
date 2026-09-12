@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { safeNextPath } from '@/lib/next-path';
+import { enabledSocialProviders } from '@/lib/social-providers';
+import { SocialSignIn } from '../social';
 import { SignUpForm } from './form';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +13,9 @@ export const metadata = { title: 'Create your account' };
  * A new account belongs to nothing, and the dashboard sends it straight on to name an organization
  * — so a sign-up can never see recordings belonging to anyone else. Joining an existing
  * organization is by invitation only, which keeps that an explicit act by an existing member.
+ *
+ * The social buttons are the same as on sign-in. OAuth has no notion of registering versus
+ * returning: a provider identity nobody has used here yet creates the account on the way through.
  */
 export default async function SignUpPage({
   searchParams,
@@ -20,6 +25,7 @@ export default async function SignUpPage({
   const { next } = await searchParams;
   const destination = safeNextPath(next);
   const invited = destination.startsWith('/accept-invitation/');
+  const providers = enabledSocialProviders();
 
   return (
     <>
@@ -41,6 +47,10 @@ export default async function SignUpPage({
           </>
         )}
       </p>
+
+      {providers.length > 0 && (
+        <SocialSignIn providers={providers} next={destination} />
+      )}
 
       <SignUpForm next={destination} />
 

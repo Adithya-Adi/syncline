@@ -7,6 +7,7 @@ import type { AuditAction } from '@syncline/models';
 import { record } from './audit';
 import { currentAuditActor, type AuditActor } from './audit-actor';
 import { db } from './db';
+import { configuredSocialProviders } from './social-providers';
 
 /**
  * Authentication for the Syncline dashboard.
@@ -15,9 +16,10 @@ import { db } from './db';
  * key-authenticated: it never has to understand a user session, and a browser never holds an
  * ingest key. The web app is the only thing that knows about people.
  *
- * Email and password only. A self-hosted install should not need an OAuth app registration or a
- * working SMTP server before anyone can log in for the first time. Social providers can be added
- * later without a schema change — the account table already accommodates them.
+ * Email and password always works. A self-hosted install should not need an OAuth app
+ * registration or a working SMTP server before anyone can log in for the first time. Social
+ * sign-in is optional on top, and shows up only once a provider has credentials in the
+ * environment. See social-providers.ts.
  */
 
 const DEFAULT_ORGANIZATION_ID = 'org_default';
@@ -136,6 +138,24 @@ export const auth = betterAuth({
     minPasswordLength: 10,
   },
 
+  socialProviders: configuredSocialProviders(),
+
+  /**
+   * Account linking is left on Better Auth's defaults, and there is no `account` block on purpose.
+   *
+   * The default that matters is `accountLinking.requireLocalEmailVerified`, which is true: a
+   * social identity is never merged into an existing row unless that row is already
+   * email-verified. Nothing here sends mail, so no password account ever is, and registration is
+   * open. Without the check, anyone could register at an address they do not own and wait for the
+   * real owner to arrive through Google, landing them in a row somebody else knows the password
+   * to.
+   *
+   * The cost is real: someone with both gets `account_not_linked` and has to use their password.
+   * The sign-in page says so. `requireLocalEmailVerified: false` is the setting that would undo
+   * this. `trustedProviders` would not — it only waives the provider's half of the condition,
+   * which Google already satisfies.
+   */
+
   /**
    * Better Auth's session table would collide with ours, which means a recording. Renaming a
    * domain model across six packages to accommodate a library is the wrong trade, so the library's
@@ -211,7 +231,11 @@ export const auth = betterAuth({
           });
         },
 
-        afterCreateInvitation: async ({ invitation, inviter, organization }) => {
+        afterCreateInvitation: async ({
+          invitation,
+          inviter,
+          organization,
+        }) => {
           await logMembership(organization.id, 'member.invite', {
             targetId: invitation.id,
             targetLabel: invitation.email,

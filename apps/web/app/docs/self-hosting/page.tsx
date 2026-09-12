@@ -97,6 +97,65 @@ export default function SelfHosting() {
         the first ingest an hour later.
       </p>
 
+      <h2 className="docs__h2">Signing in</h2>
+      <p>
+        Email and password works out of the box and needs nothing configured —
+        no OAuth app, no SMTP server. The first person to register takes the
+        seeded organization if <code>pnpm db:seed</code> left one behind, and
+        everyone after that either creates their own or arrives by invitation.
+      </p>
+      <p>
+        Google, GitHub and GitLab are available on top of that, each off until
+        its credentials are present. Set both halves of a pair and the button
+        appears on the sign-in and sign-up pages.
+      </p>
+      <pre className="snippet">
+        <code>
+          <span className="k">GOOGLE_CLIENT_ID</span>=
+          <span className="s">…</span>
+          {'\n'}
+          <span className="k">GOOGLE_CLIENT_SECRET</span>=
+          <span className="s">…</span>
+          {'\n'}
+          <span className="k">GITHUB_CLIENT_ID</span>=
+          <span className="s">…</span>
+          {'\n'}
+          <span className="k">GITHUB_CLIENT_SECRET</span>=
+          <span className="s">…</span>
+          {'\n'}
+          <span className="k">GITLAB_CLIENT_ID</span>=
+          <span className="s">…</span>
+          {'\n'}
+          <span className="k">GITLAB_CLIENT_SECRET</span>=
+          <span className="s">…</span>
+          {'\n'}
+          <span className="k">GITLAB_ISSUER</span>=
+          <span className="s">https://gitlab.example.com</span>
+          {'   '}
+          <span className="c"># self-hosted GitLab only</span>
+        </code>
+      </pre>
+      <p>
+        Register the callback URL with each provider as{' '}
+        <code>BETTER_AUTH_URL</code> plus{' '}
+        <code>/api/auth/callback/&lt;provider&gt;</code> — so{' '}
+        <code>https://syncline.example.com/api/auth/callback/google</code>. A
+        provider with only half its credentials set stays off instead of
+        stopping startup, so a typo in an OAuth secret never takes down a
+        dashboard you can still reach with a password.
+      </p>
+      <div className="callout callout--warn">
+        <strong>
+          A password account and a social identity at the same address do not
+          merge.
+        </strong>{' '}
+        Nothing here sends mail, so a password account is never email-verified.
+        Linking one to an OAuth identity on the provider&rsquo;s word alone is
+        how account takeover works: anyone could register the address first and
+        wait. So signing in through a provider at an address that already has a
+        password is refused, and the page says to use the password instead.
+      </div>
+
       <h2 className="docs__h2">Sizing</h2>
       <p>
         rrweb chunks dominate storage — expect a few hundred KB per minute of an
@@ -232,13 +291,13 @@ export default function SelfHosting() {
         role on the server; hidden buttons are a courtesy, not the boundary.
       </p>
       <p>
-        Every one of those mutations is recorded in the <strong>audit log</strong>,
-        which owners and admins read from the sidebar: who changed a project,
-        rotated a key, dropped a search key, invited or removed or re-roled
-        somebody. Reads are not recorded — a log of who watched which recording
-        is a surveillance feature, and it would bury the entries that matter.
-        Entries outlive the projects and accounts they name, and the recording
-        retention window does not touch them.
+        Every one of those mutations is recorded in the{' '}
+        <strong>audit log</strong>, which owners and admins read from the
+        sidebar: who changed a project, rotated a key, dropped a search key,
+        invited or removed or re-roled somebody. Reads are not recorded — a log
+        of who watched which recording is a surveillance feature, and it would
+        bury the entries that matter. Entries outlive the projects and accounts
+        they name, and the recording retention window does not touch them.
       </p>
 
       <h2 className="docs__h2">Deleting a project</h2>
@@ -251,17 +310,17 @@ export default function SelfHosting() {
         not a retention policy.
       </p>
       <p>
-        The delay is deliberate. A project with a year of recordings is
-        hundreds of thousands of rows and as many objects, and deleting them
-        inside the request would time out partway through — leaving the rows
-        gone and their blobs stranded under keys nothing can reconstruct.
+        The delay is deliberate. A project with a year of recordings is hundreds
+        of thousands of rows and as many objects, and deleting them inside the
+        request would time out partway through — leaving the rows gone and their
+        blobs stranded under keys nothing can reconstruct.
       </p>
 
       <div className="callout callout--warn">
         <strong>What is still missing.</strong> No SSO, and no way to export a
-        project before deleting it. Put it behind a proxy that
-        terminates TLS: the session cookies are <code>secure</code>, so the
-        browser will not send them over plain HTTP.
+        project before deleting it. Put it behind a proxy that terminates TLS:
+        the session cookies are <code>secure</code>, so the browser will not
+        send them over plain HTTP.
       </div>
     </>
   );
